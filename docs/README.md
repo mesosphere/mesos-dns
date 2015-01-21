@@ -21,28 +21,28 @@ following the instructions.
 
     * On Linux:
 
-            $ apt-get install ruby-dev make autoconf nodejs nodejs-legacy python-dev
+            apt-get install ruby-dev make autoconf nodejs nodejs-legacy python-dev
     * On Mac OS X:
     
-            $ brew install node
+            brew install node
 
 2. Clone the Mesos-DNS repository
 
 3. Change into the "docs" directory where docs live
 
-        $ cd docs
+        cd docs
 
 4. Install Bundler
 
-        $ sudo gem install bundler
+        sudo gem install bundler
 
 5. Install the bundle's dependencies
 
-        $ bundle install
+        bundle install
 
 6. Start the web server
 
-        $ bundle exec jekyll serve --watch
+        bundle exec jekyll serve --watch
 
 7. Visit the site at
    [http://localhost:4000/mesos-dns/](http://localhost:4000/mesos-dns/)
@@ -52,21 +52,21 @@ following the instructions.
 1. Clone a separate copy of the Mesos-DNS repo as a sibling of your normal
    Mesos-DNS project directory and name it "mesos-dns-gh-pages".
 
-        $ git clone git@github.com:mesosphere/mesos-dns.git mesos-dns-gh-pages
+        git clone git@github.com:mesosphere/mesos-dns.git mesos-dns-gh-pages
 
 2. Check out the "gh-pages" branch.
 
-        $ cd /path/to/mesos-dns-gh-pages
-        $ git checkout -b gh-pages
+        cd /path/to/mesos-dns-gh-pages
+        git checkout -b gh-pages
 
 3. Copy the contents of the "docs" directory in master to the root of your
    mesos-dns-gh-pages directory.
 
-        $ cd /path/to/mesos-dns
-        $ cp -r docs/** ../mesos-dns-gh-pages
+        cd /path/to/mesos-dns
+        cp -r docs/** ../mesos-dns-gh-pages
 
 4. Change to the mesos-dns-gh-pages directory, commit, and push the changes
 
-        $ cd /path/to/mesos-dns-gh-pages
-        $ git commit . -m "Syncing docs with master branch"
-        $ git push
+        cd /path/to/mesos-dns-gh-pages
+        git commit . -m "Syncing docs with master branch"
+        git push
