@@ -57,7 +57,7 @@ following the instructions.
 2. Check out the "gh-pages" branch.
 
         $ cd /path/to/mesos-dns-gh-pages
-        $ git checkout gh-pages
+        $ git checkout -b gh-pages
 
 3. Copy the contents of the "docs" directory in master to the root of your
    mesos-dns-gh-pages directory.
