@@ -30,7 +30,7 @@ We have built and tested Mesos-DNS with `go` versions 1.3.3 and 1.4. Newer versi
 
 ### Running Mesos-DNS
 
-To run Mesos-DNS, you first need to install the `mesos-dns` binary somewhere a selected server. The server can be the same machine as one of the Mesos masters, one of the slaves, or a dedicated machine on the same network. Next, follow [these instructions](configuration-parameters.html) to create a configuration file for your cluster. You can launch Mesos-DNS with: 
+To run Mesos-DNS, you first need to install the `mesos-dns` binary somewhere on a selected server. The server can be the same machine as one of the Mesos masters, one of the slaves, or a dedicated machine on the same network. Next, follow [these instructions](configuration-parameters.html) to create a configuration file for your cluster. You can launch Mesos-DNS with: 
 
 ```
 sudo mesos-dns -config=config.json & 
@@ -48,7 +48,7 @@ For fault tolerance, we ***recommend*** that you use [Marathon](https://mesosphe
 "constraints": [["hostname", "CLUSTER", "10.181.64.13"]]
 }
 ```
-Note that the `hostname` field refers to the hostname used by the slave when it registers with Mesos. It may not be an IP address or a valid hostname of any kind. You can inspect the hostnames and attributes of slaves on a Mesos through the master web interface. For instance, you can access the `state` REST endpoint with:
+Note that the `hostname` field refers to the hostname used by the slave when it registers with Mesos. It may not be an IP address or a valid hostname of any kind. You can inspect the hostnames and attributes of slaves on a Mesos cluster through the master web interface. For instance, you can access the `state` REST endpoint with:
 
 ```
 curl http://master_hostname:5050/master/state.json | python -mjson.tool
@@ -56,7 +56,7 @@ curl http://master_hostname:5050/master/state.json | python -mjson.tool
 
 ### Slave Setup
 
-To allow Mesos tasks to use Mesos-DNS as the primary DNS server, you must edit the file `/etc/resolv.conf` and add a new nameserver. For instance, if `mesos-dns` runs on the server with IP address `10.181.64.13`, you should add the line `nameserver 10.181.64.13` at the ***beginning*** of `/etc/resolv.conf` of every slave node. This can be achieve by running:
+To allow Mesos tasks to use Mesos-DNS as the primary DNS server, you must edit the file `/etc/resolv.conf` and add a new nameserver. For instance, if `mesos-dns` runs on the server with IP address `10.181.64.13`, you should add the line `nameserver 10.181.64.13` at the ***beginning*** of `/etc/resolv.conf` on every slave node. This can be achieve by running:
 
 ```
 sudo sed -i 'nameserver 10.181.64.13' /etc/resolv.conf

@@ -4,7 +4,7 @@ title: Mesos-DNS Configuration Parameters
 
 ##  Mesos-DNS Configuration Parameters
 
-Mesos-DNS is configured through the parameters in a json file. You can point Mesos-DNS to a specific configuration file using the argument `-config=pathto/file.json`. If not configuration file is passed as an argument, Mesos-DNS will look for file `config.json` in the current directory. 
+Mesos-DNS is configured through the parameters in a json file. You can point Mesos-DNS to a specific configuration file using the argument `-config=pathto/file.json`. If no configuration file is passed as an argument, Mesos-DNS will look for file `config.json` in the current directory. 
 
 The configuration file should include the following fields:
 
@@ -27,9 +27,9 @@ The configuration file should include the following fields:
 
 `ttl` is the [time to live](http://en.wikipedia.org/wiki/Time_to_live#DNS_records) value for DNS records served by Mesos-DNS, in seconds. It allows caching of the DNS record for a period of time in order to reduce DNS request rate. `ttl` should be equal or larger than `refreshSeconds`. The default value is 60 seconds. 
 
-`domain` is the domain name for the Mesos cluster. The domain name can use characters [a-z, A-Z, 0-9], `-` if it is not the first or last character of a domain portion, and `.` as a separator of the textual portions of the domain name. We recommend you avoid valid [top-level domain names](http://en.wikipedia.org/wiki/List_of_Internet_top-level_domains). The dafault value is `mesos`.
+`domain` is the domain name for the Mesos cluster. The domain name can use characters [a-z, A-Z, 0-9], `-` if it is not the first or last character of a domain portion, and `.` as a separator of the textual portions of the domain name. We recommend you avoid valid [top-level domain names](http://en.wikipedia.org/wiki/List_of_Internet_top-level_domains). The default value is `mesos`.
 
-`port` is the port number that Mesos-DNS monitors for incoming DNS requests from slaves. Requests can be send over TCP or UDP. We recommend you use port `53` as several applications assume that the DNS server listens to this port. The default value is `53`.
+`port` is the port number that Mesos-DNS monitors for incoming DNS requests from slaves. Requests can be sent over TCP or UDP. We recommend you use port `53` as several applications assume that the DNS server listens to this port. The default value is `53`.
 
 `resolvers` is a comma separated list with the IP addresses of external DNS servers that Mesos-DNS will contact to resolve any DNS requests outside the `domain`. For example, you can list the nameservers specified in the `/etc/resolv.conf` on the server Mesos-DNS is running or `8.8.8.8`, which is the [Google public DNS](https://developers.google.com/speed/public-dns/) address. The `resolvers` field is required. 
  
