@@ -31,6 +31,6 @@ The configuration file should include the following fields:
 
 `port` is the port number that Mesos-DNS monitors for incoming DNS requests from slaves. Requests can be sent over TCP or UDP. We recommend you use port `53` as several applications assume that the DNS server listens to this port. The default value is `53`.
 
-`resolvers` is a comma separated list with the IP addresses of external DNS servers that Mesos-DNS will contact to resolve any DNS requests outside the `domain`. For example, you can list the nameservers specified in the `/etc/resolv.conf` on the server Mesos-DNS is running or `8.8.8.8`, which is the [Google public DNS](https://developers.google.com/speed/public-dns/) address. The `resolvers` field is required. 
+`resolvers` is a comma separated list with the IP addresses of external DNS servers that Mesos-DNS will contact to resolve any DNS requests outside the `domain`. We ***recommend*** that you list the nameservers specified in the `/etc/resolv.conf` on the server Mesos-DNS is running. Alternatively, you can list `8.8.8.8`, which is the [Google public DNS](https://developers.google.com/speed/public-dns/) address. The `resolvers` field is required. 
  
 `timeout` is the timeout threshold, in seconds, for connections and requests to external DNS requests. The default value is 5 seconds. 
