@@ -56,12 +56,10 @@ curl http://master_hostname:5050/master/state.json | python -mjson.tool
 
 ### Slave Setup
 
-To allow Mesos tasks to use Mesos-DNS as the primary DNS server, you must edit the file `/etc/resolv.conf` and add a new nameserver. For instance, if `mesos-dns` runs on the server with IP address `10.181.64.13`, you should add the line `nameserver 10.181.64.13` at the ***beginning*** of `/etc/resolv.conf` on every slave node. This can be achieve by running:
+To allow Mesos tasks to use Mesos-DNS as the primary DNS server, you must edit the file `/etc/resolv.conf` in every slave and add a new nameserver. For instance, if `mesos-dns` runs on the server with IP address `10.181.64.13`, you should add the line `nameserver 10.181.64.13` at the ***beginning*** of `/etc/resolv.conf` on every slave node. This can be achieve by running:
 
 ```
-sudo sed -i 'nameserver 10.181.64.13' /etc/resolv.conf
+sudo sed -i '1s/^/nameserver 10.181.64.13\n /' /etc/resolv.conf
 ```
 
-If multiple instances of Mesos-DNS are launched, add a nameserver line for each one at the beginning of `/etc/resolv.conf`. The order of these entries determines the order that the slave will use to contact Mesos-DNS instances. 
-
-All other nameserver settings in `/etc/resolv.conf` should remain unchanged. 
+If multiple instances of Mesos-DNS are launched, add a nameserver line for each one at the beginning of `/etc/resolv.conf`. The order of these entries determines the order that the slave will use to contact Mesos-DNS instances. All other nameserver settings in `/etc/resolv.conf` should remain unchanged. The `/etc/resolv.conf` file in the masters should only change if the master machines are also used as slaves. 
