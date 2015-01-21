@@ -126,6 +126,27 @@ func (res *Resolver) formatA(dom string, target string) (*dns.A, error) {
 	}
 }
 
+// formatSOA returns the SOA resource record for the mesos domain
+func (res *Resolver) formatSOA(dom string) (*dns.SOA, error) {
+	ttl := uint32(res.Config.TTL)
+
+	return &dns.SOA{
+		Hdr: dns.RR_Header{
+			Name:   dom,
+			Rrtype: dns.TypeSOA,
+			Class:  dns.ClassINET,
+			Ttl:    ttl,
+		},
+		Ns:      "ns" + "." + res.Config.Domain + ".",
+		Mbox:    "postmaster." + res.Config.Domain + ".",
+		Serial:  uint32(time.Now().Unix()),
+		Refresh: ttl,
+		Retry:   600,
+		Expire:  86400,
+		Minttl:  ttl,
+	}, nil
+}
+
 // shuffleAnswers reorders answers for very basic load balancing
 func shuffleAnswers(answers []dns.RR) []dns.RR {
 	rand.Seed(time.Now().UTC().UnixNano())
@@ -178,6 +199,7 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 		logging.CurLog.NonMesosFailed += 1
 	} else {
 
+		// nxdomain
 		if len(m.Answer) == 0 {
 			logging.CurLog.NonMesosNXDomain += 1
 		} else {
@@ -249,6 +271,18 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 			}
 		}
 
+	} else if qType == dns.TypeSOA {
+
+		m = new(dns.Msg)
+		m.SetReply(r)
+
+		rr, err := res.formatSOA(r.Question[0].Name)
+		if err != nil {
+			logging.Error.Println(err)
+		} else {
+			m.Ns = append(m.Ns, rr)
+		}
+
 	}
 
 	// shuffle answers
@@ -260,7 +294,22 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	if err != nil {
 		logging.CurLog.MesosFailed += 1
 	} else {
-		if len(m.Answer) == 0 {
+		// no answers but not a {SOA,SRV} request
+		if len(m.Answer) == 0 && (qType != dns.TypeSOA) && (qType != dns.TypeSRV) {
+
+			m = new(dns.Msg)
+			m.SetReply(r)
+
+			// set NXDOMAIN
+			m.SetRcode(r, 3)
+
+			rr, err := res.formatSOA(r.Question[0].Name)
+			if err != nil {
+				logging.Error.Println(err)
+			} else {
+				m.Ns = append(m.Ns, rr)
+			}
+
 			logging.CurLog.MesosNXDomain += 1
 			logging.Error.Println("total A rrs:\t" + strconv.Itoa(len(res.rs.As)))
 			logging.Error.Println("failed looking for " + r.Question[0].String())

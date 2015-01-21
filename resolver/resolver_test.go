@@ -102,7 +102,7 @@ func fakeDNS(port int) (Resolver, error) {
 	return res, nil
 }
 
-func fakeQuery(dom string, rrHeader uint16, proto string) ([]dns.RR, error) {
+func fakeMsg(dom string, rrHeader uint16, proto string) (*dns.Msg, error) {
 	qc := uint16(dns.ClassINET)
 
 	c := new(dns.Client)
@@ -113,6 +113,12 @@ func fakeQuery(dom string, rrHeader uint16, proto string) ([]dns.RR, error) {
 	m.Question[0] = dns.Question{dns.Fqdn(dom), rrHeader, qc}
 
 	in, _, err := c.Exchange(m, "127.0.0.1:8053")
+	return in, err
+
+}
+
+func fakeQuery(dom string, rrHeader uint16, proto string) ([]dns.RR, error) {
+	in, err := fakeMsg(dom, rrHeader, proto)
 	if err != nil {
 		return in.Answer, err
 	}
@@ -153,6 +159,26 @@ func TestHandler(t *testing.T) {
 
 	if len(msg) != 2 {
 		t.Error("not serving up SRV records")
+	}
+
+	// test SOA
+	m, err2 := fakeMsg("non-existing.mesos.", dns.TypeSOA, "udp")
+	if err2 != nil {
+		t.Error(err2)
+	}
+
+	if m.Ns == nil {
+		t.Error("not serving up SOA")
+	}
+
+	// test non-existing host
+	m, err = fakeMsg("missing.mesos.", dns.TypeA, "udp")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if m.Rcode != 3 {
+		t.Error("not setting NXDOMAIN")
 	}
 
 	// test tcp
