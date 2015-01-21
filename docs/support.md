@@ -15,5 +15,5 @@ You can report issues and bugs at the [Mesos-DNS github repository](https://gith
 
 ### Mesos Community
 
-You can get advise on Mesos and Mesos-related projects from the [Apache Mesos irc channel and mailing lists](http://mesos.apache.org/community/). 
+You can get advice on Mesos and Mesos-related projects from the [Apache Mesos IRC channel and mailing lists](http://mesos.apache.org/community/). 
 

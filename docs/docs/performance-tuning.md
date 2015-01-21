@@ -4,7 +4,7 @@ title: Mesos-DNS Performance Tuning
 
 ## Mesos-DNS Performance Tuning
 
-Mesos-DNS is light-weight and can achieve high throughput with a small ammount of resources. For example, our benchmarking on [Google cloud platform](https://cloud.google.com/) shows that, using a single core of an `n1-standard-2` instance, it can serve up to 8.5K queries/second for lookups in the Mesos cluster domain. For many use cases, this should be sufficiently performant. 
+Mesos-DNS is light-weight and can achieve high throughput with a small amount of resources. For example, our benchmarking on [Google Cloud Platform](https://cloud.google.com/) shows that, using a single core of an `n1-standard-2` instance, it can serve up to 8.5K queries/second for lookups in the Mesos cluster domain. For many use cases, this should be sufficiently performant. 
 
 The following are suggestions for further performance tuning, focusing primarily on Linux systems. 
 
@@ -19,7 +19,7 @@ GOMAXPROCS=8 mesos-dns
 If a single Mesos-DNS server cannot meet the performance requirements in a very large cluster, you can bring up multiple Mesos-DNS servers and configure a subset of the slaves to use each Mesos-DNS server. All Mesos-DNS servers will serve the same settings derived from the Mesos master state. 
 
 
-You should also increase the shell limits the maximum number of file descriptors and processes. Use `ulimit -a` to check the current settings and, if needed, increase them by executing the following shell commands before launching Mesos-DNS.
+You should also increase the shell limits for the maximum number of file descriptors and processes. Use `ulimit -a` to check the current settings and, if needed, increase them by executing the following shell commands before launching Mesos-DNS.
 
 ```
 ulimit -n 65536
