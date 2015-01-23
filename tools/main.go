@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/miekg/dns"
 	"log"
 	"time"
+
+	"github.com/miekg/dns"
 )
 
 func query(dom string) {
-
 	nameserver := "127.0.0.1:8053"
 
 	qt := dns.TypeA
@@ -22,16 +22,12 @@ func query(dom string) {
 	m.Question[0] = dns.Question{dns.Fqdn(dom), qt, qc}
 
 	_, _, err := c.Exchange(m, nameserver)
-	// fmt.Println(rtt)
 	if err != nil {
 		fmt.Println(err)
 	}
-
-	// fmt.Println(in)
 }
 
 func main() {
-
 	start := time.Now()
 
 	cnt := 10000

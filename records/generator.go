@@ -5,11 +5,12 @@ package records
 import (
 	"encoding/json"
 	"errors"
-	"github.com/mesosphere/mesos-dns/logging"
 	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/mesosphere/mesos-dns/logging"
 )
 
 // rrs is a type of question names to resource records answers
@@ -74,7 +75,6 @@ func (rg *RecordGenerator) hostBySlaveId(slaveId string) (string, error) {
 
 // loadFromMaster loads state.json from mesos master
 func (rg *RecordGenerator) loadFromMaster(ip string, port string) (sj StateJSON) {
-
 	// tls ?
 	url := "http://" + ip + ":" + port + "/master/state.json"
 
@@ -189,7 +189,6 @@ func getProto(pair string) (string, string, error) {
 // it also tries different mesos masters if one is not up
 // this will shudown if it can't connect to a mesos master
 func (rg *RecordGenerator) ParseState(config Config) {
-
 	// try each listed mesos master before dying
 	sj, err := rg.findMaster(config.Masters)
 	if err != nil {
@@ -207,7 +206,6 @@ func cleanName(tname string) string {
 
 // stripInvalid remove any non-valid hostname characters
 func stripInvalid(tname string) string {
-
 	reg, err := regexp.Compile("[^\\w-.\\.]")
 	if err != nil {
 		logging.Error.Println(err)
@@ -274,7 +272,6 @@ func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
 	logging.Verbose.Println("[" + rtype + "]\t" + name + ": " + host)
 
 	if rtype == "A" {
-
 		if val, ok := rg.As[name]; ok {
 
 			h := stripHost(host)
@@ -288,14 +285,11 @@ func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
 		} else {
 			rg.As[name] = []string{host}
 		}
-
 	} else {
-
 		if val, ok := rg.SRVs[name]; ok {
 			rg.SRVs[name] = append(val, host)
 		} else {
 			rg.SRVs[name] = []string{host}
 		}
 	}
-
 }
