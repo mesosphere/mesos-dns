@@ -100,7 +100,7 @@ Launch Mesos-DNS using:
 curl -X POST -H "Content-Type: application/json" http://10.41.40.151:8080/v2/apps -d@mesos-dns.json
 ```
 
-This command instructs Marathon to launch Mesos-DNS on node `10.14.245.208`. The `-v` option allows you to capture detailed warning/error logs for Mesos-DNS that may be useful for debugging. You can access the `stdout` and `stderr` for Mesos-DNS through the Mesos webUI, accessible through `http://10.41.40.151:5050` in this example. 
+This command instructs Marathon to launch Mesos-DNS on node `10.14.245.208`. The `-v` option allows you to capture detailed warning/error logs for Mesos-DNS that may be useful for debugging. For example, Mesos-DNS will now periodically print in `stdout` information about all the A and SRV records it servers. This can be useful if you are not sure about how tasks and frameworks are named in your setup. You can access the `stdout` and `stderr` for Mesos-DNS through the Mesos webUI, accessible through `http://10.41.40.151:5050` in this example. 
 
 ### Step 4: Configure cluster nodes
 
