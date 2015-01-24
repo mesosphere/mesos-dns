@@ -228,6 +228,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string) error {
 	// complete crap - refactor me
 	for i := 0; i < len(f); i++ {
 		fname := f[i].Name
+		fname = cleanName(fname)
 
 		for x := 0; x < len(f[i].Tasks); x++ {
 			task := f[i].Tasks[x]
