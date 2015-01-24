@@ -4,14 +4,16 @@ package resolver
 
 import (
 	"errors"
-	"github.com/mesosphere/mesos-dns/logging"
-	"github.com/mesosphere/mesos-dns/records"
-	"github.com/miekg/dns"
 	"math/rand"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/records"
+
+	"github.com/miekg/dns"
 )
 
 var (
@@ -21,7 +23,6 @@ var (
 // resolveOut queries other nameserver
 // randomly picks from the list that is not mesos
 func (res *Resolver) resolveOut(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
-
 	var in *dns.Msg
 	var err error
 
@@ -112,7 +113,6 @@ func (res *Resolver) formatA(dom string, target string) (*dns.A, error) {
 	if err != nil {
 		return nil, err
 	} else {
-
 		a := ip.IP
 
 		return &dns.A{
@@ -227,8 +227,8 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	m.RecursionAvailable = true
 	m.SetReply(r)
 
-	if qType == dns.TypeSRV {
-
+	switch qType {
+	case dns.TypeSRV:
 		for i := 0; i < len(res.rs.SRVs[dom]); i++ {
 			rr, err := res.formatSRV(r.Question[0].Name, res.rs.SRVs[dom][i])
 			if err != nil {
@@ -237,9 +237,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 				m.Answer = append(m.Answer, rr)
 			}
 		}
-
-	} else if qType == dns.TypeA {
-
+	case dns.TypeA:
 		for i := 0; i < len(res.rs.As[dom]); i++ {
 			rr, err := res.formatA(dom, res.rs.As[dom][i])
 			if err != nil {
@@ -249,9 +247,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 			}
 
 		}
-
-	} else if qType == dns.TypeANY {
-
+	case dns.TypeANY:
 		// refactor me
 		for i := 0; i < len(res.rs.As[dom]); i++ {
 			rr, err := res.formatA(r.Question[0].Name, res.rs.As[dom][i])
@@ -271,7 +267,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 			}
 		}
 
-	} else if qType == dns.TypeSOA {
+	case dns.TypeSOA:
 
 		m = new(dns.Msg)
 		m.SetReply(r)
@@ -326,11 +322,11 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 
 // Serve starts a dns server for net protocol
 func (res *Resolver) Serve(net string) {
-
 	server := &dns.Server{
 		Addr:       res.Config.Listener + ":" + strconv.Itoa(res.Config.Port),
 		Net:        net,
-		TsigSecret: nil}
+		TsigSecret: nil,
+	}
 
 	err := server.ListenAndServe()
 	if err != nil {

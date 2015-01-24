@@ -2,14 +2,15 @@ package records
 
 import (
 	"encoding/json"
-	"github.com/mesosphere/mesos-dns/logging"
-	"github.com/miekg/dns"
 	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/miekg/dns"
 )
 
 // Config holds mesos dns configuration
@@ -154,7 +155,6 @@ func nonLocalAddies(cservers []string) []string {
 		if !local {
 			good = append(good, cservers[i])
 		}
-
 	}
 
 	return good

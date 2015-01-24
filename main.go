@@ -2,12 +2,14 @@ package main
 
 import (
 	"flag"
+	"sync"
+	"time"
+
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/resolver"
+
 	"github.com/miekg/dns"
-	"sync"
-	"time"
 )
 
 func main() {
