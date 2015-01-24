@@ -137,8 +137,8 @@ func (res *Resolver) formatSOA(dom string) (*dns.SOA, error) {
 			Class:  dns.ClassINET,
 			Ttl:    ttl,
 		},
-		Ns:      "ns" + "." + res.Config.Domain + ".",
-		Mbox:    "postmaster." + res.Config.Domain + ".",
+		Ns:      res.Config.Mname,
+		Mbox:    res.Config.Email,
 		Serial:  uint32(time.Now().Unix()),
 		Refresh: ttl,
 		Retry:   600,
@@ -328,7 +328,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 func (res *Resolver) Serve(net string) {
 
 	server := &dns.Server{
-		Addr:       ":" + strconv.Itoa(res.Config.Port),
+		Addr:       res.Config.Listener + ":" + strconv.Itoa(res.Config.Port),
 		Net:        net,
 		TsigSecret: nil}
 

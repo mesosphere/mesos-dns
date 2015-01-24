@@ -83,6 +83,9 @@ func fakeDNS(port int) (Resolver, error) {
 		Port:      port,
 		Domain:    "mesos",
 		Resolvers: records.GetLocalDNS(),
+		Listener:  "127.0.0.1",
+		Email:     "root.mesos-dns.mesos.",
+		Mname:     "mesos-dns.mesos.",
 	}
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
@@ -97,7 +100,7 @@ func fakeDNS(port int) (Resolver, error) {
 	}
 
 	res.rs = records.RecordGenerator{}
-	res.rs.InsertState(sj, "mesos")
+	res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1")
 
 	return res, nil
 }

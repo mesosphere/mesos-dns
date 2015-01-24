@@ -95,7 +95,7 @@ func TestInsertState(t *testing.T) {
 	}
 
 	rg := RecordGenerator{}
-	rg.InsertState(sj, "mesos")
+	rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1")
 
 	// ensure we are only collecting running tasks
 	_, ok := rg.SRVs["_poseidon._tcp.marathon-0.6.0.mesos."]
@@ -118,8 +118,8 @@ func TestInsertState(t *testing.T) {
 		t.Error("not enough SRVs")
 	}
 
-	// test for 3 A names
-	if len(rg.As) != 3 {
+	// test for 3 A names + at least one for mesos-dns
+	if len(rg.As) < 3 {
 		t.Error("not enough As")
 	}
 

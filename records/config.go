@@ -39,6 +39,15 @@ type Config struct {
 
 	// File is the location of the config.json file
 	File string
+
+	// Email is the rname for a SOA
+	Email string
+
+	// Mname is the mname for a SOA
+	Mname string
+
+	// ListenAddr is the server listener address
+	Listener string
 }
 
 // SetConfig instantiates a Config struct read in from config.json
@@ -49,7 +58,9 @@ func SetConfig(cjson string) (c Config) {
 		Domain:         "mesos",
 		Port:           53,
 		Timeout:        5,
+		Email:          "root.mesos-dns.mesos",
 		Resolvers:      []string{"8.8.8.8"},
+		Listener:       "0.0.0.0",
 	}
 
 	usr, _ := user.Current()
@@ -82,14 +93,23 @@ func SetConfig(cjson string) (c Config) {
 		os.Exit(1)
 	}
 
-    logging.Verbose.Println("Mesos-DNS configuration:")
-    logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters,", "))
-    logging.Verbose.Println("   - RefreshSeconds: ", c.RefreshSeconds)
-    logging.Verbose.Println("   - TTL: ", c.TTL)
-    logging.Verbose.Println("   - Domain: " + c.Domain)
-    logging.Verbose.Println("   - Port: ", c.Port)
-    logging.Verbose.Println("   - Timeout: ",  c.Timeout)
-    logging.Verbose.Println("   - Resolvers: " + strings.Join(c.Resolvers,", "))
+	c.Email = strings.Replace(c.Email, "@", ".", -1)
+	if c.Email[len(c.Email)-1:] != "." {
+		c.Email = c.Email + "."
+	}
+
+	c.Mname = "mesos-dns." + c.Domain + "."
+
+	logging.Verbose.Println("Mesos-DNS configuration:")
+	logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
+	logging.Verbose.Println("   - RefreshSeconds: ", c.RefreshSeconds)
+	logging.Verbose.Println("   - TTL: ", c.TTL)
+	logging.Verbose.Println("   - Domain: " + c.Domain)
+	logging.Verbose.Println("   - Port: ", c.Port)
+	logging.Verbose.Println("   - Timeout: ", c.Timeout)
+	logging.Verbose.Println("   - Resolvers: " + strings.Join(c.Resolvers, ", "))
+	logging.Verbose.Println("   - Email: " + c.Email)
+	logging.Verbose.Println("   - Mname: " + c.Mname)
 
 	return c
 }
