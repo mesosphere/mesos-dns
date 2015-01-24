@@ -92,7 +92,7 @@
             "failover_timeout": 1200,
             "hostname": "socket.net",
             "id": "20140703-014514-3041283216-5050-5348-0001",
-            "name": "chronos-2.0.1",
+            "name": "chronos with a space -2.0.1",
             "offers": [],
             "registered_time": 1414913537.10742,
             "reregistered_time": 1414913537.10744,
@@ -102,7 +102,28 @@
                 "mem": 0
             },
             "role": "*",
-            "tasks": [],
+            "tasks": [
+              {
+                  "executor_id": "",
+                  "framework_id": "20140703-014514-3041283216-5050-5348-000",
+                  "id": "some-box.b8db9f73-562f-11e4-a088-c20493233aa5",
+                  "name": "some-box",
+                  "resources": {
+                      "cpus": 1,
+                      "disk": 0,
+                      "mem": 1024,
+                      "ports": "[31354-31354]"
+                  },
+                  "slave_id": "20140803-125133-3041283216-5050-2410-0",
+                  "state": "TASK_RUNNING",
+                  "statuses": [
+                      {
+                          "state": "TASK_RUNNING",
+                          "timestamp": 1413572390.09275
+                      }
+                  ]
+              }
+            ],
             "unregistered_time": 0,
             "user": "root"
         },

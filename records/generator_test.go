@@ -113,14 +113,20 @@ func TestInsertState(t *testing.T) {
 		t.Error("should not find this not-running task - A record")
 	}
 
-	// test for 6 SRV names
-	if len(rg.SRVs) != 6 {
+	// test for 8 SRV names
+	if len(rg.SRVs) != 8 {
 		t.Error("not enough SRVs")
 	}
 
-	// test for 3 A names
-	if len(rg.As) != 3 {
+	// test for 4 A names
+	if len(rg.As) != 4 {
 		t.Error("not enough As")
+	}
+
+	// ensure we translate the framework name as well
+	_, ok = rg.As["some-box.chronoswithaspace-2.0.1.mesos."]
+	if !ok {
+		t.Error("should find this task w/a space in the framework name - A record")
 	}
 
 	// ensure we find this SRV
