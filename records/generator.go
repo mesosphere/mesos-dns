@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -196,7 +197,7 @@ func (rg *RecordGenerator) ParseState(config Config) {
 		return
 	}
 
-	rg.InsertState(sj, config.Domain)
+	rg.InsertState(sj, config.Domain, config.Mname, config.Listener)
 }
 
 // cleanName sanitizes invalid characters
@@ -217,7 +218,7 @@ func stripInvalid(tname string) string {
 }
 
 // InsertState transforms a StateJSON into RecordGenerator RRs
-func (rg *RecordGenerator) InsertState(sj StateJSON, domain string) error {
+func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string, listener string) error {
 	rg.Slaves = sj.Slaves
 
 	rg.SRVs = make(rrs)
@@ -260,7 +261,63 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string) error {
 		}
 	}
 
+	rg.listenerRecord(listener, mname)
+
 	return nil
+}
+
+// listenerRecord sets the A record for the mesos-dns server in case
+// there is a request for it's hostname (eg: from SOA mname)
+func (rg *RecordGenerator) listenerRecord(listener string, mname string) {
+	if listener == "0.0.0.0" {
+		rg.setFromLocal(listener, mname)
+	} else if listener == "127.0.0.1" {
+		rg.insertRR(mname, "127.0.0.1", "A")
+	} else {
+		rg.insertRR(mname, listener, "A")
+	}
+}
+
+// setFromLocal generates A records for each local interface we are
+// listening on - if this causes problems you should explicitly set the
+// listener address in config.json
+func (rg *RecordGenerator) setFromLocal(host string, mname string) {
+
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		logging.Error.Println(err)
+	}
+
+	// handle err
+	for _, i := range ifaces {
+
+		addrs, err := i.Addrs()
+		if err != nil {
+			logging.Error.Println(err)
+		}
+
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+
+			if ip == nil || ip.IsLoopback() {
+				continue
+			}
+
+			ip = ip.To4()
+			if ip == nil {
+				continue
+			}
+
+			rg.insertRR(mname, ip.String(), "A")
+		}
+
+	}
 }
 
 func stripHost(hostip string) string {
