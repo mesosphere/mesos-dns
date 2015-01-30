@@ -4,14 +4,13 @@ package resolver
 
 import (
 	"errors"
+	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/records"
 	"math/rand"
 	"net"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/mesosphere/mesos-dns/logging"
-	"github.com/mesosphere/mesos-dns/records"
 
 	"github.com/miekg/dns"
 )
@@ -110,6 +109,7 @@ func (res *Resolver) formatA(dom string, target string) (*dns.A, error) {
 	h, _ := res.splitDomain(target)
 
 	ip, err := net.ResolveIPAddr("ip4", h)
+
 	if err != nil {
 		return nil, err
 	} else {
