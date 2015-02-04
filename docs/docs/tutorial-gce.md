@@ -65,7 +65,8 @@ $ cat /usr/local/mesos-dns/config.json
   "domain": "mesos",
   "port": 53,
   "resolvers": ["169.254.169.254","10.0.0.1"],
-  "timeout": 5
+  "timeout": 5,
+  "email": "root.mesos-dns.mesos"
 }
 ```
 The `resolvers` field includes the two nameservers listed in the `/etc/resolv.conf` of the nodes in this cluster. 
