@@ -15,8 +15,10 @@ The configuration file should include the following fields:
   "ttl": 60,
   "domain": "mesos",
   "port": 53,
-  "resolvers": ["169.254.169.254"]
-  "timeout": 5
+  "resolvers": ["169.254.169.254"],
+  "timeout": 5, 
+  "listener": "10.101.160.16",
+  "email": "root.mesos-dns.mesos"
 }
 ```
 
