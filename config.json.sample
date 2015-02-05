@@ -6,5 +6,6 @@
   "port": 8053,
   "resolvers": ["8.8.8.8"],
   "timeout": 5,
+  "listener": "0.0.0.0",
   "email": "root.mesos-dns.mesos"
 }
