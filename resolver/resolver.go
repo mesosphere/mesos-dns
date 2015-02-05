@@ -4,14 +4,13 @@ package resolver
 
 import (
 	"errors"
+	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/records"
 	"math/rand"
 	"net"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/mesosphere/mesos-dns/logging"
-	"github.com/mesosphere/mesos-dns/records"
 
 	"github.com/miekg/dns"
 )
@@ -39,9 +38,12 @@ func (res *Resolver) resolveOut(r *dns.Msg, nameserver string, proto string, cnt
 	c.WriteTimeout = t
 
 	in, _, err = c.Exchange(r, nameserver)
+	if err != nil {
+		return in, err
+	}
 
 	// recurse
-	if in != nil && len(in.Answer) == 0 && !in.MsgHdr.Authoritative && len(in.Ns) > 0 {
+	if (in != nil) && (len(in.Answer) == 0) && (!in.MsgHdr.Authoritative) && (len(in.Ns) > 0) && (err != nil) {
 
 		if cnt == recurseCnt {
 			logging.CurLog.NonMesosRecursed += 1
@@ -110,6 +112,7 @@ func (res *Resolver) formatA(dom string, target string) (*dns.A, error) {
 	h, _ := res.splitDomain(target)
 
 	ip, err := net.ResolveIPAddr("ip4", h)
+
 	if err != nil {
 		return nil, err
 	} else {
@@ -307,8 +310,8 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 			}
 
 			logging.CurLog.MesosNXDomain += 1
-			logging.Error.Println("total A rrs:\t" + strconv.Itoa(len(res.rs.As)))
-			logging.Error.Println("failed looking for " + r.Question[0].String())
+			logging.Verbose.Println("total A rrs:\t" + strconv.Itoa(len(res.rs.As)))
+			logging.Verbose.Println("failed looking for " + r.Question[0].String())
 		} else {
 			logging.CurLog.MesosSuccess += 1
 		}
