@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -12,13 +14,25 @@ import (
 	"github.com/miekg/dns"
 )
 
+var (
+	version = "0.1"
+)
+
 func main() {
 	var wg sync.WaitGroup
 	var resolver resolver.Resolver
 
+	versionFlag := false
+
 	cjson := flag.String("config", "config.json", "location of configuration file (json)")
 	flag.BoolVar(&logging.VerboseFlag, "v", false, "increase the verbosity level")
+	flag.BoolVar(&versionFlag, "version", false, "output the version")
 	flag.Parse()
+
+	if versionFlag {
+		fmt.Println(version)
+		os.Exit(0)
+	}
 
 	logging.SetupLogs()
 
