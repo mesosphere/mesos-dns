@@ -14,10 +14,6 @@ import (
 	"github.com/miekg/dns"
 )
 
-var (
-	version = "0.1"
-)
-
 func main() {
 	var wg sync.WaitGroup
 	var resolver resolver.Resolver
