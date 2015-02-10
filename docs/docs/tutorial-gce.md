@@ -171,10 +171,10 @@ Now let's launch a task using Mesos. We will use the nginx webserver using Marat
 ssh jclouds@10.41.40.151
 ```
 
-First, create a configuration file for ngix named `ngix.json`:
+First, create a configuration file for nginx named `nginx.json`:
 
 ```
-$ cat ngix.json 
+$ cat nginx.json
 {
   "id": "nginx",
   "container": {
@@ -186,14 +186,20 @@ $ cat ngix.json
   },
   "instances": 1,
   "cpus": 1,
-  "mem": 640
+  "mem": 640,
+  "constraints": [
+    [
+      "hostname",
+      "UNIQUE"
+    ]
+  ]
 }
 ```
 
 You can launch it on Mesos using: 
 
 ```
-curl -X POST -H "Content-Type: application/json" http://10.41.40.151:8080/v2/apps -d@ngix.json
+curl -X POST -H "Content-Type: application/json" http://10.41.40.151:8080/v2/apps -d@nginx.json
 ```
 
 This will launch nginx on one of the three slaves using docker and host networking. You can use the Marathon webUI to verify it is running without problems. It turns out that Mesos launched it on node `10.114.227.92` and we can verify it works using:
