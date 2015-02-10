@@ -186,7 +186,13 @@ $ cat nginx.json
   },
   "instances": 1,
   "cpus": 1,
-  "mem": 640
+  "mem": 640,
+  "constraints": [
+    [
+      "hostname",
+      "UNIQUE"
+    ]
+  ]
 }
 ```
 
