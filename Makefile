@@ -18,7 +18,7 @@ format: deps
 
 build: deps
 	@echo "--> Building mesos-dns"
-	@go build -o mesos-dns main.go
+	@go build -o mesos-dns
 
 test: deps
 	@go test ./...
