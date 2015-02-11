@@ -20,7 +20,7 @@ To build Mesos-DNS using `go`:
 go get github.com/miekg/dns
 go get github.com/mesosphere/mesos-dns
 cd $GOPATH/src/github.com/mesosphere/mesos-dns
-go build -o mesos-dns main.go
+go build -o mesos-dns 
 ``` 
 
 `mesos-dns` is a statically-linked binary that can be installed anywhere. You will find a sample configuration file `config.json` in the same directory. 

@@ -49,7 +49,7 @@ Now, we are ready to compile Mesos-DNS:
 go get github.com/miekg/dns
 go get github.com/mesosphere/mesos-dns
 cd $GOPATH/src/github.com/mesosphere/mesos-dns
-go build -o mesos-dns main.go
+go build -o mesos-dns
 sudo mkdir /usr/local/mesos-dns
 sudo mv mesos-dns /usr/local/mesos-dns
 ```
