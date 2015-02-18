@@ -108,6 +108,7 @@ func SetConfig(cjson string) (c Config) {
 	logging.Verbose.Println("   - Domain: " + c.Domain)
 	logging.Verbose.Println("   - Port: ", c.Port)
 	logging.Verbose.Println("   - Timeout: ", c.Timeout)
+	logging.Verbose.Println("   - Listener: " + c.Listener)
 	logging.Verbose.Println("   - Resolvers: " + strings.Join(c.Resolvers, ", "))
 	logging.Verbose.Println("   - Email: " + c.Email)
 	logging.Verbose.Println("   - Mname: " + c.Mname)
