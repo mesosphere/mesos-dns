@@ -134,12 +134,21 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 	return sj, err
 }
 
-// yankPort grabs the first port in the port field
-// this takes a string even though it should take an array
-func yankPort(ports string) string {
+// yankPorts takes an array of port ranges
+// FIXME - does not use ranges
+func yankPorts(ports string) []string {
 	rhs := strings.Split(ports, "[")[1]
 	lhs := strings.Split(rhs, "]")[0]
-	return strings.Split(lhs, "-")[0]
+
+	yports := []string{}
+
+	mports := strings.Split(lhs, ", ")
+	for i := 0; i < len(mports); i++ {
+		pz := strings.Split(mports[i], "-")[0]
+		yports = append(yports, pz)
+	}
+
+	return yports
 }
 
 // findMaster tries each master and looks for the leader
@@ -241,16 +250,19 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 				tail := fname + "." + domain + "."
 
 				// hack - what to do?
-				// SRVs have to have ports ?
 				if task.Resources.Ports != "" {
-					sport := yankPort(task.Resources.Ports)
-					host += ":" + sport
+					sports := yankPorts(task.Resources.Ports)
 
-					tcp := "_" + tname + "._tcp." + tail
-					udp := "_" + tname + "._udp." + tail
+					// FIXME - 3 nested loops
+					for s := 0; s < len(sports); s++ {
+						host += ":" + sports[s]
 
-					rg.insertRR(tcp, host, "SRV")
-					rg.insertRR(udp, host, "SRV")
+						tcp := "_" + tname + "._tcp." + tail
+						udp := "_" + tname + "._udp." + tail
+
+						rg.insertRR(tcp, host, "SRV")
+						rg.insertRR(udp, host, "SRV")
+					}
 
 				}
 
