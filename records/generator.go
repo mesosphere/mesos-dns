@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/mesosphere/mesos-dns/logging"
@@ -135,17 +136,22 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 }
 
 // yankPorts takes an array of port ranges
-// FIXME - does not use ranges
 func yankPorts(ports string) []string {
 	rhs := strings.Split(ports, "[")[1]
 	lhs := strings.Split(rhs, "]")[0]
 
 	yports := []string{}
 
-	mports := strings.Split(lhs, ", ")
+	mports := strings.Split(lhs, ",")
 	for i := 0; i < len(mports); i++ {
-		pz := strings.Split(mports[i], "-")[0]
-		yports = append(yports, pz)
+		tmp := strings.TrimSpace(mports[i])
+		pz := strings.Split(tmp, "-")
+		lo, _ := strconv.Atoi(pz[0])
+		hi, _ := strconv.Atoi(pz[1])
+
+		for t := lo; t <= hi; t++ {
+			yports = append(yports, strconv.Itoa(t))
+		}
 	}
 
 	return yports
