@@ -138,8 +138,9 @@ func TestInsertState(t *testing.T) {
 		t.Error(err)
 	}
 
+        masters := []string{"144.76.157.37:5050"}
 	rg := RecordGenerator{}
-	rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1")
+	rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
 
 	// ensure we are only collecting running tasks
 	_, ok := rg.SRVs["_poseidon._tcp.marathon-0.6.0.mesos."]
@@ -158,12 +159,12 @@ func TestInsertState(t *testing.T) {
 	}
 
 	// test for 8 SRV names
-	if len(rg.SRVs) != 8 {
+	if len(rg.SRVs) != 10 {
 		t.Error("not enough SRVs")
 	}
 
 	// test for 5 A names
-	if len(rg.As) != 5 {
+	if len(rg.As) != 6 {
 		t.Error("not enough As")
 	}
 

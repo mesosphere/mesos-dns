@@ -101,8 +101,9 @@ func fakeDNS(port int) (Resolver, error) {
 		return res, err
 	}
 
+        masters := []string{"144.76.157.37:5050"}
 	res.rs = records.RecordGenerator{}
-	res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1")
+	res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
 
 	return res, nil
 }

@@ -212,7 +212,7 @@ func (rg *RecordGenerator) ParseState(config Config) {
 		return
 	}
 
-	rg.InsertState(sj, config.Domain, config.Mname, config.Listener)
+	rg.InsertState(sj, config.Domain, config.Mname, config.Listener, config.Masters)
 }
 
 // cleanName sanitizes invalid characters
@@ -233,7 +233,7 @@ func stripInvalid(tname string) string {
 }
 
 // InsertState transforms a StateJSON into RecordGenerator RRs
-func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string, listener string) error {
+func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string, listener string, masters []string) error {
 	rg.Slaves = sj.Slaves
 
 	rg.SRVs = make(rrs)
@@ -280,6 +280,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 	}
 
 	rg.listenerRecord(listener, mname)
+	rg.masterRecord(listener, domain, masters)
 
 	return nil
 }
@@ -294,6 +295,26 @@ func (rg *RecordGenerator) listenerRecord(listener string, mname string) {
 	} else {
 		rg.insertRR(mname, listener, "A")
 	}
+}
+
+// masterRecord sets A records for the mesos masters in case
+// there is a request for it's hostname (eg: from SOA mname)
+func (rg *RecordGenerator) masterRecord(listener string, domain string, masters []string) {
+        for i := 0; i < len(masters); i++ {
+		ip, port, err := getProto(masters[i])
+		if err != nil {
+			logging.Error.Println(err)
+		}
+
+                arec := "master." + domain + "."
+                rg.insertRR(arec , ip, "A")
+
+                tcp := "_master._tcp." + domain + "."
+                udp := "_master._udp." + domain + "."
+                host := ip + ":" + port
+                rg.insertRR(tcp, host, "SRV")
+                rg.insertRR(udp, host, "SRV")
+         } 
 }
 
 // setFromLocal generates A records for each local interface we are
