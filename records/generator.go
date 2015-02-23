@@ -261,13 +261,13 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 
 					// FIXME - 3 nested loops
 					for s := 0; s < len(sports); s++ {
-						host += ":" + sports[s]
+						var srvhost string = host + ":" + sports[s]
 
 						tcp := "_" + tname + "._tcp." + tail
 						udp := "_" + tname + "._udp." + tail
 
-						rg.insertRR(tcp, host, "SRV")
-						rg.insertRR(udp, host, "SRV")
+						rg.insertRR(tcp, srvhost, "SRV")
+						rg.insertRR(udp, srvhost, "SRV")
 					}
 
 				}
