@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+func init() {
+	logging.VerboseFlag = false
+	logging.SetupLogs()
+}
+
 // dig @127.0.0.1 -p 8053 "bob.*.mesos" ANY
 func TestCleanWild(t *testing.T) {
 	dom := "bob.*.mesos"
@@ -74,9 +79,6 @@ func TestShuffleAnswers(t *testing.T) {
 }
 
 func fakeDNS(port int) (Resolver, error) {
-	logging.VerboseFlag = false
-	logging.SetupLogs()
-
 	var res Resolver
 	res.Config = records.Config{
 		TTL:       60,
@@ -99,8 +101,9 @@ func fakeDNS(port int) (Resolver, error) {
 		return res, err
 	}
 
+        masters := []string{"144.76.157.37:5050"}
 	res.rs = records.RecordGenerator{}
-	res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1")
+	res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
 
 	return res, nil
 }
@@ -160,7 +163,7 @@ func TestHandler(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(msg) != 2 {
+	if len(msg) != 3 {
 		t.Error("not serving up SRV records")
 	}
 

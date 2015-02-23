@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/mesosphere/mesos-dns/logging"
@@ -134,12 +135,26 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 	return sj, err
 }
 
-// yankPort grabs the first port in the port field
-// this takes a string even though it should take an array
-func yankPort(ports string) string {
+// yankPorts takes an array of port ranges
+func yankPorts(ports string) []string {
 	rhs := strings.Split(ports, "[")[1]
 	lhs := strings.Split(rhs, "]")[0]
-	return strings.Split(lhs, "-")[0]
+
+	yports := []string{}
+
+	mports := strings.Split(lhs, ",")
+	for i := 0; i < len(mports); i++ {
+		tmp := strings.TrimSpace(mports[i])
+		pz := strings.Split(tmp, "-")
+		lo, _ := strconv.Atoi(pz[0])
+		hi, _ := strconv.Atoi(pz[1])
+
+		for t := lo; t <= hi; t++ {
+			yports = append(yports, strconv.Itoa(t))
+		}
+	}
+
+	return yports
 }
 
 // findMaster tries each master and looks for the leader
@@ -197,7 +212,7 @@ func (rg *RecordGenerator) ParseState(config Config) {
 		return
 	}
 
-	rg.InsertState(sj, config.Domain, config.Mname, config.Listener)
+	rg.InsertState(sj, config.Domain, config.Mname, config.Listener, config.Masters)
 }
 
 // cleanName sanitizes invalid characters
@@ -218,7 +233,7 @@ func stripInvalid(tname string) string {
 }
 
 // InsertState transforms a StateJSON into RecordGenerator RRs
-func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string, listener string) error {
+func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string, listener string, masters []string) error {
 	rg.Slaves = sj.Slaves
 
 	rg.SRVs = make(rrs)
@@ -241,16 +256,19 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 				tail := fname + "." + domain + "."
 
 				// hack - what to do?
-				// SRVs have to have ports ?
 				if task.Resources.Ports != "" {
-					sport := yankPort(task.Resources.Ports)
-					host += ":" + sport
+					sports := yankPorts(task.Resources.Ports)
 
-					tcp := "_" + tname + "._tcp." + tail
-					udp := "_" + tname + "._udp." + tail
+					// FIXME - 3 nested loops
+					for s := 0; s < len(sports); s++ {
+						var srvhost string = host + ":" + sports[s]
 
-					rg.insertRR(tcp, host, "SRV")
-					rg.insertRR(udp, host, "SRV")
+						tcp := "_" + tname + "._tcp." + tail
+						udp := "_" + tname + "._udp." + tail
+
+						rg.insertRR(tcp, srvhost, "SRV")
+						rg.insertRR(udp, srvhost, "SRV")
+					}
 
 				}
 
@@ -262,6 +280,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 	}
 
 	rg.listenerRecord(listener, mname)
+	rg.masterRecord(listener, domain, masters)
 
 	return nil
 }
@@ -276,6 +295,26 @@ func (rg *RecordGenerator) listenerRecord(listener string, mname string) {
 	} else {
 		rg.insertRR(mname, listener, "A")
 	}
+}
+
+// masterRecord sets A records for the mesos masters in case
+// there is a request for it's hostname (eg: from SOA mname)
+func (rg *RecordGenerator) masterRecord(listener string, domain string, masters []string) {
+        for i := 0; i < len(masters); i++ {
+		ip, port, err := getProto(masters[i])
+		if err != nil {
+			logging.Error.Println(err)
+		}
+
+                arec := "master." + domain + "."
+                rg.insertRR(arec , ip, "A")
+
+                tcp := "_master._tcp." + domain + "."
+                udp := "_master._udp." + domain + "."
+                host := ip + ":" + port
+                rg.insertRR(tcp, host, "SRV")
+                rg.insertRR(udp, host, "SRV")
+         } 
 }
 
 // setFromLocal generates A records for each local interface we are

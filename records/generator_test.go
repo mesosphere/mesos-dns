@@ -7,6 +7,11 @@ import (
 	"testing"
 )
 
+func init() {
+	logging.VerboseFlag = false
+	logging.SetupLogs()
+}
+
 func TestHostBySlaveId(t *testing.T) {
 
 	slaves := []slave{
@@ -29,14 +34,55 @@ func TestHostBySlaveId(t *testing.T) {
 
 }
 
-func TestYankPort(t *testing.T) {
+func TestYankPorts(t *testing.T) {
 	p := "[31328-31328]"
 
-	port := yankPort(p)
+	ports := yankPorts(p)
 
-	if port != "31328" {
+	if ports[0] != "31328" {
 		t.Error("not parsing port")
 	}
+}
+
+func TestMultipleYankPorts(t *testing.T) {
+	p := "[31111-31111, 31113-31113]"
+
+	ports := yankPorts(p)
+
+	if len(ports) != 2 {
+		t.Error("not parsing ports")
+	}
+
+	if ports[0] != "31111" {
+		t.Error("not parsing port")
+	}
+
+	if ports[1] != "31113" {
+		t.Error("not parsing port")
+	}
+}
+
+func TestRangePorts(t *testing.T) {
+	p := "[31115-31117]"
+
+	ports := yankPorts(p)
+
+	if len(ports) != 3 {
+		t.Error("not parsing ports")
+	}
+
+	if ports[0] != "31115" {
+		t.Error("not parsing port")
+	}
+
+	if ports[1] != "31116" {
+		t.Error("not parsing port")
+	}
+
+	if ports[2] != "31117" {
+		t.Error("not parsing port")
+	}
+
 }
 
 func TestLeaderIP(t *testing.T) {
@@ -79,8 +125,6 @@ func TestStripInvalid(t *testing.T) {
 
 // ensure we are parsing what we think we are
 func TestInsertState(t *testing.T) {
-	logging.VerboseFlag = false
-	logging.SetupLogs()
 
 	var sj StateJSON
 
@@ -94,8 +138,9 @@ func TestInsertState(t *testing.T) {
 		t.Error(err)
 	}
 
+        masters := []string{"144.76.157.37:5050"}
 	rg := RecordGenerator{}
-	rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1")
+	rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
 
 	// ensure we are only collecting running tasks
 	_, ok := rg.SRVs["_poseidon._tcp.marathon-0.6.0.mesos."]
@@ -114,12 +159,12 @@ func TestInsertState(t *testing.T) {
 	}
 
 	// test for 8 SRV names
-	if len(rg.SRVs) != 8 {
+	if len(rg.SRVs) != 10 {
 		t.Error("not enough SRVs")
 	}
 
 	// test for 5 A names
-	if len(rg.As) != 5 {
+	if len(rg.As) != 6 {
 		t.Error("not enough As")
 	}
 
@@ -132,8 +177,8 @@ func TestInsertState(t *testing.T) {
 	// ensure we find this SRV
 	rrs := rg.SRVs["_liquor-store._tcp.marathon-0.6.0.mesos."]
 
-	// ensure there are 2 RRDATA answers for this SRV name
-	if len(rrs) != 2 {
+	// ensure there are 3 RRDATA answers for this SRV name
+	if len(rrs) != 3 {
 		t.Error("not enough SRV records")
 	}
 
