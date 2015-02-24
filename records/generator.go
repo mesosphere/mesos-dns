@@ -217,7 +217,7 @@ func (rg *RecordGenerator) ParseState(config Config) {
 
 // cleanName sanitizes invalid characters
 func cleanName(tname string) string {
-	return stripInvalid(tname)
+	return stripInvalid(strings.ToLower(tname))
 }
 
 // stripInvalid remove any non-valid hostname characters
@@ -253,7 +253,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 			if err == nil && (task.State == "TASK_RUNNING") {
 
 				tname := cleanName(task.Name)
-				tail := fname + "." + domain + "."
+				tail := strings.ToLower(fname + "." + domain + ".")
 
 				// hack - what to do?
 				if task.Resources.Ports != "" {

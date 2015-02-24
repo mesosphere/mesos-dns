@@ -222,7 +222,7 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	var err error
 
-	dom := cleanWild(r.Question[0].Name)
+	dom := strings.ToLower(cleanWild(r.Question[0].Name))
 	qType := r.Question[0].Qtype
 
 	m := new(dns.Msg)
