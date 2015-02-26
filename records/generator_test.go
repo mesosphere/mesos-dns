@@ -108,6 +108,7 @@ func TestStripInvalid(t *testing.T) {
 		{"blah-dash.com", "blah-dash.com"},
 		{"not$1234.com", "not1234.com"},
 		{"(@ host . com", "host.com"},
+		{"MiXeDcase.CoM", "mixedcase.com"},
 	}
 
 	for _, pair := range tests {
@@ -138,7 +139,7 @@ func TestInsertState(t *testing.T) {
 		t.Error(err)
 	}
 
-        masters := []string{"144.76.157.37:5050"}
+	masters := []string{"144.76.157.37:5050"}
 	rg := RecordGenerator{}
 	rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
 
@@ -169,7 +170,7 @@ func TestInsertState(t *testing.T) {
 	}
 
 	// ensure we translate the framework name as well
-	_, ok = rg.As["some-box.chronoswithaspace-2.0.1.mesos."]
+	_, ok = rg.As["some-box.chronoswithaspaceandmixedcase-2.0.1.mesos."]
 	if !ok {
 		t.Error("should find this task w/a space in the framework name - A record")
 	}

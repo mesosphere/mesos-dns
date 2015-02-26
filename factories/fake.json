@@ -92,7 +92,7 @@
             "failover_timeout": 1200,
             "hostname": "localhost",
             "id": "20140703-014514-3041283216-5050-5348-0001",
-            "name": "chronos with a space -2.0.1",
+            "name": "chronos with a space AND MIXED CASE-2.0.1",
             "offers": [],
             "registered_time": 1414913537.10742,
             "reregistered_time": 1414913537.10744,
