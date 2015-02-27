@@ -99,6 +99,7 @@ func SetConfig(cjson string) (c Config) {
 		c.Email = c.Email + "."
 	}
 
+    c.Domain = strings.ToLower(c.Domain)
 	c.Mname = "mesos-dns." + c.Domain + "."
 
 	logging.Verbose.Println("Mesos-DNS configuration:")

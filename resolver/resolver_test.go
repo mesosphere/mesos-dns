@@ -169,7 +169,7 @@ func TestHandler(t *testing.T) {
 		t.Error("not serving up A records")
 	}
 
-	// Test case sensitivity
+	// Test case sensitivity -- this test depends on one above
 	msg_a := msg
 	msg, err = fakeQuery("cHrOnOs.MARATHON-0.6.0.mesoS.", dns.TypeA, "udp")
 	if err != nil {

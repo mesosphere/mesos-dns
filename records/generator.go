@@ -253,7 +253,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 			if err == nil && (task.State == "TASK_RUNNING") {
 
 				tname := cleanName(task.Name)
-				tail := strings.ToLower(fname + "." + domain + ".")
+				tail := fname + "." + domain + "."
 
 				// hack - what to do?
 				if task.Resources.Ports != "" {
