@@ -101,7 +101,7 @@ func fakeDNS(port int) (Resolver, error) {
 		return res, err
 	}
 
-        masters := []string{"144.76.157.37:5050"}
+	masters := []string{"144.76.157.37:5050"}
 	res.rs = records.RecordGenerator{}
 	res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
 
@@ -132,6 +132,18 @@ func fakeQuery(dom string, rrHeader uint16, proto string) ([]dns.RR, error) {
 	return in.Answer, nil
 }
 
+func identicalResults(msg_a []dns.RR, msg_b []dns.RR) bool {
+	if len(msg_a) != len(msg_b) {
+		return false
+	}
+	for i := range msg_a {
+		if msg_a[i].String() != msg_b[i].String() {
+			return false
+		}
+	}
+	return true
+}
+
 func TestHandler(t *testing.T) {
 	var msg []dns.RR
 
@@ -155,6 +167,17 @@ func TestHandler(t *testing.T) {
 
 	if len(msg) != 1 {
 		t.Error("not serving up A records")
+	}
+
+	// Test case sensitivity -- this test depends on one above
+	msg_a := msg
+	msg, err = fakeQuery("cHrOnOs.MARATHON-0.6.0.mesoS.", dns.TypeA, "udp")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !identicalResults(msg, msg_a) {
+		t.Errorf("Case sensitivity failure:\n%s\n!=\n%s", msg, msg_a)
 	}
 
 	// test SRV record
