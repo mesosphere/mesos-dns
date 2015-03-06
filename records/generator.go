@@ -233,7 +233,8 @@ func stripInvalid(tname string) string {
 }
 
 // InsertState transforms a StateJSON into RecordGenerator RRs
-func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string, listener string, masters []string) error {
+func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string,
+	listener string, masters []string) error {
 	rg.Slaves = sj.Slaves
 
 	rg.SRVs = make(rrs)
@@ -280,8 +281,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 	}
 
 	rg.listenerRecord(listener, mname)
-	rg.masterRecord(listener, domain, masters)
-
+	rg.masterRecord(listener, domain, masters, leaderIP(sj.Leader))
 	return nil
 }
 
@@ -297,23 +297,39 @@ func (rg *RecordGenerator) listenerRecord(listener string, mname string) {
 	}
 }
 
-// masterRecord sets A records for the mesos masters in case
-// there is a request for it's hostname (eg: from SOA mname)
-func (rg *RecordGenerator) masterRecord(listener string, domain string, masters []string) {
+// masterRecord sets A records for the mesos masters and an A record
+// for the leading master
+func (rg *RecordGenerator) masterRecord(listener string, domain string, masters []string, leader string) {
+
 	for i := 0; i < len(masters); i++ {
 		ip, port, err := getProto(masters[i])
 		if err != nil {
 			logging.Error.Println(err)
 		}
 
+		// A record
 		arec := "master." + domain + "."
 		rg.insertRR(arec, ip, "A")
 
+		// SRV records
 		tcp := "_master._tcp." + domain + "."
 		udp := "_master._udp." + domain + "."
 		host := "master." + domain + ":" + port
 		rg.insertRR(tcp, host, "SRV")
 		rg.insertRR(udp, host, "SRV")
+
+		// if this is this is the leading master
+		if ip == leader {
+			// A record
+			arec = "leader." + domain + "."
+			rg.insertRR(arec, ip, "A")
+			// SRV records
+			tcp := "_leader._tcp." + domain + "."
+			udp := "_leader._udp." + domain + "."
+			host := "leader." + domain + ":" + port
+			rg.insertRR(tcp, host, "SRV")
+			rg.insertRR(udp, host, "SRV")
+		}
 	}
 }
 
