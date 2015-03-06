@@ -138,6 +138,7 @@ func TestInsertState(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	sj.Leader = "master@144.76.157.37:5050"
 
 	masters := []string{"144.76.157.37:5050"}
 	rg := RecordGenerator{}
@@ -159,13 +160,33 @@ func TestInsertState(t *testing.T) {
 		t.Error("should not find this not-running task - A record")
 	}
 
-	// test for 8 SRV names
-	if len(rg.SRVs) != 10 {
+	_, ok = rg.As["master.mesos."]
+	if !ok {
+		t.Error("should find a running master - A record")
+	}
+
+	_, ok = rg.SRVs["_master._tcp.mesos."]
+	if !ok {
+		t.Error("should find a running master - SRV record")
+	}
+
+	_, ok = rg.As["leader.mesos."]
+	if !ok {
+		t.Error("should find a leading master - A record")
+	}
+
+	_, ok = rg.SRVs["_leader._tcp.mesos."]
+	if !ok {
+		t.Error("should find a leading master - SRV record")
+	}
+
+	// test for 12 SRV names
+	if len(rg.SRVs) != 12 {
 		t.Error("not enough SRVs")
 	}
 
 	// test for 5 A names
-	if len(rg.As) != 6 {
+	if len(rg.As) != 7 {
 		t.Error("not enough As")
 	}
 
