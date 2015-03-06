@@ -292,6 +292,14 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 
 	if err != nil {
 		logging.CurLog.MesosFailed += 1
+	} else if (qType == dns.TypeAAAA) && (len(res.rs.SRVs[dom]) > 0 || len(res.rs.As[dom]) > 0) {
+
+		m = new(dns.Msg)
+		m.SetReply(r)
+		// set NOERROR
+		m.SetRcode(r, 0)
+		// leave answer empty (NOERROR --> NODATA)
+
 	} else {
 		// no answers but not a {SOA,SRV} request
 		if len(m.Answer) == 0 && (qType != dns.TypeSOA) && (qType != dns.TypeSRV) {
