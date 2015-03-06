@@ -220,6 +220,26 @@ func TestHandler(t *testing.T) {
 		t.Error("not serving up A records")
 	}
 
+	// test AAAA --> NODATA
+	m, err = fakeMsg("chronos.marathon-0.6.0.mesos.", dns.TypeAAAA, "udp")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if m.Rcode != 0 || len(m.Answer) > 0 {
+		t.Error("not setting NODATA for AAAA requests")
+	}
+
+	// test AAAA --> NXDOMAIN
+	m, err = fakeMsg("missing.mesos.", dns.TypeAAAA, "udp")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if m.Rcode != 3 {
+		t.Error("not setting NXDOMAIN for AAAA requests")
+	}
+
 }
 
 func TestNonMesosHandler(t *testing.T) {
