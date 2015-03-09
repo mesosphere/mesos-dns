@@ -48,6 +48,7 @@ _search._tcp.marathon.mesos.	60 IN SRV 0 0 31302 10.254.132.41.
 
 SRV records are generated only for tasks that have been allocated a specific port through Mesos. 
 
+
 ## Notes
 
 If a framework launches multiple tasks with the same name, the DNS lookup will return multiple records, one per task. Mesos-DNS randomly shuffles the order of records to provide rudimentary load balancing between these tasks. 
@@ -56,5 +57,7 @@ Mesos-DNS does not support other types of DNS records at this point, including t
 
 Some frameworks register with longer, less friendly names. For example, earlier versions of marathon may register with names like `marathon-0.7.5`, which will lead to names like `search.marathon-0.7.5.mesos`. Make sure your framework registers with the desired name. For instance, you can launch marathon with ` --framework_name marathon` to get the framework registered as `marathon`.  
 
+## Special Records
 
+Mesos-DNS generates a few special records. Specifically, it creates A records (`master.domain`) and SRV records (`_master._tcp.domain` and `_master._udp.domain`) for every Mesos master in the cluster. There is set of records for the leading master (A record for `leader.domain` and SRV records for `_leader._tcp.domain` and `_leader._udp.domain`). Note that Mesos-DNS discovers the leading master when it regenerates DNS records. Hence, the records for the leader will not be updated instantaneously when new leader is elected. Finally Mesos-DNS generates A records for itself (`mesos-dns.domain`) that list all the IP addresses that Mesos-DNS is listening to. 
 
