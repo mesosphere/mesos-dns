@@ -7,10 +7,11 @@ import (
 )
 
 var (
-	VerboseFlag bool
-	Info        *log.Logger
-	Verbose     *log.Logger
-	Error       *log.Logger
+	VerboseFlag     bool
+	VeryVerboseFlag bool
+	Verbose         *log.Logger
+	VeryVerbose     *log.Logger
+	Error           *log.Logger
 )
 
 type LogOut struct {
@@ -32,18 +33,23 @@ func PrintCurLog() {
 	Verbose.Printf("%+v\n", CurLog)
 }
 
-// setupLogs provides the following logs
-// Info = stdout
+// SetupLogs provides the following logs
 // Verbose = optional verbosity
+// VeryVerbose = optional verbosity
 // Error = stderr
 func SetupLogs() {
-	Info = log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	logopts := log.Ldate | log.Ltime | log.Lshortfile
 
 	if VerboseFlag {
-		Verbose = log.New(os.Stdout, "VERBOSE: ", log.Ldate|log.Ltime|log.Lshortfile)
+		Verbose = log.New(os.Stdout, "VERBOSE: ", logopts)
+		VeryVerbose = log.New(ioutil.Discard, "VERY VERBOSE: ", logopts)
+	} else if VeryVerboseFlag {
+		Verbose = log.New(os.Stdout, "VERY VERBOSE: ", logopts)
+		VeryVerbose = Verbose
 	} else {
-		Verbose = log.New(ioutil.Discard, "VERBOSE: ", log.Ldate|log.Ltime|log.Lshortfile)
+		Verbose = log.New(ioutil.Discard, "VERBOSE: ", logopts)
+		VeryVerbose = log.New(ioutil.Discard, "VERY VERBOSE: ", logopts)
 	}
 
-	Error = log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	Error = log.New(os.Stderr, "ERROR: ", logopts)
 }
