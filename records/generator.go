@@ -124,11 +124,11 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 
 	}()
 
-	logging.Verbose.Println("reloading from master " + ip)
+	logging.VeryVerbose.Println("reloading from master " + ip)
 	sj = rg.loadFromMaster(ip, port)
 
 	if rip := leaderIP(sj.Leader); rip != ip {
-		logging.Verbose.Println("master changed to " + ip)
+		logging.VeryVerbose.Println("master changed to " + ip)
 		sj = rg.loadFromMaster(rip, port)
 	}
 
@@ -172,7 +172,7 @@ func (rg *RecordGenerator) findMaster(masters []string) (StateJSON, error) {
 		sj, _ = rg.loadWrap(ip, port)
 
 		if sj.Leader == "" {
-			logging.Verbose.Println("not a leader - trying next one")
+			logging.VeryVerbose.Println("not a leader - trying next one")
 
 			if len(masters)-1 == i {
 				return sj, errors.New("no master")
@@ -382,7 +382,7 @@ func stripHost(hostip string) string {
 // insertRR inserts host to name's map
 // refactor me
 func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
-	logging.Verbose.Println("[" + rtype + "]\t" + name + ": " + host)
+	logging.VeryVerbose.Println("[" + rtype + "]\t" + name + ": " + host)
 
 	if rtype == "A" {
 		if val, ok := rg.As[name]; ok {

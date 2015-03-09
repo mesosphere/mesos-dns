@@ -21,7 +21,8 @@ func main() {
 	versionFlag := false
 
 	cjson := flag.String("config", "config.json", "location of configuration file (json)")
-	flag.BoolVar(&logging.VerboseFlag, "v", false, "increase the verbosity level")
+	flag.BoolVar(&logging.VerboseFlag, "v", false, "verbose logging")
+	flag.BoolVar(&logging.VeryVerboseFlag, "vv", false, "very verbose logging")
 	flag.BoolVar(&versionFlag, "version", false, "output the version")
 	flag.Parse()
 
