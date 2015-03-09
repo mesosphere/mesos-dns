@@ -30,7 +30,7 @@ var CurLog LogOut
 
 // PrintCurLog prints out the current LogOut and then resets
 func PrintCurLog() {
-	Verbose.Printf("%+v\n", CurLog)
+	VeryVerbose.Printf("%+v\n", CurLog)
 }
 
 // SetupLogs provides the following logs
