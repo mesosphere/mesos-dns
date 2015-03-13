@@ -319,8 +319,8 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 			}
 
 			logging.CurLog.MesosNXDomain += 1
-			logging.Verbose.Println("total A rrs:\t" + strconv.Itoa(len(res.rs.As)))
-			logging.Verbose.Println("failed looking for " + r.Question[0].String())
+			logging.VeryVerbose.Println("total A rrs:\t" + strconv.Itoa(len(res.rs.As)))
+			logging.VeryVerbose.Println("failed looking for " + r.Question[0].String())
 		} else {
 			logging.CurLog.MesosSuccess += 1
 		}
