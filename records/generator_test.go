@@ -165,6 +165,12 @@ func TestInsertState(t *testing.T) {
 		t.Error("should find a running master - A record")
 	}
 
+	_, ok = rg.As["master0.mesos."]
+	if !ok {
+		t.Error("should find a running master0 - A record")
+	}
+
+
 	_, ok = rg.SRVs["_master._tcp.mesos."]
 	if !ok {
 		t.Error("should find a running master - SRV record")
@@ -186,7 +192,7 @@ func TestInsertState(t *testing.T) {
 	}
 
 	// test for 5 A names
-	if len(rg.As) != 7 {
+	if len(rg.As) != 8 {
 		t.Error("not enough As")
 	}
 
