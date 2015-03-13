@@ -350,8 +350,11 @@ func (res *Resolver) Serve(net string) {
 	err := server.ListenAndServe()
 	if err != nil {
 		logging.Error.Printf("Failed to setup "+net+" server: %s\n", err.Error())
-		os.Exit(1)
+	} else {
+		logging.Error.Printf("Not listening/serving any more requests.")
 	}
+
+	os.Exit(1)
 }
 
 // Resolver holds configuration information and the resource records
