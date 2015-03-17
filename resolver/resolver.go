@@ -8,6 +8,7 @@ import (
 	"github.com/mesosphere/mesos-dns/records"
 	"math/rand"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -334,6 +335,13 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 
 // Serve starts a dns server for net protocol
 func (res *Resolver) Serve(net string) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			logging.Error.Printf("%s\n", rec)
+			os.Exit(1)
+		}
+	}()
+
 	server := &dns.Server{
 		Addr:       res.Config.Listener + ":" + strconv.Itoa(res.Config.Port),
 		Net:        net,
@@ -343,7 +351,11 @@ func (res *Resolver) Serve(net string) {
 	err := server.ListenAndServe()
 	if err != nil {
 		logging.Error.Printf("Failed to setup "+net+" server: %s\n", err.Error())
+	} else {
+		logging.Error.Printf("Not listening/serving any more requests.")
 	}
+
+	os.Exit(1)
 }
 
 // Resolver holds configuration information and the resource records
