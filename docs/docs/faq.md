@@ -6,9 +6,9 @@ title: Mesos-DNS FAQ
 
 ---
 
-#### Verbose mode
+#### Verbose and very verbose modes
 
-If you start Mesos-DNS in verbose mode using the `-v` argument, it  prints a variety of messages that are useful for debugging and performance tuning. 
+If you start Mesos-DNS in verbose mode using the `-v` or `-vv` arguments, it  prints a variety of messages that are useful for debugging and performance tuning. The `-vv` option will periodically print every A or SRV record Mesos-DNS generates. 
 
 ---
 

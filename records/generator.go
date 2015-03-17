@@ -307,8 +307,10 @@ func (rg *RecordGenerator) masterRecord(listener string, domain string, masters 
 			logging.Error.Println(err)
 		}
 
-		// A record
+		// A records (master and masterN)
 		arec := "master." + domain + "."
+		rg.insertRR(arec, ip, "A")
+		arec = "master" + strconv.Itoa(i) + "." + domain + "."
 		rg.insertRR(arec, ip, "A")
 
 		// SRV records
