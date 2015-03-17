@@ -295,6 +295,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	} else if (qType == dns.TypeAAAA) && (len(res.rs.SRVs[dom]) > 0 || len(res.rs.As[dom]) > 0) {
 
 		m = new(dns.Msg)
+		m.Authoritative = true
 		m.SetReply(r)
 		// set NOERROR
 		m.SetRcode(r, 0)
