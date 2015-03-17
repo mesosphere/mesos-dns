@@ -16,8 +16,11 @@ import (
 // Config holds mesos dns configuration
 type Config struct {
 
-	// Mesos master(s): a list of IP:port/zk pairs for one or more Mesos masters
+	// Mesos master(s): a list of IP:port pairs for one or more Mesos masters
 	Masters []string
+
+	// Mesos master(s): a single Zk url
+	Zk string
 
 	// Refresh frequency: the frequency in seconds of regenerating records (default 60)
 	RefreshSeconds int
@@ -89,8 +92,8 @@ func SetConfig(cjson string) (c Config) {
 		c.Resolvers = GetLocalDNS()
 	}
 
-	if len(c.Masters) == 0 {
-		logging.Error.Println("please specify mesos masters in config.json")
+	if len(c.Masters) == 0 && c.Zk == "" {
+		logging.Error.Println("please specify mesos masters  or zookeeper in config.json")
 		os.Exit(1)
 	}
 
@@ -103,7 +106,11 @@ func SetConfig(cjson string) (c Config) {
 	c.Mname = "mesos-dns." + c.Domain + "."
 
 	logging.Verbose.Println("Mesos-DNS configuration:")
-	logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
+	if c.Zk == "" {
+		logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
+		} else {
+		logging.Verbose.Println("   - ZK: ", c.Zk)	
+		}
 	logging.Verbose.Println("   - RefreshSeconds: ", c.RefreshSeconds)
 	logging.Verbose.Println("   - TTL: ", c.TTL)
 	logging.Verbose.Println("   - Domain: " + c.Domain)
