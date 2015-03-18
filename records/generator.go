@@ -207,7 +207,7 @@ func getProto(pair string) (string, string, error) {
 func (rg *RecordGenerator) ParseState(config Config) {
 
 	// let's test things first
-	if config.Zk[0] != "" {
+	if len(config.Zk) > 0 {
 		logging.Verbose.Println("Zookeper things leading master is ", config.leader)
 	}
 
