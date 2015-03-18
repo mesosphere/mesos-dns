@@ -181,6 +181,7 @@ func (rg *RecordGenerator) findMaster(c Config) (StateJSON, error) {
 	}
 
 	// try each listed mesos master before dying
+	logging.VeryVerbose.Println("Falling back to Masters config field: ", c.Masters)
 	for i := 0; i < len(c.Masters); i++ {
 		ip, port, err := getProto(c.Masters[i])
 		if err != nil {
