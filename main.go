@@ -37,7 +37,10 @@ func main() {
 
 	// if ZK is identified, start detector
 	if len(resolver.Config.Zk) != 0 {
-		records.ZKdetect(&resolver.Config)
+		dr := make(chan bool)
+		go records.ZKdetect(&resolver.Config, dr)
+		<-dr
+
 		// wait for the first read from ZK
 		//for {
 		//	if resolver.Config.StartZk == true {
@@ -45,7 +48,7 @@ func main() {
 		//	}
 		//}
 		// horrible hack
-		time.Sleep(100 * time.Millisecond)
+		//time.Sleep(100 * time.Millisecond)
 	}
 
 	// reload the first time
