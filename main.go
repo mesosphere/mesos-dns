@@ -35,6 +35,11 @@ func main() {
 
 	resolver.Config = records.SetConfig(*cjson)
 
+	// if ZK is identified, start detector
+	if resolver.Config.Zk[0] != "" {
+		records.ZKdetect(resolver.Config)
+	}
+
 	// reload the first time
 	resolver.Reload()
 	ticker := time.NewTicker(time.Second * time.Duration(resolver.Config.RefreshSeconds))

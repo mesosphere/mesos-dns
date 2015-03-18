@@ -205,6 +205,12 @@ func getProto(pair string) (string, string, error) {
 // it also tries different mesos masters if one is not up
 // this will shudown if it can't connect to a mesos master
 func (rg *RecordGenerator) ParseState(config Config) {
+
+    // let's test things first
+    if config.Zk[0] != "" {
+    	logging.Verbose.Println("Zookeper things leading master is ", config.leader)
+	}
+
 	// try each listed mesos master before dying
 	sj, err := rg.findMaster(config.Masters)
 	if err != nil {
