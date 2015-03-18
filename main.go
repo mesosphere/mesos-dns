@@ -36,7 +36,7 @@ func main() {
 	resolver.Config = records.SetConfig(*cjson)
 
 	// if ZK is identified, start detector
-	if len(resolver.Config.Zk) {
+	if len(resolver.Config.Zk) != 0 {
 		records.ZKdetect(resolver.Config)
 	}
 
