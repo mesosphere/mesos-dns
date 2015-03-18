@@ -206,9 +206,9 @@ func getProto(pair string) (string, string, error) {
 // this will shudown if it can't connect to a mesos master
 func (rg *RecordGenerator) ParseState(config Config) {
 
-    // let's test things first
-    if config.Zk[0] != "" {
-    	logging.Verbose.Println("Zookeper things leading master is ", config.leader)
+	// let's test things first
+	if config.Zk[0] != "" {
+		logging.Verbose.Println("Zookeper things leading master is ", config.leader)
 	}
 
 	// try each listed mesos master before dying

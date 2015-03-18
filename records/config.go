@@ -1,8 +1,9 @@
 package records
 
 import (
-	"encoding/json"
 	"encoding/binary"
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"fmt"
 
 	"github.com/mesos/mesos-go/detector"
 	_ "github.com/mesos/mesos-go/detector/zoo"
@@ -200,7 +200,7 @@ func ZKdetect(c Config) {
 	logging.Verbose.Println("Starting master detector for ZK ", c.Zk[0])
 	md, err := detector.New(c.Zk[0])
 	if err != nil {
-		logging.Error.Println("failed to create master detector: %v", err)
+		logging.Error.Println("failed to create master detector: ", err)
 		os.Exit(1)
 	}
 
@@ -225,9 +225,9 @@ func ZKdetect(c Config) {
 		if len(c.leader) > 0 {
 			c.leader = fmt.Sprintf("%s:%d", c.leader, info.GetPort())
 		}
-		logging.Verbose.Println("New master in Zookeeper '%v'", c.leader)
+		logging.Verbose.Println("New master in Zookeeper ", c.leader)
 	})); err != nil {
-		logging.Error.Println("failed to initialize master detector: %v", err)
+		logging.Error.Println("failed to initialize master detector ", err)
 		os.Exit(1)
 	}
 
