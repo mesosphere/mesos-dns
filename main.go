@@ -39,11 +39,12 @@ func main() {
 	if len(resolver.Config.Zk) != 0 {
 		records.ZKdetect(&resolver.Config)
 		// wait for the first read from ZK
-		for {
-			if resolver.Config.StartZk == true {
-				break
-			}
-		}
+		//for {
+		//	if resolver.Config.StartZk == true {
+		//		break
+		//	}
+		//}
+		time.Sleep(100 * time.Millisecond)
 	}
 
 	// reload the first time

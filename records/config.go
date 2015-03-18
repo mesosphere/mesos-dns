@@ -62,7 +62,7 @@ type Config struct {
 
 	// Leading master info, as identified through Zookeeper
 	leader     string
-	StartZk     bool 
+	StartZk    bool
 	leaderLock sync.RWMutex
 }
 
