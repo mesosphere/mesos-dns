@@ -38,6 +38,12 @@ func main() {
 	// if ZK is identified, start detector
 	if len(resolver.Config.Zk) != 0 {
 		records.ZKdetect(&resolver.Config)
+		// wait for the first read from ZK
+		for {
+			if resolver.Config.startZk == true {
+				break
+			}
+		}
 	}
 
 	// reload the first time
