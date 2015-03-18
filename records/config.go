@@ -118,9 +118,10 @@ func SetConfig(cjson string) (c Config) {
 	c.Mname = "mesos-dns." + c.Domain + "."
 
 	logging.Verbose.Println("Mesos-DNS configuration:")
-	if len(c.Zk) == 0 {
+	if len(c.Masters) != 0 {
 		logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
-	} else {
+	}
+	if len(c.Zk) != 0 {
 		logging.Verbose.Println("   - Zookeeper: " + strings.Join(c.Zk, ", "))
 	}
 	logging.Verbose.Println("   - RefreshSeconds: ", c.RefreshSeconds)
