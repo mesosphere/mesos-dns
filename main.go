@@ -35,20 +35,12 @@ func main() {
 
 	resolver.Config = records.SetConfig(*cjson)
 
-	// if ZK is identified, start detector
+	// if ZK is identified, start detector and wait for first master
 	if len(resolver.Config.Zk) != 0 {
 		dr := make(chan bool)
 		go records.ZKdetect(&resolver.Config, dr)
 		<-dr
-
-		// wait for the first read from ZK
-		//for {
-		//	if resolver.Config.StartZk == true {
-		//		break
-		//	}
-		//}
-		// horrible hack
-		//time.Sleep(100 * time.Millisecond)
+		close(dr)
 	}
 
 	// reload the first time
