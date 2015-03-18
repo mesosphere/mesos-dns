@@ -37,7 +37,7 @@ func main() {
 
 	// if ZK is identified, start detector
 	if len(resolver.Config.Zk) != 0 {
-		records.ZKdetect(resolver.Config)
+		records.ZKdetect(&resolver.Config)
 	}
 
 	// reload the first time

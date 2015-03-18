@@ -195,7 +195,7 @@ func GetLocalDNS() []string {
 }
 
 // Start a Zookeeper listener to track leading master
-func ZKdetect(c Config) {
+func ZKdetect(c *Config) {
 
 	// start listener
 	logging.Verbose.Println("Starting master detector for ZK ", c.Zk[0])
