@@ -301,7 +301,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 	}
 
 	rg.listenerRecord(listener, mname)
-	rg.masterRecord(listener, domain, masters, leaderIP(sj.Leader))
+	rg.masterRecord(listener, domain, masters, sj.Leader)
 	return nil
 }
 
@@ -321,7 +321,36 @@ func (rg *RecordGenerator) listenerRecord(listener string, mname string) {
 // for the leading master
 func (rg *RecordGenerator) masterRecord(listener string, domain string, masters []string, leader string) {
 
+	// create records for leader
+	// A records
+	ip, port, err := getProto(leader)
+	if err != nil {
+		logging.Error.Println(err)
+	}
+	arec := "leader." + domain + "."
+	rg.insertRR(arec, ip, "A")
+	arec = "master." + domain + "."
+	rg.insertRR(arec, ip, "A")
+	// SRV records
+	tcp := "_leader._tcp." + domain + "."
+	udp := "_leader._udp." + domain + "."
+	host := "leader." + domain + ":" + port
+	rg.insertRR(tcp, host, "SRV")
+	rg.insertRR(udp, host, "SRV")
+	tcp = "_master._tcp." + domain + "."
+	udp = "_master._udp." + domain + "."
+	host = "master." + domain + ":" + port
+	rg.insertRR(tcp, host, "SRV")
+	rg.insertRR(udp, host, "SRV")
+
+	// if there is a list of masters, insert that as well
 	for i := 0; i < len(masters); i++ {
+
+		// skip leader
+		if leader == masters[i] {
+			continue
+		}
+
 		ip, port, err := getProto(masters[i])
 		if err != nil {
 			logging.Error.Println(err)
@@ -339,19 +368,6 @@ func (rg *RecordGenerator) masterRecord(listener string, domain string, masters 
 		host := "master." + domain + ":" + port
 		rg.insertRR(tcp, host, "SRV")
 		rg.insertRR(udp, host, "SRV")
-
-		// if this is this is the leading master
-		if ip == leader {
-			// A record
-			arec = "leader." + domain + "."
-			rg.insertRR(arec, ip, "A")
-			// SRV records
-			tcp := "_leader._tcp." + domain + "."
-			udp := "_leader._udp." + domain + "."
-			host := "leader." + domain + ":" + port
-			rg.insertRR(tcp, host, "SRV")
-			rg.insertRR(udp, host, "SRV")
-		}
 	}
 }
 
