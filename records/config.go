@@ -213,10 +213,11 @@ func ZKdetect(c Config) {
 		if info == nil {
 			c.leader = ""
 			logging.Error.Println("No leader available in Zookeeper.")
-
 		} else if host := info.GetHostname(); host != "" {
+			logging.VeryVerbose.Println("ZK info ", info)
 			c.leader = host
 		} else {
+			logging.VeryVerbose.Println("ZK info ", info)
 			// unpack IPv4
 			octets := make([]byte, 4, 4)
 			binary.BigEndian.PutUint32(octets, info.GetIp())
