@@ -301,7 +301,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 	}
 
 	rg.listenerRecord(listener, mname)
-	rg.masterRecord(listener, domain, masters, sj.Leader)
+	rg.masterRecord(domain, masters, sj.Leader)
 	return nil
 }
 
@@ -319,12 +319,13 @@ func (rg *RecordGenerator) listenerRecord(listener string, mname string) {
 
 // masterRecord sets A records for the mesos masters and an A record
 // for the leading master
-func (rg *RecordGenerator) masterRecord(listener string, domain string, masters []string, leader string) {
-	logging.VeryVerbose.Println("MasterRecord called")
+func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader string) {
+	logging.VeryVerbose.Println("MasterRecord called" + leader)
 
 	// create records for leader
 	// A records
-	ip, port, err := getProto(leader)
+	h := strings.Split(leader, "@")
+	ip, port, err := getProto(h[0])
 	if err != nil {
 		logging.Error.Println(err)
 	}
