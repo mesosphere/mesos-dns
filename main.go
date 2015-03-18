@@ -44,6 +44,7 @@ func main() {
 		//		break
 		//	}
 		//}
+		// horrible hack
 		time.Sleep(100 * time.Millisecond)
 	}
 
