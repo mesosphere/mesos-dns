@@ -320,6 +320,7 @@ func (rg *RecordGenerator) listenerRecord(listener string, mname string) {
 // masterRecord sets A records for the mesos masters and an A record
 // for the leading master
 func (rg *RecordGenerator) masterRecord(listener string, domain string, masters []string, leader string) {
+	logging.VeryVerbose.Println("MasterRecord called")
 
 	// create records for leader
 	// A records
