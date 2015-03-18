@@ -62,7 +62,7 @@ type Config struct {
 
 	// Leading master info, as identified through Zookeeper
 	leader     string
-	startZk     bool 
+	StartZk     bool 
 	leaderLock sync.RWMutex
 }
 
@@ -135,7 +135,7 @@ func SetConfig(cjson string) (c Config) {
 	logging.Verbose.Println("   - Email: " + c.Email)
 	logging.Verbose.Println("   - Mname: " + c.Mname)
 
-	c.startZk = false
+	c.StartZk = false
 	return c
 }
 
@@ -229,7 +229,7 @@ func ZKdetect(c *Config) {
 			c.leader = fmt.Sprintf("%s:%d", c.leader, info.GetPort())
 		}
 		logging.Verbose.Println("New master in Zookeeper ", c.leader)
-		c.startZk = true
+		c.StartZk = true
 	})); err != nil {
 		logging.Error.Println("failed to initialize master detector ", err)
 		os.Exit(1)

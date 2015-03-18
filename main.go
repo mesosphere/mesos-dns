@@ -40,7 +40,7 @@ func main() {
 		records.ZKdetect(&resolver.Config)
 		// wait for the first read from ZK
 		for {
-			if resolver.Config.startZk == true {
+			if resolver.Config.StartZk == true {
 				break
 			}
 		}
