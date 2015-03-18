@@ -159,12 +159,30 @@ func yankPorts(ports string) []string {
 
 // findMaster tries each master and looks for the leader
 // if no leader responds it errors
-func (rg *RecordGenerator) findMaster(masters []string) (StateJSON, error) {
+func (rg *RecordGenerator) findMaster(c Config) (StateJSON, error) {
 	var sj StateJSON
 
+	if len(c.leader) != 0 {
+		logging.VeryVerbose.Println("Zookeeper says the leader is: ", c.leader)
+		ip, port, err := getProto(c.leader)
+		if err != nil {
+			logging.Error.Println(err)
+		}
+
+		sj, _ = rg.loadWrap(ip, port)
+		if sj.Leader == "" {
+			logging.VeryVerbose.Println("Zookeeper is wrong about leader")
+			if len(c.Masters) == 0 {
+				return sj, errors.New("no master")
+			}
+		} else {
+			return sj, nil
+		}
+	}
+
 	// try each listed mesos master before dying
-	for i := 0; i < len(masters); i++ {
-		ip, port, err := getProto(masters[i])
+	for i := 0; i < len(c.Masters); i++ {
+		ip, port, err := getProto(c.Masters[i])
 		if err != nil {
 			logging.Error.Println(err)
 		}
@@ -174,7 +192,7 @@ func (rg *RecordGenerator) findMaster(masters []string) (StateJSON, error) {
 		if sj.Leader == "" {
 			logging.VeryVerbose.Println("not a leader - trying next one")
 
-			if len(masters)-1 == i {
+			if len(c.Masters)-1 == i {
 				return sj, errors.New("no master")
 			}
 
@@ -206,13 +224,8 @@ func getProto(pair string) (string, string, error) {
 // this will shudown if it can't connect to a mesos master
 func (rg *RecordGenerator) ParseState(config Config) {
 
-	// let's test things first
-	if len(config.Zk) > 0 {
-		logging.Verbose.Println("Zookeper things leading master is ", config.leader)
-	}
-
 	// try each listed mesos master before dying
-	sj, err := rg.findMaster(config.Masters)
+	sj, err := rg.findMaster(config)
 	if err != nil {
 		logging.Error.Println("no master")
 		return
