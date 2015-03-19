@@ -368,7 +368,9 @@ type Resolver struct {
 // Reload triggers a new refresh from mesos master
 func (res *Resolver) Reload() {
 	t := records.RecordGenerator{}
-	t.ParseState(res.Config)
+	err := t.ParseState(res.Config)
 
-	res.rs = t
+	if err == nil {
+		res.rs = t
+	}
 }

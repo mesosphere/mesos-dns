@@ -224,19 +224,23 @@ func getProto(pair string) (string, string, error) {
 //  _<tag>.<service>.<framework>._<protocol>..mesos
 // it also tries different mesos masters if one is not up
 // this will shudown if it can't connect to a mesos master
-func (rg *RecordGenerator) ParseState(config Config) {
+func (rg *RecordGenerator) ParseState(config Config) error {
 
 	// try each listed mesos master before dying
 	sj, err := rg.findMaster(config)
 	if err != nil {
 		logging.Error.Println("no master")
-		return
+		return err
 	}
 
 	if sj.Leader == "" {
 		logging.Error.Println("Unexpected error")
+		err = errors.New("empty master")
+		return err
 	}
+
 	rg.InsertState(sj, config.Domain, config.Mname, config.Listener, config.Masters)
+	return nil
 }
 
 // cleanName sanitizes invalid characters
