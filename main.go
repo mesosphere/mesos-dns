@@ -35,12 +35,20 @@ func main() {
 
 	resolver.Config = records.SetConfig(*cjson)
 
+	// handle for everything in this domain...
+	dns.HandleFunc(resolver.Config.Domain+".", panicRecover(resolver.HandleMesos))
+	dns.HandleFunc(".", panicRecover(resolver.HandleNonMesos))
+
+	go resolver.Serve("tcp")
+	go resolver.Serve("udp")
+
 	// if ZK is identified, start detector and wait for first master
 	if resolver.Config.Zk != "" {
 		dr := make(chan bool)
 		go records.ZKdetect(&resolver.Config, dr)
 		logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
 		<-dr
+		logging.VeryVerbose.Println("Warning: done waiting for initial information from Zookeper.")
 		close(dr)
 	}
 
@@ -53,13 +61,6 @@ func main() {
 			logging.PrintCurLog()
 		}
 	}()
-
-	// handle for everything in this domain...
-	dns.HandleFunc(resolver.Config.Domain+".", panicRecover(resolver.HandleMesos))
-	dns.HandleFunc(".", panicRecover(resolver.HandleNonMesos))
-
-	go resolver.Serve("tcp")
-	go resolver.Serve("udp")
 
 	wg.Add(1)
 	wg.Wait()
