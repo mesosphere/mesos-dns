@@ -128,7 +128,7 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 	sj = rg.loadFromMaster(ip, port)
 
 	if rip := leaderIP(sj.Leader); rip != ip {
-		logging.VeryVerbose.Println("master changed to " + ip)
+		logging.VeryVerbose.Println("Warning: master changed to " + ip)
 		sj = rg.loadFromMaster(rip, port)
 	}
 
@@ -162,7 +162,7 @@ func yankPorts(ports string) []string {
 func (rg *RecordGenerator) findMaster(c Config) (StateJSON, error) {
 	var sj StateJSON
 
-	if len(c.leader) != 0 {
+	if c.leader != "" {
 		logging.VeryVerbose.Println("Zookeeper says the leader is: ", c.leader)
 		ip, port, err := getProto(c.leader)
 		if err != nil {
@@ -171,9 +171,11 @@ func (rg *RecordGenerator) findMaster(c Config) (StateJSON, error) {
 
 		sj, _ = rg.loadWrap(ip, port)
 		if sj.Leader == "" {
-			logging.VeryVerbose.Println("Zookeeper is wrong about leader")
+			logging.VeryVerbose.Println("Warning: Zookeeper is wrong about leader")
 			if len(c.Masters) == 0 {
 				return sj, errors.New("no master")
+			} else {
+				logging.VeryVerbose.Println("Warning: falling back to Masters config field: ", c.Masters)
 			}
 		} else {
 			return sj, nil
@@ -181,7 +183,6 @@ func (rg *RecordGenerator) findMaster(c Config) (StateJSON, error) {
 	}
 
 	// try each listed mesos master before dying
-	logging.VeryVerbose.Println("Falling back to Masters config field: ", c.Masters)
 	for i := 0; i < len(c.Masters); i++ {
 		ip, port, err := getProto(c.Masters[i])
 		if err != nil {
@@ -191,7 +192,7 @@ func (rg *RecordGenerator) findMaster(c Config) (StateJSON, error) {
 		sj, _ = rg.loadWrap(ip, port)
 
 		if sj.Leader == "" {
-			logging.VeryVerbose.Println("not a leader - trying next one")
+			logging.VeryVerbose.Println("Warning: not a leader - trying next one")
 
 			if len(c.Masters)-1 == i {
 				return sj, errors.New("no master")
@@ -232,6 +233,9 @@ func (rg *RecordGenerator) ParseState(config Config) {
 		return
 	}
 
+	if sj.Leader == "" {
+		logging.Error.Println("Unexpected error")
+	}
 	rg.InsertState(sj, config.Domain, config.Mname, config.Listener, config.Masters)
 }
 

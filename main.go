@@ -36,9 +36,10 @@ func main() {
 	resolver.Config = records.SetConfig(*cjson)
 
 	// if ZK is identified, start detector and wait for first master
-	if len(resolver.Config.Zk) != 0 {
+	if resolver.Config.Zk != "" {
 		dr := make(chan bool)
 		go records.ZKdetect(&resolver.Config, dr)
+		logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
 		<-dr
 		close(dr)
 	}

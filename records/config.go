@@ -27,7 +27,7 @@ type Config struct {
 	Masters []string
 
 	// Zookeeper: a single Zk url
-	Zk []string
+	Zk string
 
 	// Refresh frequency: the frequency in seconds of regenerating records (default 60)
 	RefreshSeconds int
@@ -69,6 +69,7 @@ type Config struct {
 // SetConfig instantiates a Config struct read in from config.json
 func SetConfig(cjson string) (c Config) {
 	c = Config{
+		Zk:             "",
 		RefreshSeconds: 60,
 		TTL:            60,
 		Domain:         "mesos",
@@ -106,7 +107,7 @@ func SetConfig(cjson string) (c Config) {
 		c.Resolvers = GetLocalDNS()
 	}
 
-	if len(c.Masters) == 0 && len(c.Zk) == 0 {
+	if len(c.Masters) == 0 && c.Zk == "" {
 		logging.Error.Println("please specify mesos masters or zookeeper in config.json")
 		os.Exit(1)
 	}
@@ -123,8 +124,8 @@ func SetConfig(cjson string) (c Config) {
 	if len(c.Masters) != 0 {
 		logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
 	}
-	if len(c.Zk) != 0 {
-		logging.Verbose.Println("   - Zookeeper: " + strings.Join(c.Zk, ", "))
+	if c.Zk != "" {
+		logging.Verbose.Println("   - Zookeeper: ", c.Zk)
 	}
 	logging.Verbose.Println("   - RefreshSeconds: ", c.RefreshSeconds)
 	logging.Verbose.Println("   - TTL: ", c.TTL)
@@ -201,8 +202,8 @@ func GetLocalDNS() []string {
 func ZKdetect(c *Config, dr chan bool) {
 
 	// start listener
-	logging.Verbose.Println("Starting master detector for ZK ", c.Zk[0])
-	md, err := detector.New(c.Zk[0])
+	logging.Verbose.Println("Starting master detector for ZK ", c.Zk)
+	md, err := detector.New(c.Zk)
 	if err != nil {
 		logging.Error.Println("failed to create master detector: ", err)
 		os.Exit(1)
