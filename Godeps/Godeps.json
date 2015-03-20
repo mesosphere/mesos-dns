@@ -1,0 +1,54 @@
+{
+	"ImportPath": "github.com/mesosphere/mesos-dns",
+	"GoVersion": "go1.4.2",
+	"Deps": [
+		{
+			"ImportPath": "github.com/gogo/protobuf/proto",
+			"Rev": "bc946d07d1016848dfd2507f90f0859c9471681e"
+		},
+		{
+			"ImportPath": "github.com/golang/glog",
+			"Rev": "44145f04b68cf362d9c4df2182967c2275eaefed"
+		},
+		{
+			"ImportPath": "github.com/mesos/mesos-go/detector",
+			"Rev": "d4406379fb263be8b6c2f5d53bac1570aac28242"
+		},
+		{
+			"ImportPath": "github.com/mesos/mesos-go/mesosproto",
+			"Rev": "d4406379fb263be8b6c2f5d53bac1570aac28242"
+		},
+		{
+			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
+			"Rev": "d4406379fb263be8b6c2f5d53bac1570aac28242"
+		},
+		{
+			"ImportPath": "github.com/mesos/mesos-go/upid",
+			"Rev": "d4406379fb263be8b6c2f5d53bac1570aac28242"
+		},
+		{
+			"ImportPath": "github.com/miekg/dns",
+			"Rev": "f01e44c2fdbf755201344b5b7917f974a4badd13"
+		},
+		{
+			"ImportPath": "github.com/samuel/go-zookeeper/zk",
+			"Rev": "fa6674abf3f4580b946a01bf7a1ce4ba8766205b"
+		},
+		{
+			"ImportPath": "github.com/stretchr/objx",
+			"Rev": "cbeaeb16a013161a98496fad62933b1d21786672"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Rev": "e4ec8152c15fc46bd5056ce65997a07c7d415325"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/mock",
+			"Rev": "e4ec8152c15fc46bd5056ce65997a07c7d415325"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "97d8e4e174133a4d1d2171380e510eb4dea8f5ea"
+		}
+	]
+}
