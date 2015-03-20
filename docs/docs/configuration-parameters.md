@@ -10,6 +10,7 @@ The configuration file should include the following fields:
 
 ```
 {
+  "zk": "zk://10.101.160.15:2181/mesos",
   "masters": ["10.101.160.15:5050", "10.101.160.16:5050", "10.101.160.17:5050"],
   "refreshSeconds": 60,
   "ttl": 60,
@@ -22,8 +23,11 @@ The configuration file should include the following fields:
 }
 ```
 
+`zk` is a link to the Zookeeper instances on the Mesos cluster. Its format is `zk://host1:port1,host2:port2/mesos/`, where the number of hosts can be one or more. The default port for Zookeeper is `2181`. Mesos-DNS will monitor the Zookeeper instances to detect the current leading master. 
 
 `masters` is a comma separated list with the IP address and port number for the master(s) in the Mesos cluster. Mesos-DNS will automatically find the leading master at any point in order to retrieve state about running tasks. If there is no leading master or the leading master is not responsive, Mesos-DNS will continue serving DNS requests based on stale information about running tasks. The `masters` field is required. 
+
+It is sufficient to specify just one of the `zk` or `masters` field. If both are defined, Mesos-DNS will first attempt to detect the leading master through Zookeeper. If Zookeeper is not responding, it will fall back to using the `masters` field. Both `zk` and `master` fields are static. To update them you need to restart Mesos-DNS. We recommend you use the `zk` field since this allows the dynamic addition to Mesos masters. 
 
 `refreshSeconds` is the frequency at which Mesos-DNS updates DNS records based on information retrieved from the Mesos master. The default value is 60 seconds. 
 

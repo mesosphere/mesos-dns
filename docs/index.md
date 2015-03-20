@@ -38,5 +38,5 @@ Mesos-DNS periodically queries the Mesos master(s), retrieves the state of all r
 
 Mesos-DNS is simple and stateless. It does not require consensus mechanisms, persistent storage, or a replicated log. This is possible because Mesos-DNS does not implement heartbeats, health monitoring, or lifetime management for applications. This functionality is already available by the Mesos master, slaves, and frameworks. Mesos-DNS can be made fault-tolerant by launching with a framework like [Marathon](https://github.com/mesosphere/marathon), that can monitor application health and re-launch it on failures. On restart after a failure, Mesos-DNS retrieves the latest state from the Mesos master(s) and serves DNS requests without further coordination. It can be easily replicated to improve availability or to load balance DNS requests in clusters with large numbers of slaves. 
 
-The current **alpha** version of Mesos-DNS has been tested with Mesos version v0.21.0. It has no dependencies to any frameworks. 
+The current **alpha** version of Mesos-DNS (0.1.1) has been tested with Mesos version v0.21.0. It has no dependencies to any frameworks. 
 

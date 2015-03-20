@@ -6,24 +6,23 @@ title: Building and Running Mesos-DNS
 
 ### Building Mesos-DNS
 
-To build Mesos-DNS, you need to install `go` on your computer using [these instructions](https://golang.org/doc/install). If you install go to a custom location, make sure that the `GOROOT` environment variable is properly set and that `$GOROOT/bin` is added to `PATH` environment variable. You must set the `GOPATH` environment variable to point to the directory where outside `go` packages will be installed. For instance:
+To build Mesos-DNS, you need to install [`go`](https://golang.org/doc/install) and [`godep`](https://github.com/tools/godep) on your computer. If you install go to a custom location, make sure that the `GOROOT` environment variable is properly set and that `$GOROOT/bin` is added to `PATH` environment variable. You must set the `GOPATH` environment variable to point to the directory where outside `go` packages will be installed. For instance:
 
 ```
 export GOROOT=/usr/local/go
-export PATH=$PATH:$GOROOT/bin
 export GOPATH=$HOME/go
+export PATH=$PATH:$GOROOT/bin
+export PATH=$PATH:$GOPATH/bin
 ```   
 
-To build Mesos-DNS using `go`: 
+To build Mesos-DNS using `godep`: 
 
 ```
-go get github.com/miekg/dns
-go get github.com/mesosphere/mesos-dns
-cd $GOPATH/src/github.com/mesosphere/mesos-dns
-go build -o mesos-dns 
+git clone https://github.com/mesosphere/mesos-dns.git
+make build
 ``` 
 
-`mesos-dns` is a statically-linked binary that can be installed anywhere. You will find a sample configuration file `config.json` in the same directory. 
+This generates `mesos-dns`, a statically-linked binary that can be installed anywhere. You will find a sample configuration file `config.json` in the same directory. 
 
 We have built and tested Mesos-DNS with `go` versions 1.3.3 and 1.4. Newer versions of `go` should work as well. 
 
