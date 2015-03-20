@@ -372,7 +372,7 @@ func (res *Resolver) Reload() {
 
 	if err == nil {
 		res.rs = t
-		} else {
+	} else {
 		logging.VeryVerbose.Println("Warning: master not found; keeping old DNS state")
-		}
+	}
 }

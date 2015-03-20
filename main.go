@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/resolver"
@@ -21,8 +22,6 @@ func main() {
 	versionFlag := false
 
 	cjson := flag.String("config", "config.json", "location of configuration file (json)")
-	flag.BoolVar(&logging.VerboseFlag, "e", false, "verbose logging")
-	flag.BoolVar(&logging.VeryVerboseFlag, "ee", false, "very verbose logging")
 	flag.BoolVar(&versionFlag, "version", false, "output the version")
 	flag.Parse()
 
@@ -30,6 +29,15 @@ func main() {
 		fmt.Println(version)
 		os.Exit(0)
 	}
+
+	if glog.V(2) {
+		logging.VeryVerboseFlag = true
+	} else if glog.V(1) {
+		logging.VerboseFlag = true
+	}
+
+	flag.BoolVar(&logging.VerboseFlag, "e", false, "verbose logging")
+	flag.BoolVar(&logging.VeryVerboseFlag, "ee", false, "very verbose logging")
 
 	logging.SetupLogs()
 
