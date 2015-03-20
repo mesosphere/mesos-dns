@@ -36,9 +36,6 @@ func main() {
 		logging.VerboseFlag = true
 	}
 
-	flag.BoolVar(&logging.VerboseFlag, "e", false, "verbose logging")
-	flag.BoolVar(&logging.VeryVerboseFlag, "ee", false, "very verbose logging")
-
 	logging.SetupLogs()
 
 	resolver.Config = records.SetConfig(*cjson)

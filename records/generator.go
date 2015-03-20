@@ -171,11 +171,11 @@ func (rg *RecordGenerator) findMaster(c Config) (StateJSON, error) {
 
 		sj, _ = rg.loadWrap(ip, port)
 		if sj.Leader == "" {
-			logging.VeryVerbose.Println("Warning: Zookeeper is wrong about leader")
+			logging.Verbose.Println("Warning: Zookeeper is wrong about leader")
 			if len(c.Masters) == 0 {
 				return sj, errors.New("no master")
 			} else {
-				logging.VeryVerbose.Println("Warning: falling back to Masters config field: ", c.Masters)
+				logging.Verbose.Println("Warning: falling back to Masters config field: ", c.Masters)
 			}
 		} else {
 			return sj, nil

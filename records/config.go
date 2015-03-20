@@ -108,7 +108,7 @@ func SetConfig(cjson string) (c Config) {
 	}
 
 	if len(c.Masters) == 0 && c.Zk == "" {
-		logging.Error.Println("please specify mesos masters or zookeeper in config.json")
+		logging.Error.Println("specify mesos masters or zookeeper in config.json")
 		os.Exit(1)
 	}
 
