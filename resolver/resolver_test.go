@@ -255,7 +255,7 @@ func TestNonMesosHandler(t *testing.T) {
 	go res.Serve("tcp")
 
 	// wait for startup ? lame
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// test A records
 	msg, err = fakeQuery("google.com", dns.TypeA, "udp")
@@ -264,7 +264,7 @@ func TestNonMesosHandler(t *testing.T) {
 	}
 
 	if len(msg) < 2 {
-		t.Error("not serving up A records")
+		t.Errorf("not serving up A records, expected 2 records instead of %d", len(msg))
 	}
 
 }

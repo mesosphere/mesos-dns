@@ -47,7 +47,7 @@ func (res *Resolver) resolveOut(r *dns.Msg, nameserver string, proto string, cnt
 	if (in != nil) && (len(in.Answer) == 0) && (!in.MsgHdr.Authoritative) && (len(in.Ns) > 0) && (err != nil) {
 
 		if cnt == recurseCnt {
-			logging.CurLog.NonMesosRecursed += 1
+			logging.CurLog.NonMesosRecursed.Inc()
 		}
 
 		if cnt > 0 {
@@ -196,18 +196,18 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	// tracing info
-	logging.CurLog.NonMesosRequests += 1
+	logging.CurLog.NonMesosRequests.Inc()
 
 	if err != nil {
 		logging.Error.Println(err)
-		logging.CurLog.NonMesosFailed += 1
+		logging.CurLog.NonMesosFailed.Inc()
 	} else {
 
 		// nxdomain
 		if len(m.Answer) == 0 {
-			logging.CurLog.NonMesosNXDomain += 1
+			logging.CurLog.NonMesosNXDomain.Inc()
 		} else {
-			logging.CurLog.NonMesosSuccess += 1
+			logging.CurLog.NonMesosSuccess.Inc()
 		}
 	}
 
@@ -289,10 +289,10 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	m.Answer = shuffleAnswers(m.Answer)
 
 	// tracing info
-	logging.CurLog.MesosRequests += 1
+	logging.CurLog.MesosRequests.Inc()
 
 	if err != nil {
-		logging.CurLog.MesosFailed += 1
+		logging.CurLog.MesosFailed.Inc()
 	} else if (qType == dns.TypeAAAA) && (len(res.rs.SRVs[dom]) > 0 || len(res.rs.As[dom]) > 0) {
 
 		m = new(dns.Msg)
@@ -319,11 +319,11 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 				m.Ns = append(m.Ns, rr)
 			}
 
-			logging.CurLog.MesosNXDomain += 1
+			logging.CurLog.MesosNXDomain.Inc()
 			logging.VeryVerbose.Println("total A rrs:\t" + strconv.Itoa(len(res.rs.As)))
 			logging.VeryVerbose.Println("failed looking for " + r.Question[0].String())
 		} else {
-			logging.CurLog.MesosSuccess += 1
+			logging.CurLog.MesosSuccess.Inc()
 		}
 	}
 
@@ -368,7 +368,7 @@ type Resolver struct {
 // Reload triggers a new refresh from mesos master
 func (res *Resolver) Reload() {
 	t := records.RecordGenerator{}
-	err := t.ParseState(res.Config)
+	err := t.ParseState(&res.Config)
 
 	if err == nil {
 		res.rs = t

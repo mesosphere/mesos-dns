@@ -49,12 +49,20 @@ func main() {
 
 	// if ZK is identified, start detector and wait for first master
 	if resolver.Config.Zk != "" {
-		dr := make(chan bool)
-		go records.ZKdetect(&resolver.Config, dr)
+		dr, err := records.ZKdetect(&resolver.Config)
+		if err != nil {
+			logging.Error.Println(err.Error())
+			os.Exit(1)
+		}
+
 		logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
-		<-dr
-		logging.VeryVerbose.Println("Warning: done waiting for initial information from Zookeper.")
-		close(dr)
+		select {
+		case <-dr:
+			logging.VeryVerbose.Println("Warning: done waiting for initial information from Zookeper.")
+		case <-time.After(2 * time.Minute):
+			logging.Error.Println("timed out waiting for initial ZK detection, exiting")
+			os.Exit(1)
+		}
 	}
 
 	// reload the first time

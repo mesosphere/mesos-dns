@@ -4,6 +4,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
+	"sync/atomic"
 )
 
 var (
@@ -14,19 +16,45 @@ var (
 	Error           *log.Logger
 )
 
-type LogOut struct {
-	MesosRequests    int
-	MesosSuccess     int
-	MesosNXDomain    int
-	MesosFailed      int
-	NonMesosRequests int
-	NonMesosSuccess  int
-	NonMesosNXDomain int
-	NonMesosFailed   int
-	NonMesosRecursed int
+type Counter interface {
+	Inc()
 }
 
-var CurLog LogOut
+type LogCounter struct {
+	value uint64
+}
+
+func (lc *LogCounter) Inc() {
+	atomic.AddUint64(&lc.value, 1)
+}
+
+func (lc *LogCounter) String() string {
+	return strconv.FormatUint(atomic.LoadUint64(&lc.value), 10)
+}
+
+type LogOut struct {
+	MesosRequests    Counter
+	MesosSuccess     Counter
+	MesosNXDomain    Counter
+	MesosFailed      Counter
+	NonMesosRequests Counter
+	NonMesosSuccess  Counter
+	NonMesosNXDomain Counter
+	NonMesosFailed   Counter
+	NonMesosRecursed Counter
+}
+
+var CurLog = LogOut{
+	MesosRequests:    &LogCounter{},
+	MesosSuccess:     &LogCounter{},
+	MesosNXDomain:    &LogCounter{},
+	MesosFailed:      &LogCounter{},
+	NonMesosRequests: &LogCounter{},
+	NonMesosSuccess:  &LogCounter{},
+	NonMesosNXDomain: &LogCounter{},
+	NonMesosFailed:   &LogCounter{},
+	NonMesosRecursed: &LogCounter{},
+}
 
 // PrintCurLog prints out the current LogOut and then resets
 func PrintCurLog() {
