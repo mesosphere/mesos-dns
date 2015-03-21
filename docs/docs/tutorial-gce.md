@@ -41,15 +41,16 @@ export PATH=$PATH:/usr/local/go/bin
 export GOROOT=/usr/local/go
 export PATH=$PATH:$GOROOT/bin
 export GOPATH=$HOME/go
+go get github.com/tools/godep
+export PATH=$PATH:$GOPATH/bin
 ```
 
 Now, we are ready to compile Mesos-DNS:
 
 ```
-go get github.com/miekg/dns
 go get github.com/mesosphere/mesos-dns
 cd $GOPATH/src/github.com/mesosphere/mesos-dns
-go build -o mesos-dns
+make all
 sudo mkdir /usr/local/mesos-dns
 sudo mv mesos-dns /usr/local/mesos-dns
 ```
@@ -59,7 +60,7 @@ In the same directory (`/usr/local/mesos-dns`), create a file named `config.json
 ```
 $ cat /usr/local/mesos-dns/config.json 
 {
-  "masters": ["10.41.40.151:5050"],
+  "zk": "zk://10.41.40.151:2181/mesos",
   "refreshSeconds": 60,
   "ttl": 60,
   "domain": "mesos",
