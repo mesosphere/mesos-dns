@@ -63,7 +63,6 @@ type Config struct {
 	// Leading master info, as identified through Zookeeper
 	leader     string
 	leaderLock sync.RWMutex
-	first      bool
 }
 
 // SetConfig instantiates a Config struct read in from config.json
@@ -79,7 +78,6 @@ func SetConfig(cjson string) (c Config) {
 		Resolvers:      []string{"8.8.8.8"},
 		Listener:       "0.0.0.0",
 		leader:         "",
-		first:          true,
 	}
 
 	usr, _ := user.Current()
@@ -137,7 +135,6 @@ func SetConfig(cjson string) (c Config) {
 	logging.Verbose.Println("   - Email: " + c.Email)
 	logging.Verbose.Println("   - Mname: " + c.Mname)
 
-	c.first = true
 	return c
 }
 
@@ -198,20 +195,23 @@ func GetLocalDNS() []string {
 	return nonLocalAddies(conf.Servers)
 }
 
-// Start a Zookeeper listener to track leading master
-func ZKdetect(c *Config, dr chan bool) {
+// Start a Zookeeper listener to track leading master, returns a signal chan
+// that closes upon the first leader detection notification (and c.leader is
+// meaningfully readable).
+func ZKdetect(c *Config) (<-chan struct{}, error) {
 
 	// start listener
 	logging.Verbose.Println("Starting master detector for ZK ", c.Zk)
 	md, err := detector.New(c.Zk)
 	if err != nil {
-		logging.Error.Println("failed to create master detector: ", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("failed to create master detector: %v", err)
 	}
 
 	// and listen for master changes
+	var startedOnce sync.Once
+	started := make(chan struct{})
 	if err := md.Detect(detector.OnMasterChanged(func(info *mesos.MasterInfo) {
-		// making this tomic
+		// making this atomic
 		c.leaderLock.Lock()
 		defer c.leaderLock.Unlock()
 		logging.VeryVerbose.Println("Updated Zookeeper info: ", info)
@@ -231,13 +231,15 @@ func ZKdetect(c *Config, dr chan bool) {
 			c.leader = fmt.Sprintf("%s:%d", c.leader, info.GetPort())
 		}
 		logging.Verbose.Println("New master in Zookeeper ", c.leader)
-		if c.first {
-			dr <- true
-			c.first = false
-		}
+		startedOnce.Do(func() { close(started) })
 	})); err != nil {
-		logging.Error.Println("failed to initialize master detector ", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("failed to initialize master detector: %v", err)
 	}
+	return started, nil
+}
 
+func (c *Config) getLeader() string {
+	c.leaderLock.Lock()
+	defer c.leaderLock.Unlock()
+	return c.leader
 }
