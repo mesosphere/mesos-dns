@@ -374,6 +374,7 @@ func (res *Resolver) Hdns() {
     // webserver + available routes
 	ws := new(restful.WebService)
 	ws.Route(ws.GET("/config").To(res.HdnsConfig))
+	ws.Route(ws.GET("/version").To(res.HdnsVersion))
 	restful.Add(ws)
 
 	portString := ":" + strconv.Itoa(res.Config.HttpPort)
@@ -386,16 +387,29 @@ func (res *Resolver) Hdns() {
 	os.Exit(1)
 }
 
+// Reports configuration through http interface
 func (res *Resolver) HdnsConfig(req *restful.Request, resp *restful.Response) {
-	output, _ := json.Marshal(res.Config)
+	output, err := json.Marshal(res.Config)
+	if err != nil {
+			logging.Error.Println(err)
+	}
 	io.WriteString(resp, string(output))
 }
+
+// Reports configuration through http interface
+func (res *Resolver) HdnsVersion(req *restful.Request, resp *restful.Response) {
+	io.WriteString(resp, "Mesos-DNS " + res.Version +"\n" + 
+		           "More information at https://github.com/mesosphere/mesos-dns")
+}
+
+
 
 // Resolver holds configuration information and the resource records
 // refactor me
 type Resolver struct {
 	rs     records.RecordGenerator
 	Config records.Config
+	Version string
 }
 
 // Reload triggers a new refresh from mesos master

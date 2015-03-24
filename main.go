@@ -38,6 +38,7 @@ func main() {
 
 	logging.SetupLogs()
 
+	resolver.Version = version
 	resolver.Config = records.SetConfig(*cjson)
 
 	// handle for everything in this domain...
