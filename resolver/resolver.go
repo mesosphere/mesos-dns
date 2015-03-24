@@ -373,8 +373,11 @@ func (res *Resolver) Hdns() {
 
     // webserver + available routes
 	ws := new(restful.WebService)
-	ws.Route(ws.GET("/config").To(res.HdnsConfig))
-	ws.Route(ws.GET("/version").To(res.HdnsVersion))
+	ws.Route(ws.GET("/v1/version").To(res.HdnsVersion))
+	ws.Route(ws.GET("/v1/config").To(res.HdnsConfig))
+	ws.Route(ws.GET("/v1/hosts/{host}").To(res.HdnsHosts))
+	ws.Route(ws.GET("/v1/hosts/{host}/ports").To(res.HdnsPorts))
+	ws.Route(ws.GET("/v1/services/{service}").To(res.HdnsServices))
 	restful.Add(ws)
 
 	portString := ":" + strconv.Itoa(res.Config.HttpPort)
@@ -396,9 +399,11 @@ func (res *Resolver) HdnsConfig(req *restful.Request, resp *restful.Response) {
 	io.WriteString(resp, string(output))
 }
 
-// Reports configuration through http interface
+// Reports Mesos-DNS version through http interface
 func (res *Resolver) HdnsVersion(req *restful.Request, resp *restful.Response) {
-	mapV := map[string]string{"Version": res.Version, "url": "https://github.com/mesosphere/mesos-dns"}
+	mapV := map[string]string{"Service": "Mesos-DNS",
+	                          "Version": res.Version, 
+	                          "URL": "https://github.com/mesosphere/mesos-dns"}
 	output, err := json.Marshal(mapV)
 	if err != nil {
 			logging.Error.Println(err)
@@ -406,6 +411,22 @@ func (res *Resolver) HdnsVersion(req *restful.Request, resp *restful.Response) {
 	io.WriteString(resp, string(output))
 }
 
+// Reports Mesos-DNS version through http interface
+func (res *Resolver) HdnsHosts(req *restful.Request, resp *restful.Response) {
+		io.WriteString(resp, "To be implemented...")
+}
+
+// Reports Mesos-DNS version through http interface
+func (res *Resolver) HdnsPorts(req *restful.Request, resp *restful.Response) {
+		io.WriteString(resp, "To be implemented...")
+}
+
+// Reports Mesos-DNS version through http interface
+func (res *Resolver) HdnsServices(req *restful.Request, resp *restful.Response) {
+	service := req.PathParameter("service")
+	io.WriteString(resp, "Will soon look for " + service)
+
+}
 
 
 // Resolver holds configuration information and the resource records
