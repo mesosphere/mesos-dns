@@ -8,12 +8,15 @@ import (
 	"github.com/mesosphere/mesos-dns/records"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+	"io"
 
 	"github.com/miekg/dns"
+	"github.com/emicklei/go-restful"
 )
 
 var (
@@ -356,6 +359,31 @@ func (res *Resolver) Serve(net string) {
 	}
 
 	os.Exit(1)
+}
+
+// Hdns starts an http server for dns queries
+func (res *Resolver) Hdns() {
+	defer func() {
+		if rec := recover(); rec != nil {
+			logging.Error.Printf("%s\n", rec)
+			os.Exit(1)
+		}
+	}()
+
+	ws := new(restful.WebService)
+	ws.Route(ws.GET("/hello").To(hello))
+	restful.Add(ws)
+	if err := http.ListenAndServe(":8181", nil); err != nil {
+		logging.Error.Printf("Failed to setup http server: %s\n", err.Error())
+	} else {
+		logging.Error.Printf("Not serving http requests any more .")
+	}
+
+	os.Exit(1)
+}
+
+func hello(req *restful.Request, resp *restful.Response) {
+	io.WriteString(resp, "oops, this works")
 }
 
 // Resolver holds configuration information and the resource records
