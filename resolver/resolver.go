@@ -238,6 +238,8 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	switch qType {
 	case dns.TypeSRV:
 		for i := 0; i < len(res.rs.SRVs[dom]); i++ {
+			logging.VeryVerbose.Println("SRV request for " + r.Question[0].Name + " dom " + dom)
+
 			rr, err := res.formatSRV(r.Question[0].Name, res.rs.SRVs[dom][i])
 			if err != nil {
 				logging.Error.Println(err)
