@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 	"io"
+	"encoding/json"
 
 	"github.com/miekg/dns"
 	"github.com/emicklei/go-restful"
@@ -361,7 +362,7 @@ func (res *Resolver) Serve(net string) {
 	os.Exit(1)
 }
 
-// Hdns starts an http server for dns queries
+// Hdns starts an http server for mesos-dns queries
 func (res *Resolver) Hdns() {
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -370,10 +371,13 @@ func (res *Resolver) Hdns() {
 		}
 	}()
 
+    // webserver + available routes
 	ws := new(restful.WebService)
-	ws.Route(ws.GET("/hello").To(hello))
+	ws.Route(ws.GET("/config").To(res.HdnsConfig))
 	restful.Add(ws)
-	if err := http.ListenAndServe(":8181", nil); err != nil {
+
+	portString := ":" + strconv.Itoa(res.Config.HttpPort)
+	if err := http.ListenAndServe(portString, nil); err != nil {
 		logging.Error.Printf("Failed to setup http server: %s\n", err.Error())
 	} else {
 		logging.Error.Printf("Not serving http requests any more .")
@@ -382,8 +386,9 @@ func (res *Resolver) Hdns() {
 	os.Exit(1)
 }
 
-func hello(req *restful.Request, resp *restful.Response) {
-	io.WriteString(resp, "oops, this works")
+func (res *Resolver) HdnsConfig(req *restful.Request, resp *restful.Response) {
+	output, _ := json.Marshal(res.Config)
+	io.WriteString(resp, string(output))
 }
 
 // Resolver holds configuration information and the resource records
