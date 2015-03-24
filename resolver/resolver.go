@@ -423,9 +423,19 @@ func (res *Resolver) HdnsPorts(req *restful.Request, resp *restful.Response) {
 
 // Reports Mesos-DNS version through http interface
 func (res *Resolver) HdnsServices(req *restful.Request, resp *restful.Response) {
+	
 	service := req.PathParameter("service")
-	io.WriteString(resp, "Will soon look for " + service)
+	dom := strings.ToLower(cleanWild(service))
 
+	for i := 0; i < len(res.rs.SRVs[dom]); i++ {
+		h, p := res.splitDomain(res.rs.SRVs[dom][i])
+		mapS := map[string]string{"Service": service, "host": h, "port": strconv.Itoa(p)}
+		output, err := json.Marshal(mapS)
+		if err != nil {
+			logging.Error.Println(err)
+	    }
+	    io.WriteString(resp, string(output))
+    }
 }
 
 
