@@ -46,6 +46,8 @@ func main() {
 
 	go resolver.Serve("tcp")
 	go resolver.Serve("udp")
+	go resolver.Hdns()
+
 
 	// if ZK is identified, start detector and wait for first master
 	if resolver.Config.Zk != "" {
