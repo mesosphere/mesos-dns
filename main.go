@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/resolver"
@@ -21,8 +22,6 @@ func main() {
 	versionFlag := false
 
 	cjson := flag.String("config", "config.json", "location of configuration file (json)")
-	flag.BoolVar(&logging.VerboseFlag, "v", false, "verbose logging")
-	flag.BoolVar(&logging.VeryVerboseFlag, "vv", false, "very verbose logging")
 	flag.BoolVar(&versionFlag, "version", false, "output the version")
 	flag.Parse()
 
@@ -31,9 +30,40 @@ func main() {
 		os.Exit(0)
 	}
 
+	if glog.V(2) {
+		logging.VeryVerboseFlag = true
+	} else if glog.V(1) {
+		logging.VerboseFlag = true
+	}
+
 	logging.SetupLogs()
 
 	resolver.Config = records.SetConfig(*cjson)
+
+	// handle for everything in this domain...
+	dns.HandleFunc(resolver.Config.Domain+".", panicRecover(resolver.HandleMesos))
+	dns.HandleFunc(".", panicRecover(resolver.HandleNonMesos))
+
+	go resolver.Serve("tcp")
+	go resolver.Serve("udp")
+
+	// if ZK is identified, start detector and wait for first master
+	if resolver.Config.Zk != "" {
+		dr, err := records.ZKdetect(&resolver.Config)
+		if err != nil {
+			logging.Error.Println(err.Error())
+			os.Exit(1)
+		}
+
+		logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
+		select {
+		case <-dr:
+			logging.VeryVerbose.Println("Warning: done waiting for initial information from Zookeper.")
+		case <-time.After(2 * time.Minute):
+			logging.Error.Println("timed out waiting for initial ZK detection, exiting")
+			os.Exit(1)
+		}
+	}
 
 	// reload the first time
 	resolver.Reload()
@@ -44,13 +74,6 @@ func main() {
 			logging.PrintCurLog()
 		}
 	}()
-
-	// handle for everything in this domain...
-	dns.HandleFunc(resolver.Config.Domain+".", panicRecover(resolver.HandleMesos))
-	dns.HandleFunc(".", panicRecover(resolver.HandleNonMesos))
-
-	go resolver.Serve("tcp")
-	go resolver.Serve("udp")
 
 	wg.Add(1)
 	wg.Wait()

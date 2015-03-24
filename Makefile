@@ -2,29 +2,35 @@ DEPS = $(shell go list -f '{{range .TestImports}}{{.}} {{end}}' ./...)
 
 default: all
 
-all: deps format build
+all: test build
 
-deps:
-	@echo "--> Installing build dependencies"
-	@go get -d -v ./... $(DEPS)
+restoredeps:
+	@echo "--> Restoring build dependencies"
+	@godep restore
 
-updatedeps: deps
+savedeps: 
+	@echo "--> Saving build dependencies"
+	@godep save
+
+updatedeps: 
 	@echo "--> Updating build dependencies"
-	@go get -d -f -u ./... $(DEPS)
+	@godep update ${ARGS}
 
-format: deps
+format: 
 	@echo "--> Running go fmt"
-	@go fmt ./...
+	@godep go fmt ./...
 
-build: deps
+build: 
 	@echo "--> Building mesos-dns"
-	@go build -o mesos-dns
+	@godep go build -o mesos-dns
 
-test: deps
-	@go test ./...
+test: 
+	@echo "--> Testing mesos-dns"
+	@godep go test ./...
 
-testrace: deps
-	@go test -race ./...
+testrace: 
+	@godep go test -race ./...
 
 clean:
-	@go clean
+	@echo "--> Cleaning mesos-dns"
+	@godep go clean

@@ -128,7 +128,7 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 	sj = rg.loadFromMaster(ip, port)
 
 	if rip := leaderIP(sj.Leader); rip != ip {
-		logging.VeryVerbose.Println("master changed to " + ip)
+		logging.VeryVerbose.Println("Warning: master changed to " + ip)
 		sj = rg.loadFromMaster(rip, port)
 	}
 
@@ -159,12 +159,32 @@ func yankPorts(ports string) []string {
 
 // findMaster tries each master and looks for the leader
 // if no leader responds it errors
-func (rg *RecordGenerator) findMaster(masters []string) (StateJSON, error) {
+func (rg *RecordGenerator) findMaster(c *Config) (StateJSON, error) {
 	var sj StateJSON
 
+	if leader := c.getLeader(); leader != "" {
+		logging.VeryVerbose.Println("Zookeeper says the leader is: ", leader)
+		ip, port, err := getProto(leader)
+		if err != nil {
+			logging.Error.Println(err)
+		}
+
+		sj, _ = rg.loadWrap(ip, port)
+		if sj.Leader == "" {
+			logging.Verbose.Println("Warning: Zookeeper is wrong about leader")
+			if len(c.Masters) == 0 {
+				return sj, errors.New("no master")
+			} else {
+				logging.Verbose.Println("Warning: falling back to Masters config field: ", c.Masters)
+			}
+		} else {
+			return sj, nil
+		}
+	}
+
 	// try each listed mesos master before dying
-	for i := 0; i < len(masters); i++ {
-		ip, port, err := getProto(masters[i])
+	for i := 0; i < len(c.Masters); i++ {
+		ip, port, err := getProto(c.Masters[i])
 		if err != nil {
 			logging.Error.Println(err)
 		}
@@ -172,9 +192,9 @@ func (rg *RecordGenerator) findMaster(masters []string) (StateJSON, error) {
 		sj, _ = rg.loadWrap(ip, port)
 
 		if sj.Leader == "" {
-			logging.VeryVerbose.Println("not a leader - trying next one")
+			logging.VeryVerbose.Println("Warning: not a leader - trying next one")
 
-			if len(masters)-1 == i {
+			if len(c.Masters)-1 == i {
 				return sj, errors.New("no master")
 			}
 
@@ -204,15 +224,23 @@ func getProto(pair string) (string, string, error) {
 //  _<tag>.<service>.<framework>._<protocol>..mesos
 // it also tries different mesos masters if one is not up
 // this will shudown if it can't connect to a mesos master
-func (rg *RecordGenerator) ParseState(config Config) {
+func (rg *RecordGenerator) ParseState(config *Config) error {
+
 	// try each listed mesos master before dying
-	sj, err := rg.findMaster(config.Masters)
+	sj, err := rg.findMaster(config)
 	if err != nil {
 		logging.Error.Println("no master")
-		return
+		return err
+	}
+
+	if sj.Leader == "" {
+		logging.Error.Println("Unexpected error")
+		err = errors.New("empty master")
+		return err
 	}
 
 	rg.InsertState(sj, config.Domain, config.Mname, config.Listener, config.Masters)
+	return nil
 }
 
 // cleanName sanitizes invalid characters
@@ -281,7 +309,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 	}
 
 	rg.listenerRecord(listener, mname)
-	rg.masterRecord(listener, domain, masters, leaderIP(sj.Leader))
+	rg.masterRecord(domain, masters, sj.Leader)
 	return nil
 }
 
@@ -299,9 +327,41 @@ func (rg *RecordGenerator) listenerRecord(listener string, mname string) {
 
 // masterRecord sets A records for the mesos masters and an A record
 // for the leading master
-func (rg *RecordGenerator) masterRecord(listener string, domain string, masters []string, leader string) {
+func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader string) {
+	// create records for leader
+	// A records
+	h := strings.Split(leader, "@")
+	if len(h) < 2 {
+		logging.Error.Println(leader)
+	}
+	ip, port, err := getProto(h[1])
+	if err != nil {
+		logging.Error.Println(err)
+	}
+	arec := "leader." + domain + "."
+	rg.insertRR(arec, ip, "A")
+	arec = "master." + domain + "."
+	rg.insertRR(arec, ip, "A")
+	// SRV records
+	tcp := "_leader._tcp." + domain + "."
+	udp := "_leader._udp." + domain + "."
+	host := "leader." + domain + ":" + port
+	rg.insertRR(tcp, host, "SRV")
+	rg.insertRR(udp, host, "SRV")
+	tcp = "_master._tcp." + domain + "."
+	udp = "_master._udp." + domain + "."
+	host = "master." + domain + ":" + port
+	rg.insertRR(tcp, host, "SRV")
+	rg.insertRR(udp, host, "SRV")
 
+	// if there is a list of masters, insert that as well
 	for i := 0; i < len(masters); i++ {
+
+		// skip leader
+		if leader == masters[i] {
+			continue
+		}
+
 		ip, port, err := getProto(masters[i])
 		if err != nil {
 			logging.Error.Println(err)
@@ -319,19 +379,6 @@ func (rg *RecordGenerator) masterRecord(listener string, domain string, masters 
 		host := "master." + domain + ":" + port
 		rg.insertRR(tcp, host, "SRV")
 		rg.insertRR(udp, host, "SRV")
-
-		// if this is this is the leading master
-		if ip == leader {
-			// A record
-			arec = "leader." + domain + "."
-			rg.insertRR(arec, ip, "A")
-			// SRV records
-			tcp := "_leader._tcp." + domain + "."
-			udp := "_leader._udp." + domain + "."
-			host := "leader." + domain + ":" + port
-			rg.insertRR(tcp, host, "SRV")
-			rg.insertRR(udp, host, "SRV")
-		}
 	}
 }
 

@@ -6,9 +6,15 @@ title: Mesos-DNS FAQ
 
 ---
 
+#### Mesos-DNS version
+
+You can check the Mesos-DNS version by executing `mesos-dns -version`. 
+
+---
+
 #### Verbose and very verbose modes
 
-If you start Mesos-DNS in verbose mode using the `-v` or `-vv` arguments, it  prints a variety of messages that are useful for debugging and performance tuning. The `-vv` option will periodically print every A or SRV record Mesos-DNS generates. 
+If you start Mesos-DNS in verbose mode using the `-v=1` or `-v=2` arguments, it  prints a variety of messages that are useful for debugging and performance tuning. The `-v=2` option will periodically print every A or SRV record Mesos-DNS generates. 
 
 ---
 
@@ -21,7 +27,7 @@ Make sure that the port used for Mesos-DNS is available and not in use by anothe
 
 #### Slaves cannot connect to Mesos-DNS
 
-Make sure that port `53` is not blocked by a firewall rule on your cluster. For example, [Google Cloud Platform](https://cloud.google.com/) blocks port `53` by default. 
+Make sure that port `53` is not blocked by a firewall rule on your cluster. For example, [Google Cloud Platform](https://cloud.google.com/) blocks port `53` by default. If you use the `zk` field, you should also check if the Zookeeper port is blocked either. 
 
 Check the `/etc/resolv.conf` file. If multiple nameservers are listed and Mesos-DNS is not the first one, the slave will first connect to the other name servers. If `options rotate` is used and one of the listed nameservers is not Mesos-DNS, then you will get intermittent failures.
 
@@ -53,5 +59,5 @@ Some frameworks register with longer, less user-friendly names. For example, ear
 
 ### Mesos-DNS is not communicating with the Mesos Master using the hosts configured in the 'masters' field
 
-Mesos-DNS uses the `masters` field in the configuration file only for the initial requests to the Mesos master. The initial request for task state also return information about the current masters. This information is used for subsequent task state request. If you launch Mesos-DNS in verbose mode using `-v `, there will be a period stdout message that identifies which master Mesos-DNS is contacting at the moment. 
+If the `zk` field is defined, Mesos-DNS will ignore the `masters` field. It will contact Zookeeper to detect the leading Mesos master. If the `zk` field is not used, Mesos-DNS uses the `masters` field in the configuration file only for the initial requests to the Mesos master. The initial request for task state also return information about the current masters. This information is used for subsequent task state request. If you launch Mesos-DNS in verbose mode using `-v=2 `, there will be a period stdout message that identifies which master Mesos-DNS is contacting at the moment. 
 

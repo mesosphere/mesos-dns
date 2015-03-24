@@ -170,7 +170,6 @@ func TestInsertState(t *testing.T) {
 		t.Error("should find a running master0 - A record")
 	}
 
-
 	_, ok = rg.SRVs["_master._tcp.mesos."]
 	if !ok {
 		t.Error("should find a running master - SRV record")

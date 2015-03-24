@@ -20,3 +20,8 @@ Any changes in the public API or behavior must be reflected in the documentation
 Pull requests should include appropriate additions to the unit test suite.
 
 If the change is a bugfix, then the added tests must fail without the patch  as a safeguard against future regressions.
+
+## Working with godep
+
+To avoid complications with external packages, we use [`godep`](https://github.com/tools/godep). To use Mesos-DNS or make any changes to its own code, you will mostly use `make all` or `make build`. If you need to add a dependency to a package you started using, use `make savedeps`. If you need to restore package versions to what is specified by the branch of Mesos-DNS you are using, use `make restoredeps`. 
+
