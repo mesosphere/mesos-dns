@@ -398,8 +398,12 @@ func (res *Resolver) HdnsConfig(req *restful.Request, resp *restful.Response) {
 
 // Reports configuration through http interface
 func (res *Resolver) HdnsVersion(req *restful.Request, resp *restful.Response) {
-	io.WriteString(resp, "Mesos-DNS " + res.Version +"\n" + 
-		           "More information at https://github.com/mesosphere/mesos-dns")
+	mapV := map[string]string{"Version": res.Version, "url": "https://github.com/mesosphere/mesos-dns"}
+	output, err := json.Marshal(mapV)
+	if err != nil {
+			logging.Error.Println(err)
+	}
+	io.WriteString(resp, string(output))
 }
 
 
