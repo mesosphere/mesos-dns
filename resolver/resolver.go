@@ -427,7 +427,8 @@ func (res *Resolver) HdnsServices(req *restful.Request, resp *restful.Response) 
 	service := req.PathParameter("service")
 	dom := strings.ToLower(cleanWild(service))
 
-	for i := 0; i < len(res.rs.SRVs[dom]); i++ {
+	i := 0
+	for ; i < len(res.rs.SRVs[dom]); i++ {
 		h, p := res.splitDomain(res.rs.SRVs[dom][i])
 		mapS := map[string]string{"Service": service, "host": h, "port": strconv.Itoa(p)}
 		output, err := json.Marshal(mapS)
@@ -435,6 +436,9 @@ func (res *Resolver) HdnsServices(req *restful.Request, resp *restful.Response) 
 			logging.Error.Println(err)
 	    }
 	    io.WriteString(resp, string(output))
+    }
+    if i == 0 {
+    	io.WriteString(resp, "Found nothing for "+service+" " + dom)
     }
 }
 
