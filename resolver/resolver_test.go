@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+	"net/http"
+	"reflect"
 )
 
 func init() {
@@ -81,6 +83,7 @@ func TestShuffleAnswers(t *testing.T) {
 func fakeDNS(port int) (Resolver, error) {
 	var res Resolver
 	res.Config = records.Config{
+		Masters:   []string{"144.76.157.37:5050"},
 		TTL:       60,
 		Port:      port,
 		Domain:    "mesos",
@@ -88,6 +91,7 @@ func fakeDNS(port int) (Resolver, error) {
 		Listener:  "127.0.0.1",
 		Email:     "root.mesos-dns.mesos.",
 		Mname:     "mesos-dns.mesos.",
+		HttpPort:	8123,
 	}
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
@@ -263,8 +267,94 @@ func TestNonMesosHandler(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(msg) < 2 {
+	if len(msg) < 1 {
 		t.Errorf("not serving up A records, expected 2 records instead of %d", len(msg))
 	}
 
 }
+
+
+func TestHdns(t *testing.T) {
+
+	// setup DNS server (just http)
+	res, err := fakeDNS(8053)
+	if err != nil {
+		t.Error(err)
+	}
+	res.Version = "0.1.1"
+
+	go res.Hdns()
+	// wait for startup ? lame
+	time.Sleep(10 * time.Millisecond)
+
+    // test /v1/version
+    r1, err := http.Get("http://127.0.0.1:8123/v1/version")
+    if err != nil {
+       t.Error(err)
+    }
+    g1, err := ioutil.ReadAll(r1.Body)
+    if err != nil {
+       t.Error(err)
+    }
+    var got1 map[string]interface{}
+    err = json.Unmarshal(g1, &got1)
+    correct1 := map[string]interface{}{"Service": "Mesos-DNS","Version": "0.1.1", "URL": "https://github.com/mesosphere/mesos-dns"}
+    eq1 := reflect.DeepEqual(got1, correct1)
+    if !eq1 {
+    	t.Error("Http version API failure")
+    }
+
+    // test /v1/config
+    r2, err := http.Get("http://127.0.0.1:8123/v1/config")
+    if err != nil {
+       t.Error(err)
+    }
+    g2, err := ioutil.ReadAll(r2.Body)
+    if err != nil {
+       t.Error(err)
+    }
+    var got2 records.Config
+    err = json.Unmarshal(g2, &got2)
+    eq2 := reflect.DeepEqual(got2, res.Config)
+    if !eq2 {
+    	t.Error("Http config API failure")
+    }
+
+    // test /v1/services -- existing record
+    r3, err := http.Get("http://127.0.0.1:8123/v1/services/_leader._tcp.mesos.")
+    if err != nil {
+       t.Error(err)
+    }
+    g3, err := ioutil.ReadAll(r3.Body)
+    if err != nil {
+       t.Error(err)
+    }
+    var got3 map[string]interface{}
+    err = json.Unmarshal(g3, &got3)
+    correct3 := map[string]interface{}{"host": "leader.mesos", "port": "5050", "service": "_leader._tcp.mesos."}
+    eq3 := reflect.DeepEqual(got3, correct3)
+    if !eq3 {
+    	t.Error("Http services API failure")
+    }
+
+    // test /v1/services -- existing record
+    r4, err := http.Get("http://127.0.0.1:8123/v1/services/_myservice._tcp.mesos.")
+    if err != nil {
+       t.Error(err)
+    }
+    g4, err := ioutil.ReadAll(r4.Body)
+    if err != nil {
+       t.Error(err)
+    }
+    var got4 map[string]interface{}
+    err = json.Unmarshal(g4, &got4)
+    correct4 := map[string]interface{}{"host": "", "port": "", "service": ""}
+    eq4 := reflect.DeepEqual(got4, correct4)
+    if !eq4 {
+    	t.Error("Http services API failure")
+    }
+
+}
+
+
+

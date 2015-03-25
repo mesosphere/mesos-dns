@@ -395,6 +395,7 @@ func (res *Resolver) Hdns() {
 // Reports configuration through http interface
 func (res *Resolver) HdnsConfig(req *restful.Request, resp *restful.Response) {
 	output, err := json.Marshal(res.Config)
+	logging.VeryVerbose.Println("AAA", output)
 	if err != nil {
 			logging.Error.Println(err)
 	}
@@ -428,11 +429,14 @@ func (res *Resolver) HdnsServices(req *restful.Request, resp *restful.Response) 
 	
 	service := req.PathParameter("service")
 	dom := strings.ToLower(cleanWild(service))
+	if (dom[len(dom)-1] != '.') {
+		dom += "."
+	}
 
 	i := 0
 	for ; i < len(res.rs.SRVs[dom]); i++ {
 		h, p := res.splitDomain(res.rs.SRVs[dom][i])
-		mapS := map[string]string{"Service": service, "host": h, "port": strconv.Itoa(p)}
+		mapS := map[string]string{"service": service, "host": h, "port": strconv.Itoa(p)}
 		output, err := json.Marshal(mapS)
 		if err != nil {
 			logging.Error.Println(err)
@@ -440,7 +444,9 @@ func (res *Resolver) HdnsServices(req *restful.Request, resp *restful.Response) 
 	    io.WriteString(resp, string(output))
     }
     if i == 0 {
-    	io.WriteString(resp, "Found nothing for "+service+" " + dom)
+    	mapS := map[string]string{"service": "", "host": "", "port": ""}
+    	output, _ := json.Marshal(mapS)
+    	io.WriteString(resp, string(output))
     }
 }
 
