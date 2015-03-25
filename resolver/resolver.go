@@ -449,9 +449,7 @@ func (res *Resolver) HdnsServices(req *restful.Request, resp *restful.Response) 
     }
 
     // stats
-    mesosrq := strings.HasSuffix(dom, res.Config.Domain)
-    logging.VeryVerbose.Println("contains ", dom)
-    logging.VeryVerbose.Println("contains ", res.Config.Domain)
+    mesosrq := strings.HasSuffix(dom, res.Config.Domain + ".")
     if mesosrq {
     	logging.CurLog.MesosRequests.Inc()
     	if (i==0) {
