@@ -395,7 +395,6 @@ func (res *Resolver) Hdns() {
 // Reports configuration through http interface
 func (res *Resolver) HdnsConfig(req *restful.Request, resp *restful.Response) {
 	output, err := json.Marshal(res.Config)
-	logging.VeryVerbose.Println("AAA", output)
 	if err != nil {
 			logging.Error.Println(err)
 	}
@@ -448,6 +447,21 @@ func (res *Resolver) HdnsServices(req *restful.Request, resp *restful.Response) 
     	output, _ := json.Marshal(mapS)
     	io.WriteString(resp, string(output))
     }
+
+    // stats
+    mesosrq := strings.HasSuffix(dom,res.Config.Domain)
+    if mesosrq {
+    	logging.CurLog.MesosRequests.Inc()
+    	if (i==0) {
+    		logging.CurLog.MesosNXDomain.Inc()
+    	} else {
+    		logging.CurLog.MesosSuccess.Inc()
+    	}
+    } else {
+		logging.CurLog.NonMesosRequests.Inc()
+		logging.CurLog.NonMesosFailed.Inc()
+    }
+
 }
 
 
