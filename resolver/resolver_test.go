@@ -263,7 +263,7 @@ func TestNonMesosHandler(t *testing.T) {
 		t.Error(err)
 	}
 
-	if len(msg) < 2 {
+	if len(msg) < 1 {
 		t.Errorf("not serving up A records, expected 2 records instead of %d", len(msg))
 	}
 
