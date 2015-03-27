@@ -350,7 +350,7 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 	// SRV records
 	tcp := "_leader._tcp." + domain + "."
 	udp := "_leader._udp." + domain + "."
-	host := "leader." + domain + ":" + port
+	host := "leader." + domain + "." + ":" + port
 	rg.insertRR(tcp, host, "SRV")
 	rg.insertRR(udp, host, "SRV")
 	//tcp = "_master._tcp." + domain + "."
