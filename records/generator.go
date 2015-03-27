@@ -429,7 +429,7 @@ func stripHost(hostip string) string {
 
 func slaveIdTail(slaveID string) string {
 	fields := strings.Split(slaveID, "-")
-	return fields[len(fields)-1]
+	return strings.ToLower(fields[len(fields)-1])
 }
 
 // insertRR inserts host to name's map
