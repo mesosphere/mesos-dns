@@ -159,7 +159,7 @@
             "failover_timeout": 604800,
             "hostname": "google.com",
             "id": "20140703-014514-3041283216-5050-5348-0000",
-            "name": "marathon-0.6.0",
+            "name": "marathon",
             "offers": [],
             "registered_time": 1414913536.83611,
             "reregistered_time": 1414913536.83618,
@@ -286,10 +286,12 @@
     "pid": "master@1.2.3.4:5050",
     "slaves": [
         {
-            "attributes": {},
-            "hostname": "some.host.com",
+            "attributes": {
+                "host": "development-5226-1d.c.mesos.internal"
+            },
+            "hostname": "10.156.230.200",
             "id": "20140916-194712-631065744-5050-4798-2",
-            "pid": "slave(1)@1.2.3.6:5051",
+            "pid": "slave(1)@10.156.230:5051",
             "registered_time": 1415029403.65675,
             "resources": {
                 "cpus": 8,
@@ -299,10 +301,12 @@
             }
         },
         {
-            "attributes": {},
-            "hostname": "localhost",
+            "attributes": {
+                "host": "development-5226-1e.c.mesos.internal"
+            },
+            "hostname": "10.156.231",
             "id": "20140803-125133-3041283216-5050-2410-0",
-            "pid": "slave(1)@1.2.3.4:5051",
+            "pid": "slave(1)@10.156.231:5051",
             "registered_time": 1414913537.33691,
             "reregistered_time": 1414913537.33692,
             "resources": {
@@ -313,10 +317,12 @@
             }
         },
         {
-            "attributes": {},
-            "hostname": "google.com",
+            "attributes": {
+                "host": "development-5226-1f.c.mesos.internal"
+            },
+            "hostname": "10.156.232",
             "id": "20140827-000744-3041283216-5050-2116-1",
-            "pid": "slave(1)@1.2.3.5:5051",
+            "pid": "slave(1)@10.156.232:5051",
             "registered_time": 1414913537.19731,
             "reregistered_time": 1414913537.19735,
             "resources": {

@@ -9,30 +9,10 @@ import (
 
 func init() {
 	logging.VerboseFlag = false
+	logging.VeryVerboseFlag = false
 	logging.SetupLogs()
 }
 
-func TestHostBySlaveId(t *testing.T) {
-
-	slaves := []slave{
-		{Id: "20140827-000744-3041283216-5050-2116-1", Hostname: "blah.com"},
-		{Id: "33333333-333333-3333333333-3333-3333-2", Hostname: "blah.blah.com"},
-	}
-
-	rg := RecordGenerator{Slaves: slaves}
-
-	for i := 0; i < len(slaves); i++ {
-		host, err := rg.hostBySlaveId(slaves[i].Id)
-		if err != nil {
-			t.Error(err)
-		}
-
-		if host != slaves[i].Hostname {
-			t.Error("wrong slave/hostname")
-		}
-	}
-
-}
 
 func TestYankPorts(t *testing.T) {
 	p := "[31328-31328]"
@@ -124,6 +104,7 @@ func TestStripInvalid(t *testing.T) {
 
 }
 
+
 // ensure we are parsing what we think we are
 func TestInsertState(t *testing.T) {
 
@@ -145,17 +126,17 @@ func TestInsertState(t *testing.T) {
 	rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
 
 	// ensure we are only collecting running tasks
-	_, ok := rg.SRVs["_poseidon._tcp.marathon-0.6.0.mesos."]
+	_, ok := rg.SRVs["_poseidon._tcp.marathon.mesos."]
 	if ok {
 		t.Error("should not find this not-running task - SRV record")
 	}
 
-	_, ok = rg.As["liquor-store.marathon-0.6.0.mesos."]
+	_, ok = rg.As["liquor-store.marathon.mesos."]
 	if !ok {
 		t.Error("should find this running task - A record")
 	}
 
-	_, ok = rg.As["poseidon.marathon-0.6.0.mesos."]
+	_, ok = rg.As["poseidon.marathon.mesos."]
 	if ok {
 		t.Error("should not find this not-running task - A record")
 	}
@@ -170,11 +151,6 @@ func TestInsertState(t *testing.T) {
 		t.Error("should find a running master0 - A record")
 	}
 
-	_, ok = rg.SRVs["_master._tcp.mesos."]
-	if !ok {
-		t.Error("should find a running master - SRV record")
-	}
-
 	_, ok = rg.As["leader.mesos."]
 	if !ok {
 		t.Error("should find a leading master - A record")
@@ -185,13 +161,13 @@ func TestInsertState(t *testing.T) {
 		t.Error("should find a leading master - SRV record")
 	}
 
-	// test for 12 SRV names
-	if len(rg.SRVs) != 12 {
+	// test for 10 SRV names
+	if len(rg.SRVs) != 10 {
 		t.Error("not enough SRVs")
 	}
 
 	// test for 5 A names
-	if len(rg.As) != 8 {
+	if len(rg.As) != 13 {
 		t.Error("not enough As")
 	}
 
@@ -202,15 +178,14 @@ func TestInsertState(t *testing.T) {
 	}
 
 	// ensure we find this SRV
-	rrs := rg.SRVs["_liquor-store._tcp.marathon-0.6.0.mesos."]
-
+	rrs := rg.SRVs["_liquor-store._tcp.marathon.mesos."]
 	// ensure there are 3 RRDATA answers for this SRV name
 	if len(rrs) != 3 {
 		t.Error("not enough SRV records")
 	}
 
 	// ensure we don't find this as a SRV record
-	rrs = rg.SRVs["_liquor-store.marathon-0.6.0.mesos."]
+	rrs = rg.SRVs["_liquor-store.marathon.mesos."]
 	if len(rrs) != 0 {
 		t.Error("not a proper SRV record")
 	}
