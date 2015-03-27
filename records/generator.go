@@ -290,7 +290,8 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 
 					// FIXME - 3 nested loops
 					for s := 0; s < len(sports); s++ {
-						var srvhost string = tname + "." + fname + "." + domain + ":" + sports[s]
+						//var srvhost string = tname + "." + fname + "." + domain + ":" + sports[s]
+						var srvhost string = host + ":" + sports[s]
 
 						tcp := "_" + tname + "._tcp." + tail
 						udp := "_" + tname + "._udp." + tail
@@ -345,12 +346,14 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 	// SRV records
 	tcp := "_leader._tcp." + domain + "."
 	udp := "_leader._udp." + domain + "."
-	host := "leader." + domain + ":" + port
+	//host := "leader." + domain + ":" + port
+	host := ip + ":" + port
 	rg.insertRR(tcp, host, "SRV")
 	rg.insertRR(udp, host, "SRV")
 	tcp = "_master._tcp." + domain + "."
 	udp = "_master._udp." + domain + "."
-	host = "master." + domain + ":" + port
+	// host = "master." + domain + ":" + port
+	host = ip + ":" + port
 	rg.insertRR(tcp, host, "SRV")
 	rg.insertRR(udp, host, "SRV")
 
@@ -376,7 +379,8 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 		// SRV records
 		tcp := "_master._tcp." + domain + "."
 		udp := "_master._udp." + domain + "."
-		host := "master." + domain + ":" + port
+		//host := "master." + domain + ":" + port
+		host := ip + ":" + port
 		rg.insertRR(tcp, host, "SRV")
 		rg.insertRR(udp, host, "SRV")
 	}
