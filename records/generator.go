@@ -279,6 +279,8 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 			task := f[i].Tasks[x]
 
 			host, err := rg.hostBySlaveId(task.SlaveId)
+			logging.VeryVerbose.Println("Create ", task)
+			logging.VeryVerbose.Println("Create ", task.SlaveId)
 			if err == nil && (task.State == "TASK_RUNNING") {
 
 				tname := cleanName(task.Name)
