@@ -285,15 +285,22 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 			if err == nil && (task.State == "TASK_RUNNING") {
 
 				tname := cleanName(task.Name)
+				sid := slaveIdTail(task.SlaveId)
 				tail := fname + "." + domain + "."
 
-				// hack - what to do?
+				// A records for task and task-sid
+				arec := tname + "." + tail
+				rg.insertRR(arec, host, "A")
+				trec := tname + "-" + sid + "." + tail
+				rg.insertRR(trec, host, "A")
+
+				// SRV records
 				if task.Resources.Ports != "" {
 					sports := yankPorts(task.Resources.Ports)
 
 					// FIXME - 3 nested loops
 					for s := 0; s < len(sports); s++ {
-						var srvhost string = tname + "." + fname + "." + domain + ":" + sports[s]
+						var srvhost string =  trec + ":" + sports[s]
 
 						tcp := "_" + tname + "._tcp." + tail
 						udp := "_" + tname + "._udp." + tail
@@ -301,12 +308,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 						rg.insertRR(tcp, srvhost, "SRV")
 						rg.insertRR(udp, srvhost, "SRV")
 					}
-
 				}
-
-				arec := tname + "." + tail
-				rg.insertRR(arec, host, "A")
-
 			}
 		}
 	}
@@ -351,11 +353,6 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 	host := "leader." + domain + ":" + port
 	rg.insertRR(tcp, host, "SRV")
 	rg.insertRR(udp, host, "SRV")
-	tcp = "_master._tcp." + domain + "."
-	udp = "_master._udp." + domain + "."
-	host = "master." + domain + ":" + port
-	rg.insertRR(tcp, host, "SRV")
-	rg.insertRR(udp, host, "SRV")
 
 	// if there is a list of masters, insert that as well
 	for i := 0; i < len(masters); i++ {
@@ -365,7 +362,7 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 			continue
 		}
 
-		ip, port, err := getProto(masters[i])
+		ip, _, err := getProto(masters[i])
 		if err != nil {
 			logging.Error.Println(err)
 		}
@@ -375,13 +372,6 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 		rg.insertRR(arec, ip, "A")
 		arec = "master" + strconv.Itoa(i) + "." + domain + "."
 		rg.insertRR(arec, ip, "A")
-
-		// SRV records
-		tcp := "_master._tcp." + domain + "."
-		udp := "_master._udp." + domain + "."
-		host := "master." + domain + ":" + port
-		rg.insertRR(tcp, host, "SRV")
-		rg.insertRR(udp, host, "SRV")
 	}
 }
 
@@ -457,4 +447,10 @@ func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
 			rg.SRVs[name] = []string{host}
 		}
 	}
+}
+
+
+func slaveIdTail(slaveID string) string {
+	fields := strings.Split(slaveID, "-")
+	return strings.ToLower(fields[len(fields)-1])
 }

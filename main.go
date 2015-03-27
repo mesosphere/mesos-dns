@@ -17,7 +17,7 @@ func main() {
 	var wg 			sync.WaitGroup
 
 	// parse flags
-	cjson := flag.String("config", "config.json", "location of configuration file (json)")
+	cjson := flag.String("config", "config.json", "path to config file (json)")
 	flag.BoolVar(&versionFlag, "version", false, "output the version")
 	flag.Parse()
 
@@ -27,7 +27,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	// setup logging
+	// initialize logging
 	logging.SetupLogs()
 
 	// initialize resolver
@@ -44,7 +44,7 @@ func main() {
 		go resolver.LaunchHTTP()
 	}
 
-	// launch Zookeeper launcher
+	// launch Zookeeper listener
 	if resolver.Config.Zk != "" {
 		resolver.LaunchZK()
 	}

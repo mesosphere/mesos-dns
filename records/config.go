@@ -94,6 +94,7 @@ func SetConfig(cjson string) (c Config) {
 		logging.Error.Println("missing configuration file")
 		os.Exit(1)
 	}
+	c.File = path
 
 	err = json.Unmarshal(b, &c)
 	if err != nil {
@@ -113,7 +114,6 @@ func SetConfig(cjson string) (c Config) {
 	if len(c.Resolvers) == 0 {
 		c.Resolvers = GetLocalDNS()
 	}
-
 
 	c.Email = strings.Replace(c.Email, "@", ".", -1)
 	if c.Email[len(c.Email)-1:] != "." {
@@ -143,34 +143,24 @@ func SetConfig(cjson string) (c Config) {
 	logging.Verbose.Println("   - Mname: " + c.Mname)
 	logging.Verbose.Println("   - HttpPort: ", c.HttpPort)
 	logging.Verbose.Println("   - HttpOn: ", c.HttpOn)
+	logging.Verbose.Println("   - ConfigFile: ", c.File)
 
 	return c
 }
 
-// localAddies returns an array of local ipv4 addresses
-func localAddies() []string {
-	addies, err := net.InterfaceAddrs()
+// Returns the first nameserver in /etc/resolv.conf
+// used for non-Mesos  queries
+func GetLocalDNS() []string {
+	conf, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 	if err != nil {
 		logging.Error.Println(err)
+		os.Exit(2)
 	}
 
-	bad := []string{}
-
-	for i := 0; i < len(addies); i++ {
-		ip, _, err := net.ParseCIDR(addies[i].String())
-		if err != nil {
-			logging.Error.Println(err)
-		}
-		t4 := ip.To4()
-		if t4 != nil {
-			bad = append(bad, t4.String())
-		}
-	}
-
-	return bad
+	return nonLocalAddies(conf.Servers)
 }
 
-// nonLocalAddies only returns non-local ns entries
+// Returns non-local nameserver entries
 func nonLocalAddies(cservers []string) []string {
 	bad := localAddies()
 
@@ -192,15 +182,26 @@ func nonLocalAddies(cservers []string) []string {
 	return good
 }
 
-// GetLocalDNS returns the first nameserver in /etc/resolv.conf
-// used for out of mesos domain queries
-func GetLocalDNS() []string {
-	conf, err := dns.ClientConfigFromFile("/etc/resolv.conf")
+// Returns an array of local ipv4 addresses
+func localAddies() []string {
+	addies, err := net.InterfaceAddrs()
 	if err != nil {
 		logging.Error.Println(err)
-		os.Exit(2)
 	}
 
-	return nonLocalAddies(conf.Servers)
+	bad := []string{}
+
+	for i := 0; i < len(addies); i++ {
+		ip, _, err := net.ParseCIDR(addies[i].String())
+		if err != nil {
+			logging.Error.Println(err)
+		}
+		t4 := ip.To4()
+		if t4 != nil {
+			bad = append(bad, t4.String())
+		}
+	}
+
+	return bad
 }
 
