@@ -1,20 +1,13 @@
 package records
 
 import (
-	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
-	"sync"
-
-	"github.com/mesos/mesos-go/detector"
-	_ "github.com/mesos/mesos-go/detector/zoo"
-	mesos "github.com/mesos/mesos-go/mesosproto"
 
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/miekg/dns"
@@ -60,12 +53,12 @@ type Config struct {
 	// ListenAddr is the server listener address
 	Listener string
 
-	// Leading master info, as identified through Zookeeper
-	leader     string
-	leaderLock sync.RWMutex // refactor soon
-
 	// Http port
 	HttpPort int
+
+	// Enable/discable servers
+	DnsOn	bool
+	HttpOn	bool
 }
 
 // SetConfig instantiates a Config struct read in from config.json
@@ -80,10 +73,12 @@ func SetConfig(cjson string) (c Config) {
 		Email:          "root.mesos-dns.mesos",
 		Resolvers:      []string{"8.8.8.8"},
 		Listener:       "0.0.0.0",
-		leader:         "",
 		HttpPort:		8123,
+		DnsOn:			true,
+		HttpOn:			true,
 	}
 
+	// read configuration file
 	usr, _ := user.Current()
 	dir := usr.HomeDir + "/"
 	cjson = strings.Replace(cjson, "~/", dir, 1)
@@ -105,14 +100,20 @@ func SetConfig(cjson string) (c Config) {
 		logging.Error.Println(err)
 	}
 
-	if len(c.Resolvers) == 0 {
-		c.Resolvers = GetLocalDNS()
+	// validate and complete configuration file
+	if !(c.DnsOn || c.HttpOn) {
+		logging.Error.Println("Either DNS or HTTP server should be on")
+		os.Exit(1)
 	}
-
 	if len(c.Masters) == 0 && c.Zk == "" {
 		logging.Error.Println("specify mesos masters or zookeeper in config.json")
 		os.Exit(1)
 	}
+
+	if len(c.Resolvers) == 0 {
+		c.Resolvers = GetLocalDNS()
+	}
+
 
 	c.Email = strings.Replace(c.Email, "@", ".", -1)
 	if c.Email[len(c.Email)-1:] != "." {
@@ -122,6 +123,7 @@ func SetConfig(cjson string) (c Config) {
 	c.Domain = strings.ToLower(c.Domain)
 	c.Mname = "mesos-dns." + c.Domain + "."
 
+	// print configuration file
 	logging.Verbose.Println("Mesos-DNS configuration:")
 	if len(c.Masters) != 0 {
 		logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
@@ -130,15 +132,17 @@ func SetConfig(cjson string) (c Config) {
 		logging.Verbose.Println("   - Zookeeper: ", c.Zk)
 	}
 	logging.Verbose.Println("   - RefreshSeconds: ", c.RefreshSeconds)
-	logging.Verbose.Println("   - TTL: ", c.TTL)
 	logging.Verbose.Println("   - Domain: " + c.Domain)
-	logging.Verbose.Println("   - Port: ", c.Port)
-	logging.Verbose.Println("   - Timeout: ", c.Timeout)
 	logging.Verbose.Println("   - Listener: " + c.Listener)
+	logging.Verbose.Println("   - Port: ", c.Port)
+	logging.Verbose.Println("   - DnsOn: ", c.DnsOn)
+	logging.Verbose.Println("   - TTL: ", c.TTL)
+	logging.Verbose.Println("   - Timeout: ", c.Timeout)
 	logging.Verbose.Println("   - Resolvers: " + strings.Join(c.Resolvers, ", "))
 	logging.Verbose.Println("   - Email: " + c.Email)
 	logging.Verbose.Println("   - Mname: " + c.Mname)
 	logging.Verbose.Println("   - HttpPort: ", c.HttpPort)
+	logging.Verbose.Println("   - HttpOn: ", c.HttpOn)
 
 	return c
 }
@@ -200,51 +204,3 @@ func GetLocalDNS() []string {
 	return nonLocalAddies(conf.Servers)
 }
 
-// Start a Zookeeper listener to track leading master, returns a signal chan
-// that closes upon the first leader detection notification (and c.leader is
-// meaningfully readable).
-func ZKdetect(c *Config) (<-chan struct{}, error) {
-
-	// start listener
-	logging.Verbose.Println("Starting master detector for ZK ", c.Zk)
-	md, err := detector.New(c.Zk)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create master detector: %v", err)
-	}
-
-	// and listen for master changes
-	var startedOnce sync.Once
-	started := make(chan struct{})
-	if err := md.Detect(detector.OnMasterChanged(func(info *mesos.MasterInfo) {
-		// making this atomic
-		c.leaderLock.Lock()
-		defer c.leaderLock.Unlock()
-		logging.VeryVerbose.Println("Updated Zookeeper info: ", info)
-		if info == nil {
-			c.leader = ""
-			logging.Error.Println("No leader available in Zookeeper.")
-		} else if host := info.GetHostname(); host != "" {
-			c.leader = host
-		} else {
-			// unpack IPv4
-			octets := make([]byte, 4, 4)
-			binary.BigEndian.PutUint32(octets, info.GetIp())
-			ipv4 := net.IP(octets)
-			c.leader = ipv4.String()
-		}
-		if len(c.leader) > 0 {
-			c.leader = fmt.Sprintf("%s:%d", c.leader, info.GetPort())
-		}
-		logging.Verbose.Println("New master in Zookeeper ", c.leader)
-		startedOnce.Do(func() { close(started) })
-	})); err != nil {
-		return nil, fmt.Errorf("failed to initialize master detector: %v", err)
-	}
-	return started, nil
-}
-
-func (c *Config) getLeader() string {
-	c.leaderLock.Lock()
-	defer c.leaderLock.Unlock()
-	return c.leader
-}

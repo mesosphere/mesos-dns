@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"sync/atomic"
+	"github.com/golang/glog"
 )
 
 var (
@@ -66,6 +67,13 @@ func PrintCurLog() {
 // VeryVerbose = optional verbosity
 // Error = stderr
 func SetupLogs() {
+	// initialize logging flags
+	if glog.V(2) {
+		VeryVerboseFlag = true
+	} else if glog.V(1) {
+		VerboseFlag = true
+	}
+
 	logopts := log.Ldate | log.Ltime | log.Lshortfile
 
 	if VerboseFlag {

@@ -6,69 +6,50 @@ import (
 	"os"
 	"sync"
 	"time"
-
-	"github.com/golang/glog"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/resolver"
-
-	"github.com/miekg/dns"
 )
 
 func main() {
-	var wg sync.WaitGroup
-	var resolver resolver.Resolver
+	var resolver 	resolver.Resolver
+	var versionFlag	bool 
+	var wg 			sync.WaitGroup
 
-	versionFlag := false
-
+	// parse flags
 	cjson := flag.String("config", "config.json", "location of configuration file (json)")
 	flag.BoolVar(&versionFlag, "version", false, "output the version")
 	flag.Parse()
 
+	// -version 
 	if versionFlag {
 		fmt.Println(version)
 		os.Exit(0)
 	}
 
-	if glog.V(2) {
-		logging.VeryVerboseFlag = true
-	} else if glog.V(1) {
-		logging.VerboseFlag = true
-	}
-
+	// setup logging
 	logging.SetupLogs()
 
-	resolver.Version = version
+	// initialize resolver
 	resolver.Config = records.SetConfig(*cjson)
+	resolver.Version = version
 
-	// handle for everything in this domain...
-	dns.HandleFunc(resolver.Config.Domain+".", panicRecover(resolver.HandleMesos))
-	dns.HandleFunc(".", panicRecover(resolver.HandleNonMesos))
-
-	go resolver.Serve("tcp")
-	go resolver.Serve("udp")
-	go resolver.Hdns()
-
-
-	// if ZK is identified, start detector and wait for first master
-	if resolver.Config.Zk != "" {
-		dr, err := records.ZKdetect(&resolver.Config)
-		if err != nil {
-			logging.Error.Println(err.Error())
-			os.Exit(1)
-		}
-
-		logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
-		select {
-		case <-dr:
-			logging.VeryVerbose.Println("Warning: done waiting for initial information from Zookeper.")
-		case <-time.After(2 * time.Minute):
-			logging.Error.Println("timed out waiting for initial ZK detection, exiting")
-			os.Exit(1)
-		}
+	// launch DNS server
+	if resolver.Config.DnsOn {
+		resolver.LaunchDNS()
 	}
 
-	// reload the first time
+	// launch HTTP server
+	if resolver.Config.HttpOn {
+		go resolver.LaunchHTTP()
+	}
+
+	// launch Zookeeper launcher
+	if resolver.Config.Zk != "" {
+		resolver.LaunchZK()
+	}
+
+	// periodic loading of DNS state (pull from Master)
 	resolver.Reload()
 	ticker := time.NewTicker(time.Second * time.Duration(resolver.Config.RefreshSeconds))
 	go func() {
@@ -78,23 +59,8 @@ func main() {
 		}
 	}()
 
+	// Wait forever
 	wg.Add(1)
 	wg.Wait()
 }
 
-// panicRecover catches any panics from the resolvers and sets an error
-// code of server failure
-func panicRecover(f func(w dns.ResponseWriter, r *dns.Msg)) func(w dns.ResponseWriter, r *dns.Msg) {
-	return func(w dns.ResponseWriter, r *dns.Msg) {
-		defer func() {
-			if rec := recover(); rec != nil {
-				m := new(dns.Msg)
-				m.SetReply(r)
-				m.SetRcode(r, 2)
-				_ = w.WriteMsg(m)
-				logging.Error.Println(rec)
-			}
-		}()
-		f(w, r)
-	}
-}

@@ -15,6 +15,13 @@ import (
 	"time"
 	"io"
 	"encoding/json"
+	"encoding/binary"
+	"fmt"
+	"sync"
+
+	"github.com/mesos/mesos-go/detector"
+	_ "github.com/mesos/mesos-go/detector/zoo"
+	mesos "github.com/mesos/mesos-go/mesosproto"
 
 	"github.com/miekg/dns"
 	"github.com/emicklei/go-restful"
@@ -23,6 +30,85 @@ import (
 var (
 	recurseCnt = 3
 )
+
+// Resolver holds configuration information  and the resource records
+type Resolver struct {
+	Version 	string
+	Config 		records.Config
+	rs     		records.RecordGenerator
+	leader     	string
+	leaderLock 	sync.RWMutex 
+}
+
+// Launches DNS server for a resolver
+func (res *Resolver) LaunchDNS () {
+	// Handers for Mesos requests
+	dns.HandleFunc(res.Config.Domain+".", panicRecover(res.HandleMesos))
+	// Handler for nonMesos requests
+	dns.HandleFunc(".", panicRecover(res.HandleNonMesos))
+
+	go res.Serve("tcp")
+	go res.Serve("udp")
+}
+
+
+// Serve starts a DNS server for net protocol
+func (res *Resolver) Serve(net string) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			logging.Error.Printf("%s\n", rec)
+			os.Exit(1)
+		}
+	}()
+
+	server := &dns.Server{
+		Addr:       res.Config.Listener + ":" + strconv.Itoa(res.Config.Port),
+		Net:        net,
+		TsigSecret: nil,
+	}
+
+	err := server.ListenAndServe()
+	if err != nil {
+		logging.Error.Printf("Failed to setup "+net+" server: %s\n", err.Error())
+	} else {
+		logging.Error.Printf("Not listening/serving any more requests.")
+	}
+
+	os.Exit(1)
+}
+
+// Launches Zookeeper detector
+func (res *Resolver) LaunchZK () {
+	dr, err := res.ZKdetect()
+	if err != nil {
+		logging.Error.Println(err.Error())
+		os.Exit(1)
+	}
+
+	logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
+	select {
+	case <-dr:
+		logging.VeryVerbose.Println("Warning: done waiting for initial information from Zookeper.")
+	case <-time.After(4 * time.Minute):
+		logging.Error.Println("timed out waiting for initial ZK detection, exiting")
+		os.Exit(1)
+	}
+}
+
+
+
+// Reload triggers a new refresh from mesos master
+func (res *Resolver) Reload() {
+	t := records.RecordGenerator{}
+	err := t.ParseState(res.leader, res.Config)
+
+	if err == nil {
+		res.rs = t
+	} else {
+		logging.VeryVerbose.Println("Warning: master not found; keeping old DNS state")
+	}
+}
+
 
 // resolveOut queries other nameserver
 // randomly picks from the list that is not mesos
@@ -339,33 +425,9 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 }
 
-// Serve starts a dns server for net protocol
-func (res *Resolver) Serve(net string) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			logging.Error.Printf("%s\n", rec)
-			os.Exit(1)
-		}
-	}()
-
-	server := &dns.Server{
-		Addr:       res.Config.Listener + ":" + strconv.Itoa(res.Config.Port),
-		Net:        net,
-		TsigSecret: nil,
-	}
-
-	err := server.ListenAndServe()
-	if err != nil {
-		logging.Error.Printf("Failed to setup "+net+" server: %s\n", err.Error())
-	} else {
-		logging.Error.Printf("Not listening/serving any more requests.")
-	}
-
-	os.Exit(1)
-}
 
 // Hdns starts an http server for mesos-dns queries
-func (res *Resolver) Hdns() {
+func (res *Resolver) LaunchHTTP() {
 	defer func() {
 		if rec := recover(); rec != nil {
 			logging.Error.Printf("%s\n", rec)
@@ -388,7 +450,6 @@ func (res *Resolver) Hdns() {
 	} else {
 		logging.Error.Printf("Not serving http requests any more .")
 	}
-
 	os.Exit(1)
 }
 
@@ -465,22 +526,70 @@ func (res *Resolver) HdnsServices(req *restful.Request, resp *restful.Response) 
 }
 
 
-// Resolver holds configuration information and the resource records
-// refactor me
-type Resolver struct {
-	rs     records.RecordGenerator
-	Config records.Config
-	Version string
-}
-
-// Reload triggers a new refresh from mesos master
-func (res *Resolver) Reload() {
-	t := records.RecordGenerator{}
-	err := t.ParseState(&res.Config)
-
-	if err == nil {
-		res.rs = t
-	} else {
-		logging.VeryVerbose.Println("Warning: master not found; keeping old DNS state")
+// panicRecover catches any panics from the resolvers and sets an error
+// code of server failure
+func panicRecover(f func(w dns.ResponseWriter, r *dns.Msg)) func(w dns.ResponseWriter, r *dns.Msg) {
+	return func(w dns.ResponseWriter, r *dns.Msg) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				m := new(dns.Msg)
+				m.SetReply(r)
+				m.SetRcode(r, 2)
+				_ = w.WriteMsg(m)
+				logging.Error.Println(rec)
+			}
+		}()
+		f(w, r)
 	}
 }
+
+// Start a Zookeeper listener to track leading master, returns a signal chan
+// that closes upon the first leader detection notification (and c.leader is
+// meaningfully readable).
+func (res *Resolver) ZKdetect() (<-chan struct{}, error) {
+
+	// start listener
+	logging.Verbose.Println("Starting master detector for ZK ", res.Config.Zk)
+	md, err := detector.New(res.Config.Zk)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create master detector: %v", err)
+	}
+
+	// and listen for master changes
+	var startedOnce sync.Once
+	started := make(chan struct{})
+	if err := md.Detect(detector.OnMasterChanged(func(info *mesos.MasterInfo) {
+		// making this atomic
+		res.leaderLock.Lock()
+		defer res.leaderLock.Unlock()
+		logging.VeryVerbose.Println("Updated Zookeeper info: ", info)
+		if info == nil {
+			res.leader = ""
+			logging.Error.Println("No leader available in Zookeeper.")
+		} else if host := info.GetHostname(); host != "" {
+			res.leader = host
+		} else {
+			// unpack IPv4
+			octets := make([]byte, 4, 4)
+			binary.BigEndian.PutUint32(octets, info.GetIp())
+			ipv4 := net.IP(octets)
+			res.leader = ipv4.String()
+		}
+		if len(res.leader) > 0 {
+			res.leader = fmt.Sprintf("%s:%d", res.leader, info.GetPort())
+		}
+		logging.Verbose.Println("New master in Zookeeper ", res.leader)
+		startedOnce.Do(func() { close(started) })
+	})); err != nil {
+		return nil, fmt.Errorf("failed to initialize master detector: %v", err)
+	}
+	return started, nil
+}
+
+func (res *Resolver) getLeader() string {
+	res.leaderLock.Lock()
+	defer res.leaderLock.Unlock()
+	return res.leader
+}
+
+

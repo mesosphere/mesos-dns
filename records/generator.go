@@ -15,7 +15,9 @@ import (
 	"github.com/mesosphere/mesos-dns/logging"
 )
 
-// rrs is a type of question names to resource records answers
+// rrs is a type of question names 
+// to resource records answers
+// REFACTOR - may need a different type of map
 type rrs map[string][]string
 
 type slave struct {
@@ -55,9 +57,8 @@ type StateJSON struct {
 }
 
 // RecordGenerator is a tmp mapping of resource records and slaves
-// maybe de-dupe
-// prob. want to break apart
-// refactor me - prob. not needed
+// maybe de-dupe, prob. want to break apart
+// REFACTOR to eliminate redundancy and optimize access
 type RecordGenerator struct {
 	As   rrs
 	SRVs rrs
@@ -65,6 +66,7 @@ type RecordGenerator struct {
 }
 
 // hostBySlaveId looks up a hostname by slave_id
+// REFACTOR Slaves into a map for performance
 func (rg *RecordGenerator) hostBySlaveId(slaveId string) (string, error) {
 	for i := 0; i < len(rg.Slaves); i++ {
 		if rg.Slaves[i].Id == slaveId {
@@ -77,7 +79,7 @@ func (rg *RecordGenerator) hostBySlaveId(slaveId string) (string, error) {
 
 // loadFromMaster loads state.json from mesos master
 func (rg *RecordGenerator) loadFromMaster(ip string, port string) (sj StateJSON) {
-	// tls ?
+	// REFACTOR: state.json security
 	url := "http://" + ip + ":" + port + "/master/state.json"
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -159,10 +161,11 @@ func yankPorts(ports string) []string {
 
 // findMaster tries each master and looks for the leader
 // if no leader responds it errors
-func (rg *RecordGenerator) findMaster(c *Config) (StateJSON, error) {
+func (rg *RecordGenerator) findMaster(leader string, masters []string) (StateJSON, error) {
 	var sj StateJSON
 
-	if leader := c.getLeader(); leader != "" {
+	// Check if ZK master is responding
+	if leader != "" {
 		logging.VeryVerbose.Println("Zookeeper says the leader is: ", leader)
 		ip, port, err := getProto(leader)
 		if err != nil {
@@ -172,10 +175,10 @@ func (rg *RecordGenerator) findMaster(c *Config) (StateJSON, error) {
 		sj, _ = rg.loadWrap(ip, port)
 		if sj.Leader == "" {
 			logging.Verbose.Println("Warning: Zookeeper is wrong about leader")
-			if len(c.Masters) == 0 {
+			if len(masters) == 0 {
 				return sj, errors.New("no master")
 			} else {
-				logging.Verbose.Println("Warning: falling back to Masters config field: ", c.Masters)
+				logging.Verbose.Println("Warning: falling back to Masters config field: ", masters)
 			}
 		} else {
 			return sj, nil
@@ -183,8 +186,8 @@ func (rg *RecordGenerator) findMaster(c *Config) (StateJSON, error) {
 	}
 
 	// try each listed mesos master before dying
-	for i := 0; i < len(c.Masters); i++ {
-		ip, port, err := getProto(c.Masters[i])
+	for i := 0; i < len(masters); i++ {
+		ip, port, err := getProto(masters[i])
 		if err != nil {
 			logging.Error.Println(err)
 		}
@@ -194,7 +197,7 @@ func (rg *RecordGenerator) findMaster(c *Config) (StateJSON, error) {
 		if sj.Leader == "" {
 			logging.VeryVerbose.Println("Warning: not a leader - trying next one")
 
-			if len(c.Masters)-1 == i {
+			if len(masters)-1 == i {
 				return sj, errors.New("no master")
 			}
 
@@ -224,10 +227,10 @@ func getProto(pair string) (string, string, error) {
 //  _<tag>.<service>.<framework>._<protocol>..mesos
 // it also tries different mesos masters if one is not up
 // this will shudown if it can't connect to a mesos master
-func (rg *RecordGenerator) ParseState(config *Config) error {
+func (rg *RecordGenerator) ParseState(leader string, c Config) error {
 
 	// try each listed mesos master before dying
-	sj, err := rg.findMaster(config)
+	sj, err := rg.findMaster(leader, c.Masters)
 	if err != nil {
 		logging.Error.Println("no master")
 		return err
@@ -239,7 +242,7 @@ func (rg *RecordGenerator) ParseState(config *Config) error {
 		return err
 	}
 
-	rg.InsertState(sj, config.Domain, config.Mname, config.Listener, config.Masters)
+	rg.InsertState(sj, c.Domain, c.Mname, c.Listener, c.Masters)
 	return nil
 }
 
@@ -429,7 +432,7 @@ func stripHost(hostip string) string {
 }
 
 // insertRR inserts host to name's map
-// refactor me
+// REFACTOR when storage is updated
 func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
 	logging.VeryVerbose.Println("[" + rtype + "]\t" + name + ": " + host)
 
