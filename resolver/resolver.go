@@ -102,7 +102,7 @@ func (res *Resolver) formatSRV(name string, target string) (*dns.SRV, error) {
 		Priority: 0,
 		Weight:   0,
 		Port:     uint16(p),
-		Target:   h  + ".",
+		Target:   h,
 	}, nil
 }
 
