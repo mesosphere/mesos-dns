@@ -345,21 +345,21 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 	}
 	arec := "leader." + domain + "."
 	rg.insertRR(arec, ip, "A")
-	//arec = "master." + domain + "."
-	//rg.insertRR(arec, ip, "A")
+	arec = "master." + domain + "."
+	rg.insertRR(arec, ip, "A")
 	// SRV records
 	tcp := "_leader._tcp." + domain + "."
 	udp := "_leader._udp." + domain + "."
 	host := "leader." + domain + "." + ":" + port
 	rg.insertRR(tcp, host, "SRV")
 	rg.insertRR(udp, host, "SRV")
-	//tcp = "_master._tcp." + domain + "."
-	//udp = "_master._udp." + domain + "."
-	//host = "master." + domain + ":" + port
-	//rg.insertRR(tcp, host, "SRV")
-	//rg.insertRR(udp, host, "SRV")
 
 	for i := 0; i < len(masters); i++ {
+
+		// skip leader
+		if leader == masters[i] {
+			continue
+		}
 
 		ip, _, err := getProto(masters[i])
 		if err != nil {
@@ -371,13 +371,6 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 		rg.insertRR(arec, ip, "A")
 		arec = "master" + strconv.Itoa(i) + "." + domain + "."
 		rg.insertRR(arec, ip, "A")
-
-		// SRV records
-		//tcp := "_master._tcp." + domain + "."
-		//udp := "_master._udp." + domain + "."
-		//host := "master." + domain + ":" + port
-		//rg.insertRR(tcp, host, "SRV")
-		//rg.insertRR(udp, host, "SRV")
 	}
 }
 

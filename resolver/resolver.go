@@ -242,7 +242,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 				// return one corresponding A record add additional info
 				host := strings.Split(res.rs.SRVs[dom][i],":")[0]
 				if len(res.rs.As[host]) != 0 {
-					rr, err := res.formatA(host, res.rs.As[dom][0])
+					rr, err := res.formatA(host, res.rs.As[host][0])
 					if err != nil {
 						logging.Error.Println(err)
 					} else {
@@ -277,6 +277,16 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 				logging.Error.Println(err)
 			} else {
 				m.Answer = append(m.Answer, rr)
+				// return one corresponding A record add additional info
+				host := strings.Split(res.rs.SRVs[dom][i],":")[0]
+				if len(res.rs.As[host]) != 0 {
+					rr, err := res.formatA(host, res.rs.As[host][0])
+					if err != nil {
+						logging.Error.Println(err)
+					} else {
+						m.Extra = append(m.Extra, rr)
+					}
+				}
 			}
 		}
 
