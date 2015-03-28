@@ -349,14 +349,11 @@ func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
 
 	if rtype == "A" {
 		if val, ok := rg.As[name]; ok {
-
-			h := stripHost(host)
 			for _, b := range val {
-				if stripHost(b) == h {
+				if b == host {
 					return
 				}
 			}
-
 			rg.As[name] = append(val, host)
 		} else {
 			rg.As[name] = []string{host}
@@ -370,21 +367,6 @@ func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
 	}
 }
 
-// leaderIP returns the ip for the mesos master
-func leaderIP(leader string) string {
-	pair := strings.Split(leader, "@")[1]
-	return strings.Split(pair, ":")[0]
-}
-
-
-func slaveIdTail(slaveID string) string {
-	fields := strings.Split(slaveID, "-")
-	return strings.ToLower(fields[len(fields)-1])
-}
-
-func stripHost(hostip string) string {
-	return strings.Split(hostip, ":")[0]
-}
 
 // yankPorts takes an array of port ranges
 func yankPorts(ports string) []string {
@@ -407,6 +389,19 @@ func yankPorts(ports string) []string {
 	return yports
 }
 
+
+// leaderIP returns the ip for the mesos master
+func leaderIP(leader string) string {
+	pair := strings.Split(leader, "@")[1]
+	return strings.Split(pair, ":")[0]
+}
+
+
+func slaveIdTail(slaveID string) string {
+	fields := strings.Split(slaveID, "-")
+	return strings.ToLower(fields[len(fields)-1])
+}
+
 // should be able to accept
 // ip:port
 // zk://host1:port1,host2:port2,.../path
@@ -419,13 +414,13 @@ func getProto(pair string) (string, string, error) {
 
 
 // stripInvalid remove any non-valid hostname characters
-func stripInvalid(tname string) string {
+func stripInvalid(t string) string {
 	reg, err := regexp.Compile("[^\\w-.\\.]")
 	if err != nil {
 		logging.Error.Println(err)
 	}
 
-	s := reg.ReplaceAllString(tname, "")
+	s := reg.ReplaceAllString(t, "")
 
 	return strings.ToLower(strings.Replace(s, "_", "", -1))
 }
