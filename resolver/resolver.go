@@ -586,10 +586,12 @@ func (res *Resolver) ZKdetect() (<-chan struct{}, error) {
 	return started, nil
 }
 
+/*
 func (res *Resolver) getLeader() string {
 	res.leaderLock.Lock()
 	defer res.leaderLock.Unlock()
 	return res.leader
 }
+*/
 
 
