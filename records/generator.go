@@ -162,7 +162,6 @@ func (rg *RecordGenerator) loadFromMaster(ip string, port string) (sj StateJSON)
 	return sj
 }
 
-
 // Catches an attempt to load state.json from a mesos master
 // attempts can fail from down server or mesos master secondary
 // it also reloads from a different master if the master it attempted to
@@ -188,8 +187,6 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 
 	return sj, err
 }
-
-
 
 // InsertState transforms a StateJSON into RecordGenerator RRs
 func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string,
