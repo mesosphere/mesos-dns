@@ -57,7 +57,9 @@ Some frameworks register with longer, less user-friendly names. For example, ear
 
 ---
 
-### Mesos-DNS is not communicating with the Mesos Master using the hosts configured in the 'masters' field
+### Mesos-DNS ignores the 'masters' field
 
-If the `zk` field is defined, Mesos-DNS will ignore the `masters` field. It will contact Zookeeper to detect the leading Mesos master. If the `zk` field is not used, Mesos-DNS uses the `masters` field in the configuration file only for the initial requests to the Mesos master. The initial request for task state also return information about the current masters. This information is used for subsequent task state request. If you launch Mesos-DNS in verbose mode using `-v=2 `, there will be a period stdout message that identifies which master Mesos-DNS is contacting at the moment. 
+If the `zk` field is defined, Mesos-DNS will ignore the `masters`. It will contact Zookeeper to detect the current leading master in the cluster. The master can change over time but, with some delay, Mesos-DNS will learn about any changes. 
+
+If the `zk` field is not used, Mesos-DNS uses the `masters` field in the configuration file only for the initial request to the Mesos master. The initial request for task state also returns information about the current masters. This information is used for subsequent task state request. If you launch Mesos-DNS in verbose mode using `-v=2 `, there will be a period stdout message that identifies which master Mesos-DNS is contacting at the moment. 
 
