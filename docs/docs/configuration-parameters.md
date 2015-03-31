@@ -35,7 +35,7 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 
 `domain` is the domain name for the Mesos cluster. The domain name can use characters [a-z, A-Z, 0-9], `-` if it is not the first or last character of a domain portion, and `.` as a separator of the textual portions of the domain name. We recommend you avoid valid [top-level domain names](http://en.wikipedia.org/wiki/List_of_Internet_top-level_domains). The default value is `mesos`.
 
-`port` is the port number that Mesos-DNS monitors for incoming DNS requests from slaves. Requests can be sent over TCP or UDP. We recommend you use port `53` as several applications assume that the DNS server listens to this port. The default value is `53`.
+`port` is the port number that Mesos-DNS monitors for incoming DNS requests. Requests can be sent over TCP or UDP. We recommend you use port `53` as several applications assume that the DNS server listens to this port. The default value is `53`.
 
 `resolvers` is a comma separated list with the IP addresses of external DNS servers that Mesos-DNS will contact to resolve any DNS requests outside the `domain`. We ***recommend*** that you list the nameservers specified in the `/etc/resolv.conf` on the server Mesos-DNS is running. Alternatively, you can list `8.8.8.8`, which is the [Google public DNS](https://developers.google.com/speed/public-dns/) address. The `resolvers` field is required. 
  
@@ -44,3 +44,12 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 `listener` is the IP address of Mesos-DNS. In SOA replies, Mesos-DNS identifies hostname `mesos-dns.domain` as the primary nameserver for the domain. It uses this IP address in an A record for `mesos-dns.domain`. The default value is "0.0.0.0", which instructs Mesos-DNS to create an A record for every IP address associated with a network interface on the server that runs the Mesos-DNS process. 
 
 `email` is the email address of the Mesos domain name administrator. It is associated with the SOA record for the Mesos domain. The format is `mailbox-name.domain`, using a `.` instead of `@`. For example, if the email address is `root@mesos-dns.mesos`, the `email` field should be `root.mesos-dns.mesos`. The default value is `root.mesos-dns.mesos`.
+
+`dnson` is a boolean field that controls whether Mesos-DNS replies to DNS requests or not. The default value is `true`. 
+
+`dnson` is a boolean field that controls whether Mesos-DNS replies to HTTP requests or not. The default value is `true`. 
+
+`httpport` is the port number that Mesos-DNS monitors for incoming HTTP requests. The default value is `8123`.
+
+
+

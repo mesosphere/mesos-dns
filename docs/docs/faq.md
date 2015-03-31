@@ -27,7 +27,7 @@ Make sure that the port used for Mesos-DNS is available and not in use by anothe
 
 #### Slaves cannot connect to Mesos-DNS
 
-Make sure that port `53` is not blocked by a firewall rule on your cluster. For example, [Google Cloud Platform](https://cloud.google.com/) blocks port `53` by default. If you use the `zk` field, you should also check if the Zookeeper port is blocked either. 
+Make sure that port `53` is not blocked by a firewall rule on your cluster. For example, [Google Cloud Platform](https://cloud.google.com/) blocks port `53` by default. If you use the `zk` field, you should also check if the Zookeeper port is not blocked either. Finally, if you use the HTTP interface for Mesos-DNS, make sure that the `httpport` is open. 
 
 Check the `/etc/resolv.conf` file. If multiple nameservers are listed and Mesos-DNS is not the first one, the slave will first connect to the other name servers. If `options rotate` is used and one of the listed nameservers is not Mesos-DNS, then you will get intermittent failures.
 
@@ -35,7 +35,7 @@ Check the `/etc/resolv.conf` file. If multiple nameservers are listed and Mesos-
 
 #### Mesos-DNS does not resolve names in the Mesos domain
 
-Check the configuration file to make sure that Mesos-DNS is directed to the right master(s) for the Mesos cluster (`masters`). 
+Check the configuration file to make sure that Mesos-DNS is directed to the right Zookeeper or master(s) for the Mesos cluster (`masters`). 
  
 ---
 
