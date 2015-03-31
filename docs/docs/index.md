@@ -18,7 +18,9 @@ export PATH=$PATH:$GOPATH/bin
 To build Mesos-DNS using `godep`: 
 
 ```
-git clone https://github.com/mesosphere/mesos-dns.git
+go get github.com/tools/godep
+go get github/mesosphere/mesos-dns
+cd $GOPATH/src/github.com/mesosphere/mesos-dns
 make build
 ``` 
 

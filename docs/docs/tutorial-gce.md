@@ -242,22 +242,22 @@ Now, let's use Mesos-DNS to communicate with nginx. We will still use the master
 ssh jclouds@10.41.40.151
 ```
 
-First, let's do a DNS lookup for nginx, using the expected name `nginx.marathon-0.7.6.mesos`. The version number of Marathon is there because it registed with Mesos using name `marathon-0.7.6`. We could have avoided this by launching Marathon using ` --framework_name marathon`:
+First, let's do a DNS lookup for nginx, using the expected name `nginx.marathon.mesos`.  Note, we launched Marathon using ` --framework_name marathon` to get this framework name:
 
 ```
-$ dig nginx.marathon-0.7.6.mesos
+$ dig nginx.marathon.mesos
 
-; <<>> DiG 9.8.4-rpz2+rl005.12-P1 <<>> nginx.marathon-0.7.6.mesos
+; <<>> DiG 9.8.4-rpz2+rl005.12-P1 <<>> nginx.marathon.mesos
 ;; global options: +cmd
 ;; Got answer:
 ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 11742
 ;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
 
 ;; QUESTION SECTION:
-;nginx.marathon-0.7.6.mesos. IN	A
+;nginx.marathon.mesos. IN	A
 
 ;; ANSWER SECTION:
-nginx.marathon-0.7.6.mesos. 60 IN	A	10.114.227.92
+nginx.marathon.mesos. 60 IN	A	10.114.227.92
 
 ;; Query time: 0 msec
 ;; SERVER: 10.14.245.208#53(10.14.245.208)
@@ -269,7 +269,7 @@ nginx.marathon-0.7.6.mesos. 60 IN	A	10.114.227.92
 Mesos-DNS informed us that nginx is running on node `10.114.227.92`. Now let's try to connect with it:
 
 ```
-$ curl http://nginx.marathon-0.7.6.mesos
+$ curl http://nginx.marathon.mesos
 <!DOCTYPE html>
 <html>
 <head>
@@ -305,20 +305,20 @@ We successfully connected with nginx using a logical name. Mesos-DNS works!
 Use the Marathon webUI to scale nginx to two instances. Alternatively, relaunch it after editing the json file in step 5 to indicate 2 instances. A minute later, we can look it up again using Mesos-DNS and get:
 
 ```
-$  dig nginx.marathon-0.7.6.mesos
+$  dig nginx.marathon.mesos
 
-; <<>> DiG 9.8.4-rpz2+rl005.12-P1 <<>> nginx.marathon-0.7.6.mesos
+; <<>> DiG 9.8.4-rpz2+rl005.12-P1 <<>> nginx.marathon.mesos
 ;; global options: +cmd
 ;; Got answer:
 ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 30550
 ;; flags: qr aa rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 0
 
 ;; QUESTION SECTION:
-;nginx.marathon-0.7.6.mesos. IN	A
+;nginx.marathon.mesos. IN	A
 
 ;; ANSWER SECTION:
-nginx.marathon-0.7.6.mesos. 60 IN	A	10.29.107.105
-nginx.marathon-0.7.6.mesos. 60 IN	A	10.114.227.92
+nginx.marathon.mesos. 60 IN	A	10.29.107.105
+nginx.marathon.mesos. 60 IN	A	10.114.227.92
 
 ;; Query time: 1 msec
 ;; SERVER: 10.14.245.208#53(10.14.245.208)
