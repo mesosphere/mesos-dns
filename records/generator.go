@@ -15,19 +15,20 @@ import (
 	"github.com/mesosphere/mesos-dns/logging"
 )
 
-// rrs is a type of question names 
-// to resource records answers
-// REFACTOR - may need a different type of map
+// Map host/service name to DNS answer
+// REFACTOR - when discoveryinfo is integrated
+// Will likely become map[string][]discoveryinfo
 type rrs map[string][]string
 
-type slave struct {
-	Id       	string   `json:"id"`
-	Hostname 	string   `json:"hostname"`
+// Mesos-DNS state
+// Refactor when discovery id is available
+type RecordGenerator struct {
+	As   	rrs
+	SRVs 	rrs
+	Slaves 	map[string]string
 }
 
-// Slaves is a mapping of id to hostname read in from state.json
-type Slaves []slave
-
+// The following types help parse state.json
 // Resources holds our SRV ports
 type Resources struct {
 	Ports string `json:"ports"`
@@ -49,6 +50,13 @@ type Frameworks []struct {
 	Name  string `json:"name"`
 }
 
+// Slaves is a mapping of id to hostname read in from state.json
+type slave struct {
+	Id       	string   `json:"id"`
+	Hostname 	string   `json:"hostname"`
+}
+type Slaves []slave
+
 // StateJSON is a representation of mesos master state.json
 type StateJSON struct {
 	Frameworks `json:"frameworks"`
@@ -56,14 +64,6 @@ type StateJSON struct {
 	Leader     string `json:"leader"`
 }
 
-// RecordGenerator is a tmp mapping of resource records and slaves
-// maybe de-dupe, prob. want to break apart
-// REFACTOR to eliminate redundancy and optimize access
-type RecordGenerator struct {
-	As   	rrs
-	SRVs 	rrs
-	Slaves 	map[string]string
-}
 
 // Finds the master and inserts DNS state
 func (rg *RecordGenerator) ParseState(leader string, c Config) error {
@@ -112,8 +112,8 @@ func (rg *RecordGenerator) findMaster(leader string, masters []string) (StateJSO
 	}
 
 	// try each listed mesos master before dying
-	for i := 0; i < len(masters); i++ {
-		ip, port, err := getProto(masters[i])
+	for i, master := range masters {
+		ip, port, err := getProto(master)
 		if err != nil {
 			logging.Error.Println(err)
 		}
@@ -192,10 +192,19 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string,
 	listener string, masters []string) error {
 
-	// performance optimization
+	// creates a map with slave IP addresses (IPv4)
 	rg.Slaves = make(map[string]string)
 	for _, slave := range sj.Slaves {
-		rg.Slaves[slave.Id] = slave.Hostname
+		// if slave is a hostname, translate it
+		if net.ParseIP(slave.Hostname) == nil {
+			t, err :=  net.ResolveIPAddr("ip4", slave.Hostname)
+			if err != nil {
+				logging.Error.Println("cannot translate hostname" + slave.Hostname)
+			}
+			rg.Slaves[slave.Id] = t.IP.String()
+		} else {
+			rg.Slaves[slave.Id] = slave.Hostname
+		}
 	}
 
 	rg.SRVs = make(rrs)
@@ -266,14 +275,14 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 	rg.insertRR(udp, host, "SRV")
 
 	// if there is a list of masters, insert that as well
-	for i := 0; i < len(masters); i++ {
+	for i, master := range masters {
 
 		// skip leader
-		if leader == masters[i] {
+		if leader == master {
 			continue
 		}
 
-		ip, _, err := getProto(masters[i])
+		ip, _, err := getProto(master)
 		if err != nil {
 			logging.Error.Println(err)
 		}
@@ -346,6 +355,8 @@ func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
 
 	if rtype == "A" {
 		if val, ok := rg.As[name]; ok {
+			// check if A record already exists
+			// identical tasks on same slave
 			for _, b := range val {
 				if b == host {
 					return
@@ -357,6 +368,12 @@ func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
 		}
 	} else {
 		if val, ok := rg.SRVs[name]; ok {
+			// check if SRV record already exists
+			for _, b := range val {
+				if b == host {
+					return
+				}
+			}
 			rg.SRVs[name] = append(val, host)
 		} else {
 			rg.SRVs[name] = []string{host}
@@ -365,7 +382,7 @@ func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
 }
 
 
-// yankPorts takes an array of port ranges
+// returns an array of ports from a range
 func yankPorts(ports string) []string {
 	rhs := strings.Split(ports, "[")[1]
 	lhs := strings.Split(rhs, "]")[0]
@@ -373,8 +390,8 @@ func yankPorts(ports string) []string {
 	yports := []string{}
 
 	mports := strings.Split(lhs, ",")
-	for i := 0; i < len(mports); i++ {
-		tmp := strings.TrimSpace(mports[i])
+	for _, port := range mports {
+		tmp := strings.TrimSpace(port)
 		pz := strings.Split(tmp, "-")
 		lo, _ := strconv.Atoi(pz[0])
 		hi, _ := strconv.Atoi(pz[1])
@@ -388,12 +405,14 @@ func yankPorts(ports string) []string {
 
 
 // leaderIP returns the ip for the mesos master
+// input format master@ip:port
 func leaderIP(leader string) string {
 	pair := strings.Split(leader, "@")[1]
 	return strings.Split(pair, ":")[0]
 }
 
 
+// return the slave number from a Mesos slave id
 func slaveIdTail(slaveID string) string {
 	fields := strings.Split(slaveID, "-")
 	return strings.ToLower(fields[len(fields)-1])
@@ -421,5 +440,3 @@ func stripInvalid(t string) string {
 
 	return strings.ToLower(strings.Replace(s, "_", "", -1))
 }
-
-

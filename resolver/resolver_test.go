@@ -29,6 +29,8 @@ func TestCleanWild(t *testing.T) {
 	}
 }
 
+/*
+
 func TestSplitDomain(t *testing.T) {
 	var res Resolver
 
@@ -43,6 +45,7 @@ func TestSplitDomain(t *testing.T) {
 	}
 
 }
+*/
 
 func TestShuffleAnswers(t *testing.T) {
 	var res Resolver
@@ -274,7 +277,7 @@ func TestNonMesosHandler(t *testing.T) {
 }
 
 
-func TestHdns(t *testing.T) {
+func TestHTTP(t *testing.T) {
 
 	// setup DNS server (just http)
 	res, err := fakeDNS(8053)
@@ -283,7 +286,7 @@ func TestHdns(t *testing.T) {
 	}
 	res.Version = "0.1.1"
 
-	go res.Hdns()
+	go res.LaunchHTTP()
 	// wait for startup ? lame
 	time.Sleep(10 * time.Millisecond)
 
