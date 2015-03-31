@@ -148,22 +148,6 @@ func (res *Resolver) resolveOut(r *dns.Msg, nameserver string, proto string, cnt
 	return in, err
 }
 
-/*
-// splitDomain splits dom into host and port pair
-func (res *Resolver) splitDomain(dom string) (host string, port int) {
-	s := strings.Split(dom, ":")
-	host = s[0]
-
-	// As won't have ports
-	if len(s) == 1 {
-		return host, 0
-	} else {
-		port, _ = strconv.Atoi(s[1])
-		return host, port
-	}
-}
-*/
-
 
 // formatSRV returns the SRV resource record for target
 func (res *Resolver) formatSRV(name string, target string) (*dns.SRV, error) {
@@ -185,7 +169,7 @@ func (res *Resolver) formatSRV(name string, target string) (*dns.SRV, error) {
 		Priority: 0,
 		Weight:   0,
 		Port:     uint16(p),
-		Target:   h + ".",
+		Target:   h,
 	}, nil
 }
 
@@ -461,9 +445,9 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 	if (dom[len(dom)-1] != '.') {
 		dom += "."
 	}
-
+	
 	for _, ip := range res.rs.As[dom] {
-		mapS := map[string]string{"host": host, "ip": ip}
+		mapS := map[string]string{"host": dom, "ip": ip}
 		output, err := json.Marshal(mapS)
 		if err != nil {
 			logging.Error.Println(err)
@@ -520,6 +504,7 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 		} else {
 			ip = ""
 		}
+
 		mapS := map[string]string{"service": service, "host": h, "ip": ip, "port": strconv.Itoa(p)}
 		output, err := json.Marshal(mapS)
 		if err != nil {
