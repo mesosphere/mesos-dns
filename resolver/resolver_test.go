@@ -6,11 +6,11 @@ import (
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/miekg/dns"
 	"io/ioutil"
+	"net/http"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
-	"net/http"
-	"reflect"
 )
 
 func init() {
@@ -28,7 +28,6 @@ func TestCleanWild(t *testing.T) {
 		t.Error("not stripping domain")
 	}
 }
-
 
 func TestShuffleAnswers(t *testing.T) {
 	var res Resolver
@@ -76,7 +75,7 @@ func fakeDNS(port int) (Resolver, error) {
 		Listener:  "127.0.0.1",
 		Email:     "root.mesos-dns.mesos.",
 		Mname:     "mesos-dns.mesos.",
-		HttpPort:	8123,
+		HttpPort:  8123,
 	}
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
@@ -258,7 +257,6 @@ func TestNonMesosHandler(t *testing.T) {
 
 }
 
-
 func TestHTTP(t *testing.T) {
 
 	// setup DNS server (just http)
@@ -271,7 +269,7 @@ func TestHTTP(t *testing.T) {
 	go res.LaunchHTTP()
 	// wait for startup ? lame
 	time.Sleep(10 * time.Millisecond)
-	
+
 	// test /v1/version
 	r1, err := http.Get("http://127.0.0.1:8123/v1/version")
 	if err != nil {
@@ -283,12 +281,12 @@ func TestHTTP(t *testing.T) {
 	}
 	var got1 map[string]interface{}
 	err = json.Unmarshal(g1, &got1)
-	correct1 := map[string]interface{}{"Service": "Mesos-DNS","Version": "0.1.1", "URL": "https://github.com/mesosphere/mesos-dns"}
+	correct1 := map[string]interface{}{"Service": "Mesos-DNS", "Version": "0.1.1", "URL": "https://github.com/mesosphere/mesos-dns"}
 	eq1 := reflect.DeepEqual(got1, correct1)
 	if !eq1 {
 		t.Error("Http version API failure")
 	}
-	
+
 	// test /v1/config
 	r2, err := http.Get("http://127.0.0.1:8123/v1/config")
 	if err != nil {
@@ -304,7 +302,7 @@ func TestHTTP(t *testing.T) {
 	if !eq2 {
 		t.Error("Http config API failure")
 	}
-	
+
 	// test /v1/services -- existing record
 	r3, err := http.Get("http://127.0.0.1:8123/v1/services/_leader._tcp.mesos.")
 	if err != nil {
@@ -316,12 +314,12 @@ func TestHTTP(t *testing.T) {
 	}
 	var got3 map[string]interface{}
 	err = json.Unmarshal(g3, &got3)
-	correct3 := map[string]interface{}{"host": "leader.mesos.", "port": "5050", "service": "_leader._tcp.mesos.", "ip":"1.2.3.4"}
+	correct3 := map[string]interface{}{"host": "leader.mesos.", "port": "5050", "service": "_leader._tcp.mesos.", "ip": "1.2.3.4"}
 	eq3 := reflect.DeepEqual(got3, correct3)
 	if !eq3 {
 		t.Error("Http services API failure")
 	}
-	
+
 	// test /v1/services -- non existing record
 	r4, err := http.Get("http://127.0.0.1:8123/v1/services/_myservice._tcp.mesos.")
 	if err != nil {
@@ -333,7 +331,7 @@ func TestHTTP(t *testing.T) {
 	}
 	var got4 map[string]interface{}
 	err = json.Unmarshal(g4, &got4)
-	correct4 := map[string]interface{}{"host": "", "port": "", "service": "", "ip" : ""}
+	correct4 := map[string]interface{}{"host": "", "port": "", "service": "", "ip": ""}
 	eq4 := reflect.DeepEqual(got4, correct4)
 	if !eq4 {
 		t.Error("Http services API failure")
@@ -350,14 +348,10 @@ func TestHTTP(t *testing.T) {
 	}
 	var got5 map[string]interface{}
 	err = json.Unmarshal(g5, &got5)
-	correct5 := map[string]interface{}{"host": "leader.mesos.", "ip":"1.2.3.4"}
+	correct5 := map[string]interface{}{"host": "leader.mesos.", "ip": "1.2.3.4"}
 	eq5 := reflect.DeepEqual(got5, correct5)
 	if !eq5 {
 		t.Error("Http hosts API failure")
 	}
 
-	
 }
-
-
-

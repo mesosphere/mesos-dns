@@ -13,7 +13,6 @@ func init() {
 	logging.SetupLogs()
 }
 
-
 func TestYankPorts(t *testing.T) {
 	p := "[31328-31328]"
 
@@ -103,7 +102,6 @@ func TestStripInvalid(t *testing.T) {
 	}
 
 }
-
 
 // ensure we are parsing what we think we are
 func TestInsertState(t *testing.T) {

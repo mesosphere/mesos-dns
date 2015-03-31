@@ -3,25 +3,25 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"sync"
-	"time"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/resolver"
+	"os"
+	"sync"
+	"time"
 )
 
 func main() {
-	var resolver 	resolver.Resolver
-	var versionFlag	bool 
-	var wg 			sync.WaitGroup
+	var resolver resolver.Resolver
+	var versionFlag bool
+	var wg sync.WaitGroup
 
 	// parse flags
 	cjson := flag.String("config", "config.json", "path to config file (json)")
 	flag.BoolVar(&versionFlag, "version", false, "output the version")
 	flag.Parse()
 
-	// -version 
+	// -version
 	if versionFlag {
 		fmt.Println(version)
 		os.Exit(0)
@@ -63,4 +63,3 @@ func main() {
 	wg.Add(1)
 	wg.Wait()
 }
-

@@ -23,9 +23,9 @@ type rrs map[string][]string
 // Mesos-DNS state
 // Refactor when discovery id is available
 type RecordGenerator struct {
-	As   	rrs
-	SRVs 	rrs
-	Slaves 	map[string]string
+	As     rrs
+	SRVs   rrs
+	Slaves map[string]string
 }
 
 // The following types help parse state.json
@@ -52,8 +52,8 @@ type Frameworks []struct {
 
 // Slaves is a mapping of id to hostname read in from state.json
 type slave struct {
-	Id       	string   `json:"id"`
-	Hostname 	string   `json:"hostname"`
+	Id       string `json:"id"`
+	Hostname string `json:"hostname"`
 }
 type Slaves []slave
 
@@ -63,7 +63,6 @@ type StateJSON struct {
 	Slaves     `json:"slaves"`
 	Leader     string `json:"leader"`
 }
-
 
 // Finds the master and inserts DNS state
 func (rg *RecordGenerator) ParseState(leader string, c Config) error {
@@ -197,7 +196,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 	for _, slave := range sj.Slaves {
 		// if slave is a hostname, translate it
 		if net.ParseIP(slave.Hostname) == nil {
-			t, err :=  net.ResolveIPAddr("ip4", slave.Hostname)
+			t, err := net.ResolveIPAddr("ip4", slave.Hostname)
 			if err != nil {
 				logging.Error.Println("cannot translate hostname" + slave.Hostname)
 			}
@@ -235,7 +234,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 			if task.Resources.Ports != "" {
 				ports := yankPorts(task.Resources.Ports)
 				for _, port := range ports {
-					var srvhost string =  trec + ":" + port
+					var srvhost string = trec + ":" + port
 					tcp := "_" + tname + "._tcp." + tail
 					udp := "_" + tname + "._udp." + tail
 					rg.insertRR(tcp, srvhost, "SRV")
@@ -250,8 +249,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 	return nil
 }
 
-
-// A records for the mesos masters 
+// A records for the mesos masters
 func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader string) {
 	// create records for leader
 	// A records
@@ -306,7 +304,7 @@ func (rg *RecordGenerator) listenerRecord(listener string, mname string) {
 	}
 }
 
-// A records for each local interface 
+// A records for each local interface
 // If this causes problems you should explicitly set the
 // listener address in config.json
 func (rg *RecordGenerator) setFromLocal(host string, mname string) {
@@ -347,7 +345,6 @@ func (rg *RecordGenerator) setFromLocal(host string, mname string) {
 	}
 }
 
-
 // insertRR inserts host to name's map
 // REFACTOR when storage is updated
 func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
@@ -381,7 +378,6 @@ func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
 	}
 }
 
-
 // returns an array of ports from a range
 func yankPorts(ports string) []string {
 	rhs := strings.Split(ports, "[")[1]
@@ -403,14 +399,12 @@ func yankPorts(ports string) []string {
 	return yports
 }
 
-
 // leaderIP returns the ip for the mesos master
 // input format master@ip:port
 func leaderIP(leader string) string {
 	pair := strings.Split(leader, "@")[1]
 	return strings.Split(pair, ":")[0]
 }
-
 
 // return the slave number from a Mesos slave id
 func slaveIdTail(slaveID string) string {
@@ -427,7 +421,6 @@ func getProto(pair string) (string, string, error) {
 	h := strings.Split(pair, ":")
 	return h[0], h[1], nil
 }
-
 
 // stripInvalid remove any non-valid hostname characters
 func stripInvalid(t string) string {

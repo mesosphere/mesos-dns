@@ -57,8 +57,8 @@ type Config struct {
 	HttpPort int
 
 	// Enable/discable servers
-	DnsOn	bool
-	HttpOn	bool
+	DnsOn  bool
+	HttpOn bool
 }
 
 // SetConfig instantiates a Config struct read in from config.json
@@ -73,9 +73,9 @@ func SetConfig(cjson string) (c Config) {
 		Email:          "root.mesos-dns.mesos",
 		Resolvers:      []string{"8.8.8.8"},
 		Listener:       "0.0.0.0",
-		HttpPort:		8123,
-		DnsOn:			true,
-		HttpOn:			true,
+		HttpPort:       8123,
+		DnsOn:          true,
+		HttpOn:         true,
 	}
 
 	// read configuration file
@@ -204,4 +204,3 @@ func localAddies() []string {
 
 	return bad
 }
-

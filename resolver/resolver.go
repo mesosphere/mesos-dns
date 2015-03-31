@@ -3,28 +3,28 @@
 package resolver
 
 import (
+	"encoding/binary"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
-	"time"
-	"io"
-	"encoding/json"
-	"encoding/binary"
-	"fmt"
 	"sync"
+	"time"
 
 	"github.com/mesos/mesos-go/detector"
 	_ "github.com/mesos/mesos-go/detector/zoo"
 	mesos "github.com/mesos/mesos-go/mesosproto"
 
-	"github.com/miekg/dns"
 	"github.com/emicklei/go-restful"
+	"github.com/miekg/dns"
 )
 
 var (
@@ -33,15 +33,15 @@ var (
 
 // holds configuration state and the resource records
 type Resolver struct {
-	Version 	string
-	Config 		records.Config
-	rs     		records.RecordGenerator
-	leader     	string
-	leaderLock 	sync.RWMutex 
+	Version    string
+	Config     records.Config
+	rs         records.RecordGenerator
+	leader     string
+	leaderLock sync.RWMutex
 }
 
 // launches DNS server for a resolver
-func (res *Resolver) LaunchDNS () {
+func (res *Resolver) LaunchDNS() {
 	// Handers for Mesos requests
 	dns.HandleFunc(res.Config.Domain+".", panicRecover(res.HandleMesos))
 	// Handler for nonMesos requests
@@ -50,7 +50,6 @@ func (res *Resolver) LaunchDNS () {
 	go res.Serve("tcp")
 	go res.Serve("udp")
 }
-
 
 // starts a DNS server for net protocol (tcp/udp)
 func (res *Resolver) Serve(net string) {
@@ -78,7 +77,7 @@ func (res *Resolver) Serve(net string) {
 }
 
 // launches Zookeeper detector
-func (res *Resolver) LaunchZK () {
+func (res *Resolver) LaunchZK() {
 	dr, err := res.ZKdetect()
 	if err != nil {
 		logging.Error.Println(err.Error())
@@ -106,7 +105,6 @@ func (res *Resolver) Reload() {
 		logging.VeryVerbose.Println("Warning: master not found; keeping old DNS state")
 	}
 }
-
 
 // resolveOut queries other nameserver, potentially recurses
 func (res *Resolver) resolveOut(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
@@ -148,7 +146,6 @@ func (res *Resolver) resolveOut(r *dns.Msg, nameserver string, proto string, cnt
 	return in, err
 }
 
-
 // formatSRV returns the SRV resource record for target
 func (res *Resolver) formatSRV(name string, target string) (*dns.SRV, error) {
 	ttl := uint32(res.Config.TTL)
@@ -158,7 +155,7 @@ func (res *Resolver) formatSRV(name string, target string) (*dns.SRV, error) {
 		return nil, errors.New("invalid target")
 	}
 	p, _ := strconv.Atoi(port)
-	
+
 	return &dns.SRV{
 		Hdr: dns.RR_Header{
 			Name:   name,
@@ -182,7 +179,7 @@ func (res *Resolver) formatA(dom string, target string) (*dns.A, error) {
 	if a == nil {
 		return nil, errors.New("invalid target")
 	}
-		
+
 	return &dns.A{
 		Hdr: dns.RR_Header{
 			Name:   dom,
@@ -291,14 +288,13 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	// SRV requests
 	if (qType == dns.TypeSRV) || (qType == dns.TypeANY) {
 		for _, srv := range res.rs.SRVs[dom] {
-			logging.VeryVerbose.Println("SRV request for " + r.Question[0].Name + " dom " + dom)
 			rr, err := res.formatSRV(r.Question[0].Name, srv)
 			if err != nil {
 				logging.Error.Println(err)
 			} else {
 				m.Answer = append(m.Answer, rr)
 				// return one corresponding A record add additional info
-				host := strings.Split(srv,":")[0]
+				host := strings.Split(srv, ":")[0]
 				if len(res.rs.As[host]) != 0 {
 					rr, err := res.formatA(host, res.rs.As[host][0])
 					if err != nil {
@@ -324,7 +320,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 
 		}
 	}
-	
+
 	// SOA requests
 	if qType == dns.TypeSOA {
 		m = new(dns.Msg)
@@ -385,7 +381,6 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 }
 
-
 // Hdns starts an http server for mesos-dns queries
 func (res *Resolver) LaunchHTTP() {
 	defer func() {
@@ -420,18 +415,17 @@ func (res *Resolver) RestConfig(req *restful.Request, resp *restful.Response) {
 		logging.Error.Println(err)
 	}
 
-	
 	io.WriteString(resp, string(output))
 }
 
 // Reports Mesos-DNS version through REST interface
 func (res *Resolver) RestVersion(req *restful.Request, resp *restful.Response) {
 	mapV := map[string]string{"Service": "Mesos-DNS",
-	                          "Version": res.Version, 
-	                          "URL": "https://github.com/mesosphere/mesos-dns"}
+		"Version": res.Version,
+		"URL":     "https://github.com/mesosphere/mesos-dns"}
 	output, err := json.Marshal(mapV)
 	if err != nil {
-			logging.Error.Println(err)
+		logging.Error.Println(err)
 	}
 	io.WriteString(resp, string(output))
 }
@@ -442,10 +436,10 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 	host := req.PathParameter("host")
 	// clean up host name
 	dom := strings.ToLower(cleanWild(host))
-	if (dom[len(dom)-1] != '.') {
+	if dom[len(dom)-1] != '.' {
 		dom += "."
 	}
-	
+
 	for _, ip := range res.rs.As[dom] {
 		mapS := map[string]string{"host": dom, "ip": ip}
 		output, err := json.Marshal(mapS)
@@ -463,7 +457,7 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 	}
 
 	// stats
-	mesosrq := strings.HasSuffix(dom, res.Config.Domain + ".")
+	mesosrq := strings.HasSuffix(dom, res.Config.Domain+".")
 	if mesosrq {
 		logging.CurLog.MesosRequests.Inc()
 		if empty {
@@ -480,19 +474,19 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 
 // Reports Mesos-DNS version through http interface
 func (res *Resolver) RestPorts(req *restful.Request, resp *restful.Response) {
-	io.WriteString(resp, "To be implemented...")	
+	io.WriteString(resp, "To be implemented...")
 }
 
 // Reports Mesos-DNS version through http interface
 func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 
 	var ip string
-	
+
 	service := req.PathParameter("service")
 
 	// clean up service name
 	dom := strings.ToLower(cleanWild(service))
-	if (dom[len(dom)-1] != '.') {
+	if dom[len(dom)-1] != '.' {
 		dom += "."
 	}
 
@@ -521,7 +515,7 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 	}
 
 	// stats
-	mesosrq := strings.HasSuffix(dom, res.Config.Domain + ".")
+	mesosrq := strings.HasSuffix(dom, res.Config.Domain+".")
 	if mesosrq {
 		logging.CurLog.MesosRequests.Inc()
 		if empty {
@@ -535,7 +529,6 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 	}
 
 }
-
 
 // panicRecover catches any panics from the resolvers and sets an error
 // code of server failure
@@ -597,7 +590,6 @@ func (res *Resolver) ZKdetect() (<-chan struct{}, error) {
 	return started, nil
 }
 
-
 // cleanWild strips any wildcards out thus mapping cleanly to the
 // original serviceName
 func cleanWild(dom string) string {
@@ -607,4 +599,3 @@ func cleanWild(dom string) string {
 		return dom
 	}
 }
-

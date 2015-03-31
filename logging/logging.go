@@ -1,12 +1,12 @@
 package logging
 
 import (
+	"github.com/golang/glog"
 	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
 	"sync/atomic"
-	"github.com/golang/glog"
 )
 
 var (
