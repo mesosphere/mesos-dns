@@ -432,7 +432,7 @@ func (res *Resolver) RestVersion(req *restful.Request, resp *restful.Response) {
 
 // Reports Mesos-DNS version through http interface
 func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
-
+	
 	host := req.PathParameter("host")
 	// clean up host name
 	dom := strings.ToLower(cleanWild(host))
@@ -440,21 +440,24 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 		dom += "."
 	}
 
+	mapH := make([]map[string]string, 0)
+	
 	for _, ip := range res.rs.As[dom] {
-		mapS := map[string]string{"host": dom, "ip": ip}
-		output, err := json.Marshal(mapS)
-		if err != nil {
-			logging.Error.Println(err)
-		}
-		io.WriteString(resp, string(output))
+		t := map[string]string{"host": dom, "ip": ip}
+		mapH = append(mapH, t)
 	}
-
 	empty := (len(res.rs.As[dom]) == 0)
 	if empty {
-		mapS := map[string]string{"host": "", "ip": ""}
-		output, _ := json.Marshal(mapS)
-		io.WriteString(resp, string(output))
+		t := map[string]string{"host": "", "ip": ""}
+		mapH = append(mapH, t)
 	}
+
+	output, err := json.Marshal(mapH)
+	if err != nil {
+		logging.Error.Println(err)
+	}
+	io.WriteString(resp, string(output))
+
 
 	// stats
 	mesosrq := strings.HasSuffix(dom, res.Config.Domain+".")
@@ -490,6 +493,8 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 		dom += "."
 	}
 
+	mapS := make([]map[string]string, 0)
+
 	for _, srv := range res.rs.SRVs[dom] {
 		h, port, _ := net.SplitHostPort(srv)
 		p, _ := strconv.Atoi(port)
@@ -499,20 +504,21 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 			ip = ""
 		}
 
-		mapS := map[string]string{"service": service, "host": h, "ip": ip, "port": strconv.Itoa(p)}
-		output, err := json.Marshal(mapS)
-		if err != nil {
-			logging.Error.Println(err)
-		}
-		io.WriteString(resp, string(output))
+		t := map[string]string{"service": service, "host": h, "ip": ip, "port": strconv.Itoa(p)}
+		mapS = append(mapS, t)
 	}
 
 	empty := (len(res.rs.SRVs[dom]) == 0)
 	if empty {
-		mapS := map[string]string{"service": "", "host": "", "ip": "", "port": ""}
-		output, _ := json.Marshal(mapS)
-		io.WriteString(resp, string(output))
+		t := map[string]string{"service": "", "host": "", "ip": "", "port": ""}
+		mapS = append(mapS, t)
 	}
+
+	output, err := json.Marshal(mapS)
+	if err != nil {
+		logging.Error.Println(err)
+	}
+	io.WriteString(resp, string(output))
 
 	// stats
 	mesosrq := strings.HasSuffix(dom, res.Config.Domain+".")

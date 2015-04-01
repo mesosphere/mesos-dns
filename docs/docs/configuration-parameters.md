@@ -47,7 +47,7 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 
 `dnson` is a boolean field that controls whether Mesos-DNS replies to DNS requests or not. The default value is `true`. 
 
-`dnson` is a boolean field that controls whether Mesos-DNS replies to HTTP requests or not. The default value is `true`. 
+`httpon` is a boolean field that controls whether Mesos-DNS replies to HTTP requests or not. The default value is `true`. 
 
 `httpport` is the port number that Mesos-DNS monitors for incoming HTTP requests. The default value is `8123`.
 

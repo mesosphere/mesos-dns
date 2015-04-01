@@ -312,9 +312,9 @@ func TestHTTP(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	var got3 map[string]interface{}
+	var got3 []map[string]interface{}
 	err = json.Unmarshal(g3, &got3)
-	correct3 := map[string]interface{}{"host": "leader.mesos.", "port": "5050", "service": "_leader._tcp.mesos.", "ip": "1.2.3.4"}
+	correct3 := []map[string]interface{}{{"host": "leader.mesos.", "port": "5050", "service": "_leader._tcp.mesos.", "ip": "1.2.3.4"}}
 	eq3 := reflect.DeepEqual(got3, correct3)
 	if !eq3 {
 		t.Error("Http services API failure")
@@ -329,9 +329,9 @@ func TestHTTP(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	var got4 map[string]interface{}
+	var got4 []map[string]interface{}
 	err = json.Unmarshal(g4, &got4)
-	correct4 := map[string]interface{}{"host": "", "port": "", "service": "", "ip": ""}
+	correct4 := []map[string]interface{}{{"host": "", "port": "", "service": "", "ip": ""}}
 	eq4 := reflect.DeepEqual(got4, correct4)
 	if !eq4 {
 		t.Error("Http services API failure")
@@ -346,9 +346,9 @@ func TestHTTP(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	var got5 map[string]interface{}
+	var got5 []map[string]interface{}
 	err = json.Unmarshal(g5, &got5)
-	correct5 := map[string]interface{}{"host": "leader.mesos.", "ip": "1.2.3.4"}
+	correct5 := []map[string]interface{}{{"host": "leader.mesos.", "ip": "1.2.3.4"}}
 	eq5 := reflect.DeepEqual(got5, correct5)
 	if !eq5 {
 		t.Error("Http hosts API failure")
