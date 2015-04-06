@@ -1,7 +1,15 @@
 {
 	"ImportPath": "github.com/mesosphere/mesos-dns",
 	"GoVersion": "go1.4.2",
+	"Packages": [
+		"./..."
+	],
 	"Deps": [
+		{
+			"ImportPath": "github.com/emicklei/go-restful",
+			"Comment": "v1.1.3-26-g977ac8f",
+			"Rev": "977ac8fcbcd2ee33319246f7c91d4b426402dc70"
+		},
 		{
 			"ImportPath": "github.com/gogo/protobuf/proto",
 			"Rev": "bc946d07d1016848dfd2507f90f0859c9471681e"
