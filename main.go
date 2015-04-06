@@ -7,14 +7,12 @@ import (
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/resolver"
 	"os"
-	"sync"
 	"time"
 )
 
 func main() {
 	var resolver resolver.Resolver
 	var versionFlag bool
-	var wg sync.WaitGroup
 
 	// parse flags
 	cjson := flag.String("config", "config.json", "path to config file (json)")
@@ -60,6 +58,5 @@ func main() {
 	}()
 
 	// Wait forever
-	wg.Add(1)
-	wg.Wait()
+	select {}
 }
