@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-	var resolver resolver.Resolver
 	var versionFlag bool
 
 	// parse flags
@@ -29,28 +28,29 @@ func main() {
 	logging.SetupLogs()
 
 	// initialize resolver
-	resolver.Config = records.SetConfig(*cjson)
-	resolver.Version = version
+	config := records.SetConfig(*cjson)
+	resolver := resolver.New(version, config)
 
 	// launch DNS server
-	if resolver.Config.DnsOn {
+	if config.DnsOn {
 		resolver.LaunchDNS()
 	}
 
 	// launch HTTP server
-	if resolver.Config.HttpOn {
+	if config.HttpOn {
 		go resolver.LaunchHTTP()
 	}
 
 	// launch Zookeeper listener
-	if resolver.Config.Zk != "" {
+	if config.Zk != "" {
 		resolver.LaunchZK()
 	}
 
 	// periodic loading of DNS state (pull from Master)
 	resolver.Reload()
-	ticker := time.NewTicker(time.Second * time.Duration(resolver.Config.RefreshSeconds))
+	ticker := time.NewTicker(time.Second * time.Duration(config.RefreshSeconds))
 	go func() {
+		//TODO(jdef) handle panics here?
 		for _ = range ticker.C {
 			resolver.Reload()
 			logging.PrintCurLog()
