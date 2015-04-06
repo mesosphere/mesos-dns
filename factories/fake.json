@@ -287,11 +287,11 @@
     "slaves": [
         {
             "attributes": {
-                "host": "development-5226-1d.c.mesos.internal"
+                "host": "dev-123-1d.c.mesos.internal"
             },
-            "hostname": "10.156.230.200",
+            "hostname": "1.2.3.10",
             "id": "20140916-194712-631065744-5050-4798-2",
-            "pid": "slave(1)@10.156.230:5051",
+            "pid": "slave(1)@1.2.3.10:5051",
             "registered_time": 1415029403.65675,
             "resources": {
                 "cpus": 8,
@@ -302,11 +302,11 @@
         },
         {
             "attributes": {
-                "host": "development-5226-1e.c.mesos.internal"
+                "host": "dev-123-1e.c.mesos.internal"
             },
-            "hostname": "10.156.231",
+            "hostname": "1.2.3.11",
             "id": "20140803-125133-3041283216-5050-2410-0",
-            "pid": "slave(1)@10.156.231:5051",
+            "pid": "slave(1)@1.2.3.11:5051",
             "registered_time": 1414913537.33691,
             "reregistered_time": 1414913537.33692,
             "resources": {
@@ -318,11 +318,11 @@
         },
         {
             "attributes": {
-                "host": "development-5226-1f.c.mesos.internal"
+                "host": "dev-123-1f.c.mesos.internal"
             },
-            "hostname": "10.156.232",
+            "hostname": "1.2.3.12",
             "id": "20140827-000744-3041283216-5050-2116-1",
-            "pid": "slave(1)@10.156.232:5051",
+            "pid": "slave(1)@1.2.3:12",
             "registered_time": 1414913537.19731,
             "reregistered_time": 1414913537.19735,
             "resources": {

@@ -45,9 +45,9 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 
 `email` is the email address of the Mesos domain name administrator. It is associated with the SOA record for the Mesos domain. The format is `mailbox-name.domain`, using a `.` instead of `@`. For example, if the email address is `root@mesos-dns.mesos`, the `email` field should be `root.mesos-dns.mesos`. The default value is `root.mesos-dns.mesos`.
 
-`dnson` is a boolean field that controls whether Mesos-DNS replies to DNS requests or not. The default value is `true`. 
+`dnson` is a boolean field that controls whether Mesos-DNS listens for DNS requests or not. The default value is `true`. 
 
-`httpon` is a boolean field that controls whether Mesos-DNS replies to HTTP requests or not. The default value is `true`. 
+`httpon` is a boolean field that controls whether Mesos-DNS listens for HTTP requests or not. The default value is `true`. 
 
 `httpport` is the port number that Mesos-DNS monitors for incoming HTTP requests. The default value is `8123`.
 

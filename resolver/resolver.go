@@ -36,6 +36,7 @@ type Resolver struct {
 	Version    string
 	Config     records.Config
 	rs         records.RecordGenerator
+	rsLock     sync.RWMutex
 	leader     string
 	leaderLock sync.RWMutex
 }
@@ -97,10 +98,17 @@ func (res *Resolver) LaunchZK() {
 // triggers a new refresh from mesos master
 func (res *Resolver) Reload() {
 	t := records.RecordGenerator{}
-	err := t.ParseState(res.leader, res.Config)
+	// Being very conservative
+	res.leaderLock.RLock()
+	currentLeader := res.leader
+	res.leaderLock.RUnlock()
+	err := t.ParseState(currentLeader, res.Config)
 
 	if err == nil {
+		// may need to refactor for fairness 
+		res.rsLock.Lock()
 		res.rs = t
+		res.rsLock.Unlock()
 	} else {
 		logging.VeryVerbose.Println("Warning: master not found; keeping old DNS state")
 	}
@@ -285,6 +293,9 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	m.RecursionAvailable = true
 	m.SetReply(r)
 
+	// being conservative; may need to refactor for performance
+	res.rsLock.RLock()
+	
 	// SRV requests
 	if (qType == dns.TypeSRV) || (qType == dns.TypeANY) {
 		for _, srv := range res.rs.SRVs[dom] {
@@ -375,6 +386,9 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 		}
 	}
 
+	// being conservative; may need to refactor for performance
+	res.rsLock.RUnlock()
+
 	err = w.WriteMsg(m)
 	if err != nil {
 		logging.Error.Println(err)
@@ -441,7 +455,10 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 	}
 
 	mapH := make([]map[string]string, 0)
-	
+
+	// being conservative; may need to refactor for performance
+	res.rsLock.RLock()
+
 	for _, ip := range res.rs.As[dom] {
 		t := map[string]string{"host": dom, "ip": ip}
 		mapH = append(mapH, t)
@@ -458,6 +475,9 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 	}
 	io.WriteString(resp, string(output))
 
+
+	// being conservative; may need to refactor for performance
+	res.rsLock.RUnlock()
 
 	// stats
 	mesosrq := strings.HasSuffix(dom, res.Config.Domain+".")
@@ -495,6 +515,9 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 
 	mapS := make([]map[string]string, 0)
 
+	// being conservative; may need to refactor for performance
+	res.rsLock.RLock()
+
 	for _, srv := range res.rs.SRVs[dom] {
 		h, port, _ := net.SplitHostPort(srv)
 		p, _ := strconv.Atoi(port)
@@ -519,6 +542,9 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 		logging.Error.Println(err)
 	}
 	io.WriteString(resp, string(output))
+
+	// being conservative; may need to refactor for performance
+	res.rsLock.RUnlock()
 
 	// stats
 	mesosrq := strings.HasSuffix(dom, res.Config.Domain+".")
