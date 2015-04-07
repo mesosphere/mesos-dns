@@ -66,7 +66,7 @@ func TestShuffleAnswers(t *testing.T) {
 
 func fakeDNS(port int) (Resolver, error) {
 	var res Resolver
-	res.Config = records.Config{
+	res.config = records.Config{
 		Masters:   []string{"144.76.157.37:5050"},
 		TTL:       60,
 		Port:      port,
@@ -90,7 +90,7 @@ func fakeDNS(port int) (Resolver, error) {
 	}
 
 	masters := []string{"144.76.157.37:5050"}
-	res.rs = records.RecordGenerator{}
+	res.rs = &records.RecordGenerator{}
 	res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
 
 	return res, nil
@@ -264,7 +264,7 @@ func TestHTTP(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	res.Version = "0.1.1"
+	res.version = "0.1.1"
 
 	go res.LaunchHTTP()
 	// wait for startup ? lame
@@ -298,7 +298,7 @@ func TestHTTP(t *testing.T) {
 	}
 	var got2 records.Config
 	err = json.Unmarshal(g2, &got2)
-	eq2 := reflect.DeepEqual(got2, res.Config)
+	eq2 := reflect.DeepEqual(got2, res.config)
 	if !eq2 {
 		t.Error("Http config API failure")
 	}
