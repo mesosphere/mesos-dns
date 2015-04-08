@@ -259,7 +259,6 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 	// If external request are disabled
 	if !res.config.ExternalOn {
 		m = new(dns.Msg)
-		m.SetReply(r)
 		// set refused
 		m.SetRcode(r, 5)
 	} else {
@@ -281,7 +280,6 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 	// resolveOut returns nil Msg sometimes cause of perf
 	if m == nil {
 		m = new(dns.Msg)
-		m.SetReply(r)
 		m.SetRcode(r, 2)
 		err = errors.New("nil msg")
 	}
@@ -380,7 +378,6 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 		// correct handling of AAAA if there are A or SRV records
 		m = new(dns.Msg)
 		m.Authoritative = true
-		m.SetReply(r)
 		// set NOERROR
 		m.SetRcode(r, 0)
 		// leave answer empty (NOERROR --> NODATA)
@@ -390,8 +387,6 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 		if len(m.Answer) == 0 && (qType != dns.TypeSOA) && (qType != dns.TypeSRV) {
 
 			m = new(dns.Msg)
-			m.SetReply(r)
-
 			// set NXDOMAIN
 			m.SetRcode(r, 3)
 
@@ -579,7 +574,6 @@ func panicRecover(f func(w dns.ResponseWriter, r *dns.Msg)) func(w dns.ResponseW
 		defer func() {
 			if rec := recover(); rec != nil {
 				m := new(dns.Msg)
-				m.SetReply(r)
 				m.SetRcode(r, 2)
 				_ = w.WriteMsg(m)
 				logging.Error.Println(rec)

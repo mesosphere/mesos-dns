@@ -76,6 +76,7 @@ func fakeDNS(port int) (Resolver, error) {
 		Email:     "root.mesos-dns.mesos.",
 		Mname:     "mesos-dns.mesos.",
 		HttpPort:  8123,
+	        ExternalOn: true,
 	}
 
 	b, err := ioutil.ReadFile("../factories/fake.json")

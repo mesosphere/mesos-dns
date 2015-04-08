@@ -64,3 +64,5 @@ sudo sed -i '1s/^/nameserver 10.181.64.13\n /' /etc/resolv.conf
 If multiple instances of Mesos-DNS are launched, add a nameserver line for each one at the beginning of `/etc/resolv.conf`. The order of these entries determines the order that the slave will use to contact Mesos-DNS instances. You can set `options rotate` to instruct select between the listed nameservers in a round-robin manner for load balancing.  
 
 All other nameserver settings in `/etc/resolv.conf` should remain unchanged. The `/etc/resolv.conf` file in the masters should only change if the master machines are also used as slaves. 
+
+You can also use Mesos-DNS to serve just a *forward lookup zone* from your primary DNS server (see [this tutorial](tutorial-forward.html)). In this case, you do not need to make any changes to the slaves in the cluster. 

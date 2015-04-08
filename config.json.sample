@@ -11,5 +11,6 @@
   "email": "root.mesos-dns.mesos",
   "dnson": true,
   "httpon": true,
-   "httpport": 8123
+  "httpport": 8123,
+  "externalon": true
 }
