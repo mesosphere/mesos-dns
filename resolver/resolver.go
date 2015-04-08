@@ -256,19 +256,28 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 	// tracing info
 	logging.CurLog.NonMesosRequests.Inc()
 
-	proto := "udp"
-	if _, ok := w.RemoteAddr().(*net.TCPAddr); ok {
-		proto = "tcp"
-	}
+	// If external request are disabled
+	if !res.config.ExternalOn {
+		m = new(dns.Msg)
+		m.SetReply(r)
+		// set refused
+		m.SetRcode(r, 5)
+	} else {
 
-	for _, resolver := range res.config.Resolvers {
-		nameserver := resolver + ":53"
-		m, err = res.resolveOut(r, nameserver, proto, recurseCnt)
-		if err == nil {
-			break
+		proto := "udp"
+		if _, ok := w.RemoteAddr().(*net.TCPAddr); ok {
+			proto = "tcp"
+		}
+		
+		for _, resolver := range res.config.Resolvers {
+			nameserver := resolver + ":53"
+			m, err = res.resolveOut(r, nameserver, proto, recurseCnt)
+			if err == nil {
+				break
+			}
 		}
 	}
-
+		
 	// resolveOut returns nil Msg sometimes cause of perf
 	if m == nil {
 		m = new(dns.Msg)
@@ -288,7 +297,7 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 			logging.CurLog.NonMesosSuccess.Inc()
 		}
 	}
-
+	
 	err = w.WriteMsg(m)
 	if err != nil {
 		logging.Error.Println(err)

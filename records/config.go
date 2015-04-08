@@ -56,9 +56,12 @@ type Config struct {
 	// Http port
 	HttpPort int
 
-	// Enable/discable servers
+	// Enable serving DSN and HTTP requests
 	DnsOn  bool
 	HttpOn bool
+
+	// Enable replies for external requests
+	ExternalOn bool
 }
 
 // SetConfig instantiates a Config struct read in from config.json
@@ -76,6 +79,7 @@ func SetConfig(cjson string) (c Config) {
 		HttpPort:       8123,
 		DnsOn:          true,
 		HttpOn:         true,
+	        ExternalOn:     true,
 	}
 
 	// read configuration file
@@ -111,7 +115,7 @@ func SetConfig(cjson string) (c Config) {
 		os.Exit(1)
 	}
 
-	if len(c.Resolvers) == 0 {
+	if c.ExternalOn && len(c.Resolvers) == 0 {
 		c.Resolvers = GetLocalDNS()
 	}
 
@@ -139,6 +143,7 @@ func SetConfig(cjson string) (c Config) {
 	logging.Verbose.Println("   - TTL: ", c.TTL)
 	logging.Verbose.Println("   - Timeout: ", c.Timeout)
 	logging.Verbose.Println("   - Resolvers: " + strings.Join(c.Resolvers, ", "))
+	logging.Verbose.Println("   - ExternalOn: ", c.ExternalOn)
 	logging.Verbose.Println("   - Email: " + c.Email)
 	logging.Verbose.Println("   - Mname: " + c.Mname)
 	logging.Verbose.Println("   - HttpPort: ", c.HttpPort)
