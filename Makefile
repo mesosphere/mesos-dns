@@ -2,7 +2,7 @@ DEPS = $(shell go list -f '{{range .TestImports}}{{.}} {{end}}' ./...)
 
 default: all
 
-all: test build
+all: restoredeps test build
 
 restoredeps:
 	@echo "--> Restoring build dependencies"

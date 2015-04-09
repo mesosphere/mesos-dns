@@ -1,9 +1,6 @@
 {
 	"ImportPath": "github.com/mesosphere/mesos-dns",
 	"GoVersion": "go1.4.2",
-	"Packages": [
-		"./..."
-	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/emicklei/go-restful",
