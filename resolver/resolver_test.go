@@ -73,8 +73,8 @@ func fakeDNS(port int) (Resolver, error) {
 		Domain:    "mesos",
 		Resolvers: records.GetLocalDNS(),
 		Listener:  "127.0.0.1",
-		Email:     "root.mesos-dns.mesos.",
-		Mname:     "mesos-dns.mesos.",
+		SOARname:  "root.ns1.mesos.",
+		SOAMname:  "ns1.mesos.",
 		HttpPort:  8123,
 	        ExternalOn: true,
 	}

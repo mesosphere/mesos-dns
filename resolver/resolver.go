@@ -121,9 +121,11 @@ func (res *Resolver) Reload() {
 	err := t.ParseState(currentLeader, res.config)
 
 	if err == nil {
+		timestamp :=  uint32(time.Now().Unix())
 		// may need to refactor for fairness
 		res.rsLock.Lock()
 		defer res.rsLock.Unlock()
+		res.config.SOASerial = timestamp
 		res.rs = &t
 	} else {
 		logging.VeryVerbose.Println("Warning: master not found; keeping old DNS state")
@@ -225,12 +227,12 @@ func (res *Resolver) formatSOA(dom string) (*dns.SOA, error) {
 			Class:  dns.ClassINET,
 			Ttl:    ttl,
 		},
-		Ns:      res.config.Mname,
-		Mbox:    res.config.Email,
-		Serial:  uint32(time.Now().Unix()),
-		Refresh: ttl,
-		Retry:   600,
-		Expire:  86400,
+		Ns:      res.config.SOAMname,
+		Mbox:    res.config.SOARname,
+		Serial:  res.config.SOASerial,
+		Refresh: res.config.SOARefresh,
+		Retry:   res.config.SOARetry,
+		Expire:  res.config.SOAExpire,
 		Minttl:  ttl,
 	}, nil
 }
@@ -313,7 +315,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 
 	m := new(dns.Msg)
 	m.Authoritative = true
-	m.RecursionAvailable = true
+	m.RecursionAvailable = false
 	m.SetReply(r)
 
 	rs := res.records()
@@ -385,7 +387,6 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	} else {
 		// no answers but not a {SOA,SRV} request
 		if len(m.Answer) == 0 && (qType != dns.TypeSOA) && (qType != dns.TypeSRV) {
-
 			m = new(dns.Msg)
 			// set NXDOMAIN
 			m.SetRcode(r, 3)

@@ -80,7 +80,7 @@ func (rg *RecordGenerator) ParseState(leader string, c Config) error {
 	}
 
 	// insert state
-	rg.InsertState(sj, c.Domain, c.Mname, c.Listener, c.Masters)
+	rg.InsertState(sj, c.Domain, c.SOAMname, c.Listener, c.Masters)
 	return nil
 }
 
@@ -188,7 +188,7 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 }
 
 // InsertState transforms a StateJSON into RecordGenerator RRs
-func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string,
+func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	listener string, masters []string) error {
 
 	// creates a map with slave IP addresses (IPv4)
@@ -244,7 +244,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, mname string
 		}
 	}
 
-	rg.listenerRecord(listener, mname)
+	rg.listenerRecord(listener, ns)
 	rg.masterRecord(domain, masters, sj.Leader)
 	return nil
 }
@@ -294,20 +294,20 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 }
 
 // A record for mesos-dns (the name is listed in SOA replies)
-func (rg *RecordGenerator) listenerRecord(listener string, mname string) {
+func (rg *RecordGenerator) listenerRecord(listener string, ns string) {
 	if listener == "0.0.0.0" {
-		rg.setFromLocal(listener, mname)
+		rg.setFromLocal(listener, ns)
 	} else if listener == "127.0.0.1" {
-		rg.insertRR(mname, "127.0.0.1", "A")
+		rg.insertRR(ns, "127.0.0.1", "A")
 	} else {
-		rg.insertRR(mname, listener, "A")
+		rg.insertRR(ns, listener, "A")
 	}
 }
 
 // A records for each local interface
 // If this causes problems you should explicitly set the
 // listener address in config.json
-func (rg *RecordGenerator) setFromLocal(host string, mname string) {
+func (rg *RecordGenerator) setFromLocal(host string, ns string) {
 
 	ifaces, err := net.Interfaces()
 	if err != nil {
@@ -340,7 +340,7 @@ func (rg *RecordGenerator) setFromLocal(host string, mname string) {
 				continue
 			}
 
-			rg.insertRR(mname, ip.String(), "A")
+			rg.insertRR(ns, ip.String(), "A")
 		}
 	}
 }
