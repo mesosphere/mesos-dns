@@ -135,6 +135,9 @@ func SetConfig(cjson string) (c Config) {
 	if c.SOARname[len(c.SOARname)-1:] != "." {
 		c.SOARname = c.SOARname + "."
 	}
+	if c.SOAMname[len(c.SOAMname)-1:] != "." {
+		c.SOAMname = c.SOAMname + "."
+	}
 	c.SOASerial = uint32(time.Now().Unix())
 	
 	// print configuration file
