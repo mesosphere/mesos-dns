@@ -8,6 +8,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/miekg/dns"
@@ -26,7 +27,7 @@ type Config struct {
 	RefreshSeconds int
 
 	// TTL: the TTL value used for SRV and A records (default 60)
-	TTL int
+	TTL int32
 
 	// Resolver port: port used to listen for slave requests (default 53)
 	Port int
@@ -44,11 +45,14 @@ type Config struct {
 	// File is the location of the config.json file
 	File string
 
-	// Email is the rname for a SOA
-	Email string
-
-	// Mname is the mname for a SOA
-	Mname string
+	// SOA record fields (see http://tools.ietf.org/html/rfc1035#page-18)
+	SOAMname   string  // primary name server
+	SOARname   string  // email of admin esponsible 
+	SOASerial  uint32  // initial version number (incremented on refresh)
+	SOARefresh uint32  // refresh interval
+	SOARetry   uint32  // retry interval 
+	SOAExpire  uint32  // expiration time
+	SOAMinttl  uint32  // minimum TTL
 
 	// ListenAddr is the server listener address
 	Listener string
@@ -73,7 +77,12 @@ func SetConfig(cjson string) (c Config) {
 		Domain:         "mesos",
 		Port:           53,
 		Timeout:        5,
-		Email:          "root.mesos-dns.mesos",
+		SOARname:       "root.ns1.mesos",
+	        SOAMname:       "ns1.mesos",
+	        SOARefresh:     60,
+	        SOARetry:       600,
+	        SOAExpire:      86400,
+	        SOAMinttl:      60,
 		Resolvers:      []string{"8.8.8.8"},
 		Listener:       "0.0.0.0",
 		HttpPort:       8123,
@@ -119,14 +128,15 @@ func SetConfig(cjson string) (c Config) {
 		c.Resolvers = GetLocalDNS()
 	}
 
-	c.Email = strings.Replace(c.Email, "@", ".", -1)
-	if c.Email[len(c.Email)-1:] != "." {
-		c.Email = c.Email + "."
-	}
-
 	c.Domain = strings.ToLower(c.Domain)
-	c.Mname = "mesos-dns." + c.Domain + "."
 
+	// SOA record fields
+	c.SOARname = strings.Replace(c.SOARname, "@", ".", -1)
+	if c.SOARname[len(c.SOARname)-1:] != "." {
+		c.SOARname = c.SOARname + "."
+	}
+	c.SOASerial = uint32(time.Now().Unix())
+	
 	// print configuration file
 	logging.Verbose.Println("Mesos-DNS configuration:")
 	if len(c.Masters) != 0 {
@@ -144,8 +154,13 @@ func SetConfig(cjson string) (c Config) {
 	logging.Verbose.Println("   - Timeout: ", c.Timeout)
 	logging.Verbose.Println("   - Resolvers: " + strings.Join(c.Resolvers, ", "))
 	logging.Verbose.Println("   - ExternalOn: ", c.ExternalOn)
-	logging.Verbose.Println("   - Email: " + c.Email)
-	logging.Verbose.Println("   - Mname: " + c.Mname)
+	logging.Verbose.Println("   - SOAMname: " + c.SOAMname)
+	logging.Verbose.Println("   - SOARname: " + c.SOARname)
+	logging.Verbose.Println("   - SOASerial: ", c.SOASerial)
+	logging.Verbose.Println("   - SOARefresh: ", c.SOARefresh)
+	logging.Verbose.Println("   - SOARetry: ", c.SOARetry)
+	logging.Verbose.Println("   - SOAExpire: ", c.SOAExpire)
+	logging.Verbose.Println("   - SOAExpire: ", c.SOAMinttl)
 	logging.Verbose.Println("   - HttpPort: ", c.HttpPort)
 	logging.Verbose.Println("   - HttpOn: ", c.HttpOn)
 	logging.Verbose.Println("   - ConfigFile: ", c.File)
