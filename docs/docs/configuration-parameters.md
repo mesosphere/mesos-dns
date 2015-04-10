@@ -18,8 +18,17 @@ The configuration file should include the following fields:
   "port": 53,
   "resolvers": ["169.254.169.254"],
   "timeout": 5, 
+  "httpon": true,
+  "dsnon": true,
+  "httpport": 8123,
+  "externalon": true
   "listener": "10.101.160.16",
-  "email": "root.mesos-dns.mesos"
+  "SOAMname": "root.ns1.mesos",
+  "SOARname": "ns1.mesos",
+  "SOARefresh": 60,
+  "SOARetry":   600,
+  "SOAExpire":  86400,
+  "SOAMinttl": 60,
 }
 ```
 
@@ -43,13 +52,21 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 
 `listener` is the IP address of Mesos-DNS. In SOA replies, Mesos-DNS identifies hostname `mesos-dns.domain` as the primary nameserver for the domain. It uses this IP address in an A record for `mesos-dns.domain`. The default value is "0.0.0.0", which instructs Mesos-DNS to create an A record for every IP address associated with a network interface on the server that runs the Mesos-DNS process. 
 
-`email` is the email address of the Mesos domain name administrator. It is associated with the SOA record for the Mesos domain. The format is `mailbox-name.domain`, using a `.` instead of `@`. For example, if the email address is `root@mesos-dns.mesos`, the `email` field should be `root.mesos-dns.mesos`. The default value is `root.mesos-dns.mesos`.
-
 `dnson` is a boolean field that controls whether Mesos-DNS listens for DNS requests or not. The default value is `true`. 
 
 `httpon` is a boolean field that controls whether Mesos-DNS listens for HTTP requests or not. The default value is `true`. 
 
 `httpport` is the port number that Mesos-DNS monitors for incoming HTTP requests. The default value is `8123`.
 
+`externalon` is a boolean field that controls whether Mesos-DNS serves requests outside of the Mesos domain. The default value is `true`. 
 
+`SOAMname` is the MNAME field in the SOA record for the Mesos domain. The format is `mailbox.domain`, using a `.` instead of `@`. For example, if the email address is `root@ns1.mesos`, the `email` field should be `root.mesos-dns.mesos`. For details, see the [RFC-1035](http://tools.ietf.org/html/rfc1035#page-18). The default value is `root.ns1.mesos`. 
+
+`SOARefresh` is the REFRESH field in the SOA record for the Mesos domain. For details, see the [RFC-1035](http://tools.ietf.org/html/rfc1035#page-18). The default value is `60`.
+
+`SOARetry` is the RETRY field in the SOA record for the Mesos domain. For details, see the [RFC-1035](http://tools.ietf.org/html/rfc1035#page-18). The default value is `600`.
+
+`SOAExpire` is the EXPIRE field in the SOA record for the Mesos domain. For details, see the [RFC-1035](http://tools.ietf.org/html/rfc1035#page-18). The default value is `86400`.
+
+`SOAMinttl` is the minimum TTL field in the SOA record for the Mesos domain. For details, see the [RFC-2308](https://tools.ietf.org/html/rfc2308). The default value is `60`.
 

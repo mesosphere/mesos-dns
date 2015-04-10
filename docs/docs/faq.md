@@ -10,6 +10,13 @@ title: Mesos-DNS FAQ
 
 You can check the Mesos-DNS version by executing `mesos-dns -version`. 
 
+
+---
+
+#### SOA record customization
+
+You can customize all fields in the SOA records for the Mesos domain. See the `SOA*` [configuration parameters](configuration-parameters.html).
+
 ---
 
 #### Verbose and very verbose modes
