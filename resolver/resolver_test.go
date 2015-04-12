@@ -64,9 +64,8 @@ func TestShuffleAnswers(t *testing.T) {
 	}
 }
 
-func fakeDNS(port int) (Resolver, error) {
-	var res Resolver
-	res.config = records.Config{
+func fakeDNS(port int) (*Resolver, error) {
+	res := New("", records.Config{
 		Masters:    []string{"144.76.157.37:5050"},
 		TTL:        60,
 		Port:       port,
@@ -77,7 +76,7 @@ func fakeDNS(port int) (Resolver, error) {
 		SOAMname:   "ns1.mesos.",
 		HttpPort:   8123,
 		ExternalOn: true,
-	}
+	})
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
 	if err != nil {
@@ -105,7 +104,11 @@ func fakeMsg(dom string, rrHeader uint16, proto string) (*dns.Msg, error) {
 
 	m := new(dns.Msg)
 	m.Question = make([]dns.Question, 1)
-	m.Question[0] = dns.Question{dns.Fqdn(dom), rrHeader, qc}
+	m.Question[0] = dns.Question{
+		Name:   dns.Fqdn(dom),
+		Qtype:  rrHeader,
+		Qclass: qc,
+	}
 
 	in, _, err := c.Exchange(m, "127.0.0.1:8053")
 	return in, err

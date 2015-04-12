@@ -19,7 +19,11 @@ func query(dom string) {
 
 	m := new(dns.Msg)
 	m.Question = make([]dns.Question, 1)
-	m.Question[0] = dns.Question{dns.Fqdn(dom), qt, qc}
+	m.Question[0] = dns.Question{
+		Name:   dns.Fqdn(dom),
+		Qtype:  qt,
+		Qclass: qc,
+	}
 
 	_, _, err := c.Exchange(m, nameserver)
 	if err != nil {
@@ -38,5 +42,5 @@ func main() {
 
 	elapsed := time.Since(start)
 	log.Printf("benching took %s", elapsed)
-	log.Printf("doing %s/%s rps", cnt, elapsed)
+	log.Printf("doing %d/%v rps", cnt, elapsed)
 }
