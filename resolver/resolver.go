@@ -7,23 +7,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mesosphere/mesos-dns/logging"
-	"github.com/mesosphere/mesos-dns/records"
 	"io"
 	"math/rand"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/emicklei/go-restful"
 	"github.com/mesos/mesos-go/detector"
 	_ "github.com/mesos/mesos-go/detector/zoo"
 	mesos "github.com/mesos/mesos-go/mesosproto"
-
-	"github.com/emicklei/go-restful"
+	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/records"
+	"github.com/mesosphere/mesos-dns/util"
 	"github.com/miekg/dns"
 )
 
@@ -58,24 +57,21 @@ func (res *Resolver) records() *records.RecordGenerator {
 }
 
 // launches DNS server for a resolver
-func (res *Resolver) LaunchDNS() {
+func (res *Resolver) LaunchDNS() error {
 	// Handers for Mesos requests
 	dns.HandleFunc(res.config.Domain+".", panicRecover(res.HandleMesos))
 	// Handler for nonMesos requests
 	dns.HandleFunc(".", panicRecover(res.HandleNonMesos))
 
-	go res.Serve("tcp")
-	go res.Serve("udp")
+	errCh := make(chan error, 2)
+	go func() { errCh <- res.Serve("tcp") }()
+	go func() { errCh <- res.Serve("udp") }()
+	return <-errCh
 }
 
 // starts a DNS server for net protocol (tcp/udp)
-func (res *Resolver) Serve(net string) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			logging.Error.Printf("%s\n", rec)
-			os.Exit(1)
-		}
-	}()
+func (res *Resolver) Serve(net string) error {
+	defer util.HandleCrash()
 
 	server := &dns.Server{
 		Addr:       res.config.Listener + ":" + strconv.Itoa(res.config.Port),
@@ -85,20 +81,18 @@ func (res *Resolver) Serve(net string) {
 
 	err := server.ListenAndServe()
 	if err != nil {
-		logging.Error.Printf("Failed to setup "+net+" server: %s\n", err.Error())
+		return fmt.Errorf("Failed to setup %q server: %v", net, err)
 	} else {
 		logging.Error.Printf("Not listening/serving any more requests.")
 	}
-
-	os.Exit(1)
+	return nil
 }
 
 // launches Zookeeper detector
-func (res *Resolver) LaunchZK() {
+func (res *Resolver) LaunchZK() error {
 	dr, err := res.ZKdetect()
 	if err != nil {
-		logging.Error.Println(err.Error())
-		os.Exit(1)
+		return err
 	}
 
 	logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
@@ -106,9 +100,9 @@ func (res *Resolver) LaunchZK() {
 	case <-dr:
 		logging.VeryVerbose.Println("Warning: got initial information from Zookeper.")
 	case <-time.After(4 * time.Minute):
-		logging.Error.Println("timed out waiting for initial ZK detection, exiting")
-		os.Exit(1)
+		return fmt.Errorf("timed out waiting for initial ZK detection, exiting")
 	}
+	return nil
 }
 
 // triggers a new refresh from mesos master
@@ -434,13 +428,8 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 // Hdns starts an http server for mesos-dns queries
-func (res *Resolver) LaunchHTTP() {
-	defer func() {
-		if rec := recover(); rec != nil {
-			logging.Error.Printf("%s\n", rec)
-			os.Exit(1)
-		}
-	}()
+func (res *Resolver) LaunchHTTP() error {
+	defer util.HandleCrash()
 
 	// webserver + available routes
 	ws := new(restful.WebService)
@@ -453,11 +442,11 @@ func (res *Resolver) LaunchHTTP() {
 
 	portString := ":" + strconv.Itoa(res.config.HttpPort)
 	if err := http.ListenAndServe(portString, nil); err != nil {
-		logging.Error.Printf("Failed to setup http server: %s\n", err.Error())
+		return fmt.Errorf("Failed to setup http server: %v", err)
 	} else {
-		logging.Error.Printf("Not serving http requests any more .")
+		logging.Error.Println("Not serving http requests any more.")
 	}
-	os.Exit(1)
+	return nil
 }
 
 // Reports configuration through REST interface
