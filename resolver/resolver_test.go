@@ -280,7 +280,11 @@ func TestHTTP(t *testing.T) {
 	}
 	res.version = "0.1.1"
 
-	go res.LaunchHTTP()
+	errCh := res.LaunchHTTP()
+	go func() {
+		err := <-errCh
+		t.Fatalf("HTTP server stopped with err: %v", err)
+	}()
 	// wait for startup ? lame
 	time.Sleep(10 * time.Millisecond)
 

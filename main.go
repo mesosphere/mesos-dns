@@ -38,46 +38,46 @@ func main() {
 	config := records.SetConfig(*cjson)
 	resolver := resolver.New(version, config)
 
+	var dnsErr, httpErr, zkErr <-chan error
 	// launch DNS server
 	if config.DnsOn {
-		go func() {
-			if err := resolver.LaunchDNS(); err != nil {
-				logging.Error.Fatalf("DNS server failed: %v", err)
-			} else {
-				logging.Error.Fatalf("terminating because DNS died")
-			}
-		}()
+		dnsErr = resolver.LaunchDNS()
 	}
 
 	// launch HTTP server
 	if config.HttpOn {
-		go func() {
-			if err := resolver.LaunchHTTP(); err != nil {
-				logging.Error.Fatalf("HTTP server failed: %v", err)
-			} else {
-				logging.Error.Fatalf("terminating because HTTP died")
-			}
-		}()
+		httpErr = resolver.LaunchHTTP()
 	}
 
 	// launch Zookeeper listener
 	if config.Zk != "" {
-		if err := resolver.LaunchZK(); err != nil {
-			logging.Error.Fatalf("failed to launch ZK listener: %v", err)
-		}
+		zkErr = resolver.LaunchZK()
 	}
 
 	// periodic loading of DNS state (pull from Master)
 	resolver.Reload()
 	ticker := time.NewTicker(time.Second * time.Duration(config.RefreshSeconds))
-	go func() {
-		//TODO(jdef) handle panics here?
-		for _ = range ticker.C {
+
+	handleServerErr := func(name string, err error) {
+		if err != nil {
+			logging.Error.Fatalf("%s failed: %v", name, err)
+		} else {
+			logging.Error.Fatalf("%s stopped unexpectedly", name)
+		}
+	}
+
+	defer util.HandleCrash()
+	for {
+		select {
+		case <-ticker.C:
 			resolver.Reload()
 			logging.PrintCurLog()
+		case err := <-dnsErr:
+			handleServerErr("DNS server", err)
+		case err := <-httpErr:
+			handleServerErr("HTTP server", err)
+		case err := <-zkErr:
+			handleServerErr("ZK watcher", err)
 		}
-	}()
-
-	// Wait forever
-	select {}
+	}
 }

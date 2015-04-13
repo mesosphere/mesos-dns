@@ -56,8 +56,8 @@ func (res *Resolver) records() *records.RecordGenerator {
 	return res.rs
 }
 
-// launches DNS server for a resolver
-func (res *Resolver) LaunchDNS() error {
+// launches DNS server for a resolver, returns immediately
+func (res *Resolver) LaunchDNS() <-chan error {
 	// Handers for Mesos requests
 	dns.HandleFunc(res.config.Domain+".", panicRecover(res.HandleMesos))
 	// Handler for nonMesos requests
@@ -66,10 +66,10 @@ func (res *Resolver) LaunchDNS() error {
 	errCh := make(chan error, 2)
 	go func() { errCh <- res.Serve("tcp") }()
 	go func() { errCh <- res.Serve("udp") }()
-	return <-errCh
+	return errCh
 }
 
-// starts a DNS server for net protocol (tcp/udp)
+// starts a DNS server for net protocol (tcp/udp), blocks until service has stopped
 func (res *Resolver) Serve(net string) error {
 	defer util.HandleCrash()
 
@@ -88,21 +88,27 @@ func (res *Resolver) Serve(net string) error {
 	return nil
 }
 
-// launches Zookeeper detector
-func (res *Resolver) LaunchZK() error {
-	dr, err := res.ZKdetect()
-	if err != nil {
-		return err
-	}
+// launches Zookeeper detector, returns immediately
+func (res *Resolver) LaunchZK() <-chan error {
+	errCh := make(chan error, 1)
+	go func() {
+		var err error
+		defer func() { errCh <- err }()
 
-	logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
-	select {
-	case <-dr:
-		logging.VeryVerbose.Println("Warning: got initial information from Zookeper.")
-	case <-time.After(4 * time.Minute):
-		return fmt.Errorf("timed out waiting for initial ZK detection, exiting")
-	}
-	return nil
+		var startedCh <-chan struct{}
+		if startedCh, err = res.ZKdetect(); err != nil {
+			return
+		}
+
+		logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
+		select {
+		case <-startedCh:
+			logging.VeryVerbose.Println("Warning: got initial information from Zookeper.")
+		case <-time.After(4 * time.Minute): // TODO(jdef) extract constant
+			err = fmt.Errorf("timed out waiting for initial ZK detection, exiting")
+		}
+	}()
+	return errCh
 }
 
 // triggers a new refresh from mesos master
@@ -427,8 +433,8 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 }
 
-// Hdns starts an http server for mesos-dns queries
-func (res *Resolver) LaunchHTTP() error {
+// starts an http server for mesos-dns queries, returns immediately
+func (res *Resolver) LaunchHTTP() <-chan error {
 	defer util.HandleCrash()
 
 	// webserver + available routes
@@ -441,12 +447,19 @@ func (res *Resolver) LaunchHTTP() error {
 	restful.Add(ws)
 
 	portString := ":" + strconv.Itoa(res.config.HttpPort)
-	if err := http.ListenAndServe(portString, nil); err != nil {
-		return fmt.Errorf("Failed to setup http server: %v", err)
-	} else {
-		logging.Error.Println("Not serving http requests any more.")
-	}
-	return nil
+
+	errCh := make(chan error, 1)
+	go func() {
+		var err error
+		defer func() { errCh <- err }()
+
+		if err = http.ListenAndServe(portString, nil); err != nil {
+			err = fmt.Errorf("Failed to setup http server: %v", err)
+		} else {
+			logging.Error.Println("Not serving http requests any more.")
+		}
+	}()
+	return errCh
 }
 
 // Reports configuration through REST interface
