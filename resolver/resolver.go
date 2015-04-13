@@ -88,13 +88,26 @@ func (res *Resolver) Serve(net string) error {
 	return nil
 }
 
-// launches Zookeeper detector, returns immediately
-func (res *Resolver) LaunchZK() <-chan error {
+// launches Zookeeper detector, returns immediately two chans: the first fires an empty
+// struct whenever there's a new mesos leader, the second if there's an unrecoverable
+// error in the master detector.
+func (res *Resolver) LaunchZK(initialDetectionTimeout time.Duration) (<-chan struct{}, <-chan error) {
 	errCh := make(chan error, 1)
+	leaderCh := make(chan struct{}, 1)
+	listenerFunc := func(newLeader bool) {
+		if newLeader {
+			// don't block if the buffer is full
+			select {
+			case leaderCh <- struct{}{}:
+			default:
+			}
+		}
+	}
+
 	go func() {
 		defer util.HandleCrash()
 
-		startedCh, err := res.ZKdetect()
+		startedCh, err := res.ZKdetect(listenerFunc)
 		if err != nil {
 			errCh <- err
 			return
@@ -104,11 +117,11 @@ func (res *Resolver) LaunchZK() <-chan error {
 		select {
 		case <-startedCh:
 			logging.VeryVerbose.Println("Warning: got initial information from Zookeper.")
-		case <-time.After(4 * time.Minute): // TODO(jdef) extract constant
+		case <-time.After(initialDetectionTimeout):
 			errCh <- fmt.Errorf("timed out waiting for initial ZK detection, exiting")
 		}
 	}()
-	return errCh
+	return leaderCh, errCh
 }
 
 // triggers a new refresh from mesos master
@@ -610,7 +623,7 @@ func panicRecover(f func(w dns.ResponseWriter, r *dns.Msg)) func(w dns.ResponseW
 // Start a Zookeeper listener to track leading master, returns a signal chan
 // that closes upon the first leader detection notification (and c.leader is
 // meaningfully readable).
-func (res *Resolver) ZKdetect() (<-chan struct{}, error) {
+func (res *Resolver) ZKdetect(leaderChanged func(bool)) (<-chan struct{}, error) {
 
 	// start listener
 	logging.Verbose.Println("Starting master detector for ZK ", res.config.Zk)
@@ -626,6 +639,11 @@ func (res *Resolver) ZKdetect() (<-chan struct{}, error) {
 		// making this atomic
 		res.leaderLock.Lock()
 		defer res.leaderLock.Unlock()
+		if leaderChanged != nil {
+			defer func() {
+				leaderChanged(res.leader != "")
+			}()
+		}
 		logging.VeryVerbose.Println("Updated Zookeeper info: ", info)
 		if info == nil {
 			res.leader = ""

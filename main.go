@@ -12,6 +12,10 @@ import (
 	"github.com/mesosphere/mesos-dns/util"
 )
 
+const (
+	zkInitialDetectionTimeout = 4 * time.Minute
+)
+
 func main() {
 	util.PanicHandlers = append(util.PanicHandlers, func(_ interface{}) {
 		// by default the handler already logs the panic
@@ -39,6 +43,8 @@ func main() {
 	resolver := resolver.New(version, config)
 
 	var dnsErr, httpErr, zkErr <-chan error
+	var newLeader <-chan struct{}
+
 	// launch DNS server
 	if config.DnsOn {
 		dnsErr = resolver.LaunchDNS()
@@ -51,13 +57,10 @@ func main() {
 
 	// launch Zookeeper listener
 	if config.Zk != "" {
-		zkErr = resolver.LaunchZK()
+		newLeader, zkErr = resolver.LaunchZK(zkInitialDetectionTimeout)
 	}
 
-	// periodic loading of DNS state (pull from Master)
-	resolver.Reload()
-	ticker := time.NewTicker(time.Second * time.Duration(config.RefreshSeconds))
-
+	defer util.HandleCrash()
 	handleServerErr := func(name string, err error) {
 		if err != nil {
 			logging.Error.Fatalf("%s failed: %v", name, err)
@@ -66,12 +69,33 @@ func main() {
 		}
 	}
 
-	defer util.HandleCrash()
-	for {
+	reloadSignal := make(chan struct{}, 1)
+	tryReload := func() {
+		// non-blocking, attempt to queue a reload
 		select {
-		case <-ticker.C:
+		case reloadSignal <- struct{}{}:
+		default:
+		}
+	}
+
+	// periodic loading of DNS state (pull from Master)
+	go func() {
+		defer util.HandleCrash()
+		reloadTimeout := time.Second * time.Duration(config.RefreshSeconds)
+		reloadTimer := time.AfterFunc(reloadTimeout, tryReload)
+		for range reloadSignal {
 			resolver.Reload()
 			logging.PrintCurLog()
+			reloadTimer.Reset(reloadTimeout)
+		}
+	}()
+
+	tryReload()
+
+	for {
+		select {
+		case <-newLeader:
+			tryReload()
 		case err := <-dnsErr:
 			handleServerErr("DNS server", err)
 		case err := <-httpErr:
