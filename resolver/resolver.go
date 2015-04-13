@@ -92,11 +92,11 @@ func (res *Resolver) Serve(net string) error {
 func (res *Resolver) LaunchZK() <-chan error {
 	errCh := make(chan error, 1)
 	go func() {
-		var err error
-		defer func() { errCh <- err }()
+		defer util.HandleCrash()
 
-		var startedCh <-chan struct{}
-		if startedCh, err = res.ZKdetect(); err != nil {
+		startedCh, err := res.ZKdetect()
+		if err != nil {
+			errCh <- err
 			return
 		}
 
@@ -105,7 +105,7 @@ func (res *Resolver) LaunchZK() <-chan error {
 		case <-startedCh:
 			logging.VeryVerbose.Println("Warning: got initial information from Zookeper.")
 		case <-time.After(4 * time.Minute): // TODO(jdef) extract constant
-			err = fmt.Errorf("timed out waiting for initial ZK detection, exiting")
+			errCh <- fmt.Errorf("timed out waiting for initial ZK detection, exiting")
 		}
 	}()
 	return errCh
