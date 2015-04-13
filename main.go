@@ -60,7 +60,6 @@ func main() {
 		newLeader, zkErr = resolver.LaunchZK(zkInitialDetectionTimeout)
 	}
 
-	defer util.HandleCrash()
 	handleServerErr := func(name string, err error) {
 		if err != nil {
 			logging.Error.Fatalf("%s failed: %v", name, err)
