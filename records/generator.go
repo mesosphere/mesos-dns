@@ -8,11 +8,11 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/records/labels"
 )
 
 // Map host/service name to DNS answer
@@ -211,7 +211,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 
 	// complete crap - refactor me
 	for _, f := range sj.Frameworks {
-		fname := stripInvalid(f.Name)
+		fname := labels.AsDomainFrag(f.Name)
 
 		for _, task := range f.Tasks {
 			host, ok := rg.Slaves[task.SlaveId]
@@ -220,7 +220,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 				continue
 			}
 
-			tname := stripInvalid(task.Name)
+			tname := labels.AsDNS952(task.Name)
 			sid := slaveIdTail(task.SlaveId)
 			tail := fname + "." + domain + "."
 
@@ -420,16 +420,4 @@ func slaveIdTail(slaveID string) string {
 func getProto(pair string) (string, string, error) {
 	h := strings.Split(pair, ":")
 	return h[0], h[1], nil
-}
-
-// stripInvalid remove any non-valid hostname characters
-func stripInvalid(t string) string {
-	reg, err := regexp.Compile("[^\\w-.\\.]")
-	if err != nil {
-		logging.Error.Println(err)
-	}
-
-	s := reg.ReplaceAllString(t, "")
-
-	return strings.ToLower(strings.Replace(s, "_", "", -1))
 }

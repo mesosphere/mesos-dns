@@ -67,16 +67,16 @@ func TestShuffleAnswers(t *testing.T) {
 func fakeDNS(port int) (Resolver, error) {
 	var res Resolver
 	res.config = records.Config{
-		Masters:   []string{"144.76.157.37:5050"},
-		TTL:       60,
-		Port:      port,
-		Domain:    "mesos",
-		Resolvers: records.GetLocalDNS(),
-		Listener:  "127.0.0.1",
-		SOARname:  "root.ns1.mesos.",
-		SOAMname:  "ns1.mesos.",
-		HttpPort:  8123,
-	        ExternalOn: true,
+		Masters:    []string{"144.76.157.37:5050"},
+		TTL:        60,
+		Port:       port,
+		Domain:     "mesos",
+		Resolvers:  records.GetLocalDNS(),
+		Listener:   "127.0.0.1",
+		SOARname:   "root.ns1.mesos.",
+		SOAMname:   "ns1.mesos.",
+		HttpPort:   8123,
+		ExternalOn: true,
 	}
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
@@ -198,7 +198,6 @@ func TestHandler(t *testing.T) {
 	if m.Ns == nil {
 		t.Error("not serving up NS")
 	}
-
 
 	// test non-existing host
 	m, err = fakeMsg("missing.mesos.", dns.TypeA, "udp")

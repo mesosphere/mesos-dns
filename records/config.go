@@ -46,16 +46,16 @@ type Config struct {
 	File string
 
 	// SOA record fields (see http://tools.ietf.org/html/rfc1035#page-18)
-	SOAMname   string  // primary name server
-	SOARname   string  // email of admin esponsible 
-	SOASerial  uint32  // initial version number (incremented on refresh)
-	SOARefresh uint32  // refresh interval
-	SOARetry   uint32  // retry interval 
-	SOAExpire  uint32  // expiration time
-	SOAMinttl  uint32  // minimum TTL
+	SOAMname   string // primary name server
+	SOARname   string // email of admin esponsible
+	SOASerial  uint32 // initial version number (incremented on refresh)
+	SOARefresh uint32 // refresh interval
+	SOARetry   uint32 // retry interval
+	SOAExpire  uint32 // expiration time
+	SOAMinttl  uint32 // minimum TTL
 
 	// Value of RecursionAvailable for responses in Mesos domain
-	RecurseOn bool 
+	RecurseOn bool
 
 	// ListenAddr is the server listener address
 	Listener string
@@ -81,18 +81,18 @@ func SetConfig(cjson string) (c Config) {
 		Port:           53,
 		Timeout:        5,
 		SOARname:       "root.ns1.mesos",
-	        SOAMname:       "ns1.mesos",
-	        SOARefresh:     60,
-	        SOARetry:       600,
-	        SOAExpire:      86400,
-	        SOAMinttl:      60,
+		SOAMname:       "ns1.mesos",
+		SOARefresh:     60,
+		SOARetry:       600,
+		SOAExpire:      86400,
+		SOAMinttl:      60,
 		Resolvers:      []string{"8.8.8.8"},
 		Listener:       "0.0.0.0",
 		HttpPort:       8123,
 		DnsOn:          true,
 		HttpOn:         true,
-	        ExternalOn:     true,
-	        RecurseOn:      true,
+		ExternalOn:     true,
+		RecurseOn:      true,
 	}
 
 	// read configuration file
@@ -143,7 +143,7 @@ func SetConfig(cjson string) (c Config) {
 		c.SOAMname = c.SOAMname + "."
 	}
 	c.SOASerial = uint32(time.Now().Unix())
-	
+
 	// print configuration file
 	logging.Verbose.Println("Mesos-DNS configuration:")
 	if len(c.Masters) != 0 {
