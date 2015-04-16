@@ -121,7 +121,7 @@ func (res *Resolver) Reload() {
 	err := t.ParseState(currentLeader, res.config)
 
 	if err == nil {
-		timestamp :=  uint32(time.Now().Unix())
+		timestamp := uint32(time.Now().Unix())
 		// may need to refactor for fairness
 		res.rsLock.Lock()
 		defer res.rsLock.Unlock()
@@ -248,11 +248,9 @@ func (res *Resolver) formatNS(dom string) (*dns.NS, error) {
 			Class:  dns.ClassINET,
 			Ttl:    ttl,
 		},
-		Ns:      res.config.SOAMname,
+		Ns: res.config.SOAMname,
 	}, nil
 }
-
-
 
 // reorders answers for very basic load balancing
 func shuffleAnswers(answers []dns.RR) []dns.RR {
@@ -286,7 +284,7 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 		if _, ok := w.RemoteAddr().(*net.TCPAddr); ok {
 			proto = "tcp"
 		}
-		
+
 		for _, resolver := range res.config.Resolvers {
 			nameserver := resolver + ":53"
 			m, err = res.resolveOut(r, nameserver, proto, recurseCnt)
@@ -295,7 +293,7 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 			}
 		}
 	}
-		
+
 	// resolveOut returns nil Msg sometimes cause of perf
 	if m == nil {
 		m = new(dns.Msg)
@@ -314,7 +312,7 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 			logging.CurLog.NonMesosSuccess.Inc()
 		}
 	}
-	
+
 	err = w.WriteMsg(m)
 	if err != nil {
 		logging.Error.Println(err)
@@ -374,7 +372,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	// SOA requests
-	if (qType == dns.TypeSOA)  || (qType == dns.TypeANY) {
+	if (qType == dns.TypeSOA) || (qType == dns.TypeANY) {
 		rr, err := res.formatSOA(r.Question[0].Name)
 		if err != nil {
 			logging.Error.Println(err)
@@ -384,7 +382,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	// NS requests
-	if (qType == dns.TypeNS)  || (qType == dns.TypeANY) {
+	if (qType == dns.TypeNS) || (qType == dns.TypeANY) {
 		rr, err := res.formatNS(r.Question[0].Name)
 		logging.Error.Println("NS request")
 		if err != nil {
@@ -410,7 +408,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 
 	} else {
 		// no answers but not a {SOA,SRV} request
-		if len(m.Answer) == 0 && (qType != dns.TypeSOA)  && (qType != dns.TypeNS) && (qType != dns.TypeSRV) {
+		if len(m.Answer) == 0 && (qType != dns.TypeSOA) && (qType != dns.TypeNS) && (qType != dns.TypeSRV) {
 			// set NXDOMAIN
 			m.SetRcode(r, 3)
 
