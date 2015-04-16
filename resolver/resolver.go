@@ -227,8 +227,8 @@ func (res *Resolver) formatSOA(dom string) (*dns.SOA, error) {
 			Class:  dns.ClassINET,
 			Ttl:    ttl,
 		},
-		Ns:      res.config.SOAMname,
-		Mbox:    res.config.SOARname,
+		Ns:      res.config.SOARname,
+		Mbox:    res.config.SOAMname,
 		Serial:  res.config.SOASerial,
 		Refresh: res.config.SOARefresh,
 		Retry:   res.config.SOARetry,
@@ -236,6 +236,23 @@ func (res *Resolver) formatSOA(dom string) (*dns.SOA, error) {
 		Minttl:  ttl,
 	}, nil
 }
+
+// formatNS returns the NS  record for the mesos domain
+func (res *Resolver) formatNS(dom string) (*dns.NS, error) {
+	ttl := uint32(res.config.TTL)
+
+	return &dns.NS{
+		Hdr: dns.RR_Header{
+			Name:   dom,
+			Rrtype: dns.TypeNS,
+			Class:  dns.ClassINET,
+			Ttl:    ttl,
+		},
+		Ns:      res.config.SOAMname,
+	}, nil
+}
+
+
 
 // reorders answers for very basic load balancing
 func shuffleAnswers(answers []dns.RR) []dns.RR {
@@ -315,7 +332,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 
 	m := new(dns.Msg)
 	m.Authoritative = true
-	m.RecursionAvailable = false
+	m.RecursionAvailable = res.config.RecurseOn
 	m.SetReply(r)
 
 	rs := res.records()
@@ -357,11 +374,19 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	// SOA requests
-	if qType == dns.TypeSOA {
-		m = new(dns.Msg)
-		m.SetReply(r)
-
+	if (qType == dns.TypeSOA)  || (qType == dns.TypeANY) {
 		rr, err := res.formatSOA(r.Question[0].Name)
+		if err != nil {
+			logging.Error.Println(err)
+		} else {
+			m.Ns = append(m.Ns, rr)
+		}
+	}
+
+	// NS requests
+	if (qType == dns.TypeNS)  || (qType == dns.TypeANY) {
+		rr, err := res.formatNS(r.Question[0].Name)
+		logging.Error.Println("NS request")
 		if err != nil {
 			logging.Error.Println(err)
 		} else {
@@ -378,7 +403,6 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 		logging.CurLog.MesosFailed.Inc()
 	} else if (qType == dns.TypeAAAA) && (len(rs.SRVs[dom]) > 0 || len(rs.As[dom]) > 0) {
 		// correct handling of AAAA if there are A or SRV records
-		m = new(dns.Msg)
 		m.Authoritative = true
 		// set NOERROR
 		m.SetRcode(r, 0)
@@ -386,8 +410,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 
 	} else {
 		// no answers but not a {SOA,SRV} request
-		if len(m.Answer) == 0 && (qType != dns.TypeSOA) && (qType != dns.TypeSRV) {
-			m = new(dns.Msg)
+		if len(m.Answer) == 0 && (qType != dns.TypeSOA)  && (qType != dns.TypeNS) && (qType != dns.TypeSRV) {
 			// set NXDOMAIN
 			m.SetRcode(r, 3)
 

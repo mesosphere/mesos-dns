@@ -48,16 +48,21 @@ _search._tcp.marathon.mesos.	60 IN SRV 0 0 31302 10.254.132.41.
 
 SRV records are generated only for tasks that have been allocated a specific port through Mesos. 
 
+## Other Records
+
+Mesos-DNS generates a few special records. Specifically, it creates a set of records for the leading master (A record for `leader.domain` and SRV records for `_leader._tcp.domain` and `_leader._udp.domain`). It also creates creates A records (`master.domain`) and SRV records (`_master._tcp.domain` and `_master._udp.domain`) for every Mesos master it knows about. Note that, if you configure Mesos-DNS to detect the leading master through Zookeeper, then this is the only master it knows about. If you configure Mesos-DNS using the `masters` field, it will generate master records for every master in the list. Also note that there is inherent delay between the election of a new master and the update of leader/master records in Mesos-DNS. 
+
+Mesos-DNS generates A records for itself that list all the IP addresses that Mesos-DNS is listening to. The name for Mesos-DNS can be selected using the `SOARname` [configuration parameter](configuration-parameters.html). The default name is `ns1.mesos`. 
+
+In addition to A and SRV records for Mesos tasks, Mesos-DNS supports requests for SOA and NS records for the Mesos domain. DNS requests for records of other types in the Mesos domain will return `NXDOMAIN`. Mesos-DNS does not support PTR records needed fo reserve lookups. 
 
 ## Notes
 
 If a framework launches multiple tasks with the same name, the DNS lookup will return multiple records, one per task. Mesos-DNS randomly shuffles the order of records to provide rudimentary load balancing between these tasks. 
 
-Mesos-DNS does not support other types of DNS records at this point, including the PTR records needed for reverse lookups. DNS requests for records of type`ANY`, `A`, or `SRV` will return any A or SRV records found. DNS requests for records of other types in the Mesos domain will return `NXDOMAIN`.
+Mesos-DNS follows [RFC 952](https://tools.ietf.org/html/rfc952) for name formatting. All fields used to construct hostnames for A records and service names for SRV records must be up to 24 characters and drawn from the alphabet (A-Z), digits (0-9) and minus sign (-). No distinction is made between upper and lower case. If the task name does not comply with these constraints, Mesos-DNS will trim it, remove all invalid characters, and replace period (.) with sign (-) for task names. For framework names, we allow period (.) but all other constraints apply.  For example, a task named `apiserver.myservice` launch by framework `marathon.prod`, will have A records associated with the name `apiserver-myservice.marathon.prod.mesos` and SRV records associated with name `_apiserver-myservice._tcp.marathon.prod.mesos`. 
 
 Some frameworks register with longer, less friendly names. For example, earlier versions of marathon may register with names like `marathon-0.7.5`, which will lead to names like `search.marathon-0.7.5.mesos`. Make sure your framework registers with the desired name. For instance, you can launch marathon with ` --framework_name marathon` to get the framework registered as `marathon`.  
 
-## Special Records
 
-Mesos-DNS generates a few special records. Specifically, it creates a set of records for the leading master (A record for `leader.domain` and SRV records for `_leader._tcp.domain` and `_leader._udp.domain`). It also creates creates A records (`master.domain`) and SRV records (`_master._tcp.domain` and `_master._udp.domain`) for every Mesos master it knows about. Note that, if you configure Mesos-DNS to detect the leading master through Zookeeper, then this is the only master it knows about. If you configure Mesos-DNS using the `masters` field, it will generate master records for every master in the list. Also not that the is inherent delay between the election of a new master and the update of leader/master records in Mesos-DNS. Finally Mesos-DNS generates A records for itself (`mesos-dns.domain`) that list all the IP addresses that Mesos-DNS is listening to. 
 

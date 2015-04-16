@@ -80,7 +80,7 @@ func (rg *RecordGenerator) ParseState(leader string, c Config) error {
 	}
 
 	// insert state
-	rg.InsertState(sj, c.Domain, c.SOAMname, c.Listener, c.Masters)
+	rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, c.Masters)
 	return nil
 }
 

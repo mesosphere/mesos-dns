@@ -180,14 +180,25 @@ func TestHandler(t *testing.T) {
 	}
 
 	// test SOA
-	m, err2 := fakeMsg("non-existing.mesos.", dns.TypeSOA, "udp")
-	if err2 != nil {
-		t.Error(err2)
+	m, err := fakeMsg("non-existing.mesos.", dns.TypeSOA, "udp")
+	if err != nil {
+		t.Error(err)
 	}
 
 	if m.Ns == nil {
 		t.Error("not serving up SOA")
 	}
+
+	// test NS
+	m, err = fakeMsg("non-existing2.mesos.", dns.TypeNS, "udp")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if m.Ns == nil {
+		t.Error("not serving up NS")
+	}
+
 
 	// test non-existing host
 	m, err = fakeMsg("missing.mesos.", dns.TypeA, "udp")

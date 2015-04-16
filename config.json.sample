@@ -18,5 +18,6 @@
   "dnson": true,
   "httpon": true,
   "httpport": 8123,
-  "externalon": true
+  "externalon": true,
+  "recurseon": true
 }

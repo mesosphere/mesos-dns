@@ -70,3 +70,4 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 
 `SOAMinttl` is the minimum TTL field in the SOA record for the Mesos domain. For details, see the [RFC-2308](https://tools.ietf.org/html/rfc2308). The default value is `60`.
 
+`recurseon` controls if the DNS replies for names in the Mesos domain will indicate that recursion is available. The default value is `true`. 

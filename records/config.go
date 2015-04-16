@@ -54,6 +54,9 @@ type Config struct {
 	SOAExpire  uint32  // expiration time
 	SOAMinttl  uint32  // minimum TTL
 
+	// Value of RecursionAvailable for responses in Mesos domain
+	RecurseOn bool 
+
 	// ListenAddr is the server listener address
 	Listener string
 
@@ -89,6 +92,7 @@ func SetConfig(cjson string) (c Config) {
 		DnsOn:          true,
 		HttpOn:         true,
 	        ExternalOn:     true,
+	        RecurseOn:      true,
 	}
 
 	// read configuration file
@@ -164,6 +168,7 @@ func SetConfig(cjson string) (c Config) {
 	logging.Verbose.Println("   - SOARetry: ", c.SOARetry)
 	logging.Verbose.Println("   - SOAExpire: ", c.SOAExpire)
 	logging.Verbose.Println("   - SOAExpire: ", c.SOAMinttl)
+	logging.Verbose.Println("   - RecurseOn: ", c.RecurseOn)
 	logging.Verbose.Println("   - HttpPort: ", c.HttpPort)
 	logging.Verbose.Println("   - HttpOn: ", c.HttpOn)
 	logging.Verbose.Println("   - ConfigFile: ", c.File)
