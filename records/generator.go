@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"hash/fnv"
 
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
@@ -187,6 +188,18 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 	return sj, err
 }
 
+// hash two long strings into a short one
+func hashString (s string) string {
+	var upper, lower, sum uint16
+	h:= fnv.New32a()
+	h.Write([]byte(s))
+	lower = uint16(h.Sum32())
+	upper = uint16(h.Sum32() >> 16)
+	sum   = uint16(lower + upper)
+	return strconv.Itoa(int(sum))
+}
+
+
 // InsertState transforms a StateJSON into RecordGenerator RRs
 func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	listener string, masters []string) error {
@@ -222,12 +235,13 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 
 			tname := labels.AsDNS952(task.Name)
 			sid := slaveIdTail(task.SlaveId)
+			tag := hashString(task.Id)
 			tail := fname + "." + domain + "."
 
 			// A records for task and task-sid
 			arec := tname + "." + tail
 			rg.insertRR(arec, host, "A")
-			trec := tname + "-" + sid + "." + tail
+			trec := tname + "-" + tag + "-" + sid + "." + tail
 			rg.insertRR(trec, host, "A")
 
 			// SRV records
