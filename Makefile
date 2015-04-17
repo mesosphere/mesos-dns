@@ -20,6 +20,10 @@ format:
 	@echo "--> Running go fmt"
 	@godep go fmt ./...
 
+vet: 
+	@echo "--> Running go vet"
+	@godep go vet ./...
+
 build: 
 	@echo "--> Building mesos-dns"
 	@godep go build -o mesos-dns

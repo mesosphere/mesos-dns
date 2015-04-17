@@ -7,23 +7,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mesosphere/mesos-dns/logging"
-	"github.com/mesosphere/mesos-dns/records"
 	"io"
 	"math/rand"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/emicklei/go-restful"
 	"github.com/mesos/mesos-go/detector"
 	_ "github.com/mesos/mesos-go/detector/zoo"
 	mesos "github.com/mesos/mesos-go/mesosproto"
-
-	"github.com/emicklei/go-restful"
+	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/records"
+	"github.com/mesosphere/mesos-dns/util"
 	"github.com/miekg/dns"
 )
 
@@ -57,25 +56,22 @@ func (res *Resolver) records() *records.RecordGenerator {
 	return res.rs
 }
 
-// launches DNS server for a resolver
-func (res *Resolver) LaunchDNS() {
+// launches DNS server for a resolver, returns immediately
+func (res *Resolver) LaunchDNS() <-chan error {
 	// Handers for Mesos requests
 	dns.HandleFunc(res.config.Domain+".", panicRecover(res.HandleMesos))
 	// Handler for nonMesos requests
 	dns.HandleFunc(".", panicRecover(res.HandleNonMesos))
 
-	go res.Serve("tcp")
-	go res.Serve("udp")
+	errCh := make(chan error, 2)
+	go func() { errCh <- res.Serve("tcp") }()
+	go func() { errCh <- res.Serve("udp") }()
+	return errCh
 }
 
-// starts a DNS server for net protocol (tcp/udp)
-func (res *Resolver) Serve(net string) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			logging.Error.Printf("%s\n", rec)
-			os.Exit(1)
-		}
-	}()
+// starts a DNS server for net protocol (tcp/udp), blocks until service has stopped
+func (res *Resolver) Serve(net string) error {
+	defer util.HandleCrash()
 
 	server := &dns.Server{
 		Addr:       res.config.Listener + ":" + strconv.Itoa(res.config.Port),
@@ -85,30 +81,47 @@ func (res *Resolver) Serve(net string) {
 
 	err := server.ListenAndServe()
 	if err != nil {
-		logging.Error.Printf("Failed to setup "+net+" server: %s\n", err.Error())
+		return fmt.Errorf("Failed to setup %q server: %v", net, err)
 	} else {
 		logging.Error.Printf("Not listening/serving any more requests.")
 	}
-
-	os.Exit(1)
+	return nil
 }
 
-// launches Zookeeper detector
-func (res *Resolver) LaunchZK() {
-	dr, err := res.ZKdetect()
-	if err != nil {
-		logging.Error.Println(err.Error())
-		os.Exit(1)
+// launches Zookeeper detector, returns immediately two chans: the first fires an empty
+// struct whenever there's a new mesos leader, the second if there's an unrecoverable
+// error in the master detector.
+func (res *Resolver) LaunchZK(initialDetectionTimeout time.Duration) (<-chan struct{}, <-chan error) {
+	errCh := make(chan error, 1)
+	leaderCh := make(chan struct{}, 1)
+	listenerFunc := func(newLeader bool) {
+		if newLeader {
+			// don't block if the buffer is full
+			select {
+			case leaderCh <- struct{}{}:
+			default:
+			}
+		}
 	}
 
-	logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
-	select {
-	case <-dr:
-		logging.VeryVerbose.Println("Warning: got initial information from Zookeper.")
-	case <-time.After(4 * time.Minute):
-		logging.Error.Println("timed out waiting for initial ZK detection, exiting")
-		os.Exit(1)
-	}
+	go func() {
+		defer util.HandleCrash()
+
+		startedCh, err := res.ZKdetect(listenerFunc)
+		if err != nil {
+			errCh <- err
+			return
+		}
+
+		logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
+		select {
+		case <-startedCh:
+			logging.VeryVerbose.Println("Warning: got initial information from Zookeper.")
+		case <-time.After(initialDetectionTimeout):
+			errCh <- fmt.Errorf("timed out waiting for initial ZK detection, exiting")
+		}
+	}()
+	return leaderCh, errCh
 }
 
 // triggers a new refresh from mesos master
@@ -433,14 +446,9 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 }
 
-// Hdns starts an http server for mesos-dns queries
-func (res *Resolver) LaunchHTTP() {
-	defer func() {
-		if rec := recover(); rec != nil {
-			logging.Error.Printf("%s\n", rec)
-			os.Exit(1)
-		}
-	}()
+// starts an http server for mesos-dns queries, returns immediately
+func (res *Resolver) LaunchHTTP() <-chan error {
+	defer util.HandleCrash()
 
 	// webserver + available routes
 	ws := new(restful.WebService)
@@ -452,12 +460,19 @@ func (res *Resolver) LaunchHTTP() {
 	restful.Add(ws)
 
 	portString := ":" + strconv.Itoa(res.config.HttpPort)
-	if err := http.ListenAndServe(portString, nil); err != nil {
-		logging.Error.Printf("Failed to setup http server: %s\n", err.Error())
-	} else {
-		logging.Error.Printf("Not serving http requests any more .")
-	}
-	os.Exit(1)
+
+	errCh := make(chan error, 1)
+	go func() {
+		var err error
+		defer func() { errCh <- err }()
+
+		if err = http.ListenAndServe(portString, nil); err != nil {
+			err = fmt.Errorf("Failed to setup http server: %v", err)
+		} else {
+			logging.Error.Println("Not serving http requests any more.")
+		}
+	}()
+	return errCh
 }
 
 // Reports configuration through REST interface
@@ -608,7 +623,7 @@ func panicRecover(f func(w dns.ResponseWriter, r *dns.Msg)) func(w dns.ResponseW
 // Start a Zookeeper listener to track leading master, returns a signal chan
 // that closes upon the first leader detection notification (and c.leader is
 // meaningfully readable).
-func (res *Resolver) ZKdetect() (<-chan struct{}, error) {
+func (res *Resolver) ZKdetect(leaderChanged func(bool)) (<-chan struct{}, error) {
 
 	// start listener
 	logging.Verbose.Println("Starting master detector for ZK ", res.config.Zk)
@@ -624,6 +639,11 @@ func (res *Resolver) ZKdetect() (<-chan struct{}, error) {
 		// making this atomic
 		res.leaderLock.Lock()
 		defer res.leaderLock.Unlock()
+		if leaderChanged != nil {
+			defer func() {
+				leaderChanged(res.leader != "")
+			}()
+		}
 		logging.VeryVerbose.Println("Updated Zookeeper info: ", info)
 		if info == nil {
 			res.leader = ""
