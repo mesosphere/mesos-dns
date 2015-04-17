@@ -5,12 +5,12 @@ package records
 import (
 	"encoding/json"
 	"errors"
+	"hash/fnv"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
-	"hash/fnv"
 
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
@@ -189,16 +189,15 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 }
 
 // hash two long strings into a short one
-func hashString (s string) string {
+func hashString(s string) string {
 	var upper, lower, sum uint16
-	h:= fnv.New32a()
+	h := fnv.New32a()
 	h.Write([]byte(s))
 	lower = uint16(h.Sum32())
 	upper = uint16(h.Sum32() >> 16)
-	sum   = uint16(lower + upper)
+	sum = uint16(lower + upper)
 	return strconv.Itoa(int(sum))
 }
-
 
 // InsertState transforms a StateJSON into RecordGenerator RRs
 func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
