@@ -82,7 +82,7 @@ func main() {
 		defer util.HandleCrash()
 		reloadTimeout := time.Second * time.Duration(config.RefreshSeconds)
 		reloadTimer := time.AfterFunc(reloadTimeout, tryReload)
-		for range reloadSignal {
+		for _ = range reloadSignal {
 			resolver.Reload()
 			logging.PrintCurLog()
 			reloadTimer.Reset(reloadTimeout)
