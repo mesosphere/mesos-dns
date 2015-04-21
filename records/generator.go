@@ -210,7 +210,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 		if net.ParseIP(slave.Hostname) == nil {
 			t, err := net.ResolveIPAddr("ip4", slave.Hostname)
 			if err != nil {
-				logging.Error.Println("cannot translate hostname" + slave.Hostname)
+				logging.Error.Println("cannot translate hostname " + slave.Hostname)
 			}
 			rg.Slaves[slave.Id] = t.IP.String()
 		} else {
