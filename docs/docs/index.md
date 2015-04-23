@@ -6,13 +6,13 @@ title: Building and Running Mesos-DNS
 
 ### Building Mesos-DNS
 
-To build Mesos-DNS, you need to install [`go`](https://golang.org/doc/install) and [`godep`](https://github.com/tools/godep) on your computer. If you install go to a custom location, make sure that the `GOROOT` environment variable is properly set and that `$GOROOT/bin` is added to `PATH` environment variable. You must set the `GOPATH` environment variable to point to the directory where outside `go` packages will be installed. For instance:
+To build Mesos-DNS, you need to install [`go`](https://golang.org/doc/install) and [`godep`](https://github.com/tools/godep) on your computer. You **must** set the `GOPATH` environment variable to point to the directory where outside `go` packages will be installed. You **must** also add `$GOPATH/bin` to the `PATH` environment variable. If you install go to a custom location, you may need to set the `GOROOT` environment properly and add `$GOROOT/bin` to the `PATH` environment variable. For instance, you may need to do the following:
 
 ```
-export GOROOT=/usr/local/go
 export GOPATH=$HOME/go
-export PATH=$PATH:$GOROOT/bin
 export PATH=$PATH:$GOPATH/bin
+export GOROOT=/usr/local/go      # assuming go is installed at /usr/local/go
+export PATH=$PATH:$GOROOT/bin
 ```   
 
 To build Mesos-DNS using `godep`: 
