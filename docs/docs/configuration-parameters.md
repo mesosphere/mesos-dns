@@ -21,14 +21,14 @@ The configuration file should include the following fields:
   "httpon": true,
   "dsnon": true,
   "httpport": 8123,
-  "externalon": true
+  "externalon": true,
   "listener": "10.101.160.16",
   "SOAMname": "root.ns1.mesos",
   "SOARname": "ns1.mesos",
   "SOARefresh": 60,
   "SOARetry":   600,
   "SOAExpire":  86400,
-  "SOAMinttl": 60,
+  "SOAMinttl": 60
 }
 ```
 
