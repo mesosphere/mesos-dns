@@ -58,8 +58,14 @@ func main() {
 	// launch Zookeeper listener
 	if config.Zk != "" {
 		newLeader, zkErr = resolver.LaunchZK(zkInitialDetectionTimeout)
+	} else {
+		// uniform behavior when new leader from masters field
+		leader := make(chan struct{}, 1)
+		leader <- struct{}{}
+		newLeader = leader
 	}
 
+	// print error and terminate
 	handleServerErr := func(name string, err error) {
 		if err != nil {
 			logging.Error.Fatalf("%s failed: %v", name, err)
@@ -68,6 +74,7 @@ func main() {
 		}
 	}
 
+	// generate reload signal; up to 1 reload pending at any time
 	reloadSignal := make(chan struct{}, 1)
 	tryReload := func() {
 		// non-blocking, attempt to queue a reload
@@ -89,8 +96,7 @@ func main() {
 		}
 	}()
 
-	tryReload()
-
+        // infinite loop until there is fatal error
 	for {
 		select {
 		case <-newLeader:
