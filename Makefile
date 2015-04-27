@@ -28,11 +28,16 @@ build:
 	@echo "--> Building mesos-dns"
 	@godep go build -o mesos-dns
 
-test: 
+test_banner:
 	@echo "--> Testing mesos-dns"
+
+test: test_banner
 	@godep go test ./...
 
-testrace: 
+test.v: test_banner
+	@godep go test -test.v ./...
+
+testrace:
 	@godep go test -race ./...
 
 clean:
