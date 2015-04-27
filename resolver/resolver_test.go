@@ -248,7 +248,7 @@ func TestHandler(t *testing.T) {
 func TestNonMesosHandler(t *testing.T) {
 	var msg []dns.RR
 
-	res, err := fakeDNS(8054)
+	res, err := fakeDNS(8053)
 	if err != nil {
 		t.Error(err)
 	}
