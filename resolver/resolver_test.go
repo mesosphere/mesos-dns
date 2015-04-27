@@ -109,7 +109,8 @@ func fakeMsg(dom string, rrHeader uint16, proto string) (*dns.Msg, error) {
 		Qtype:  rrHeader,
 		Qclass: qc,
 	}
-
+	m.RecursionDesired = true
+	
 	in, _, err := c.Exchange(m, "127.0.0.1:8053")
 	return in, err
 
