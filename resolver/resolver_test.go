@@ -295,6 +295,22 @@ func TestNonMesosHandler(t *testing.T) {
 
 	const port = 8054
 	res, err := fakeDNS(port)
+	res.extResolver = func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
+		t.Logf("ext-resolver: r=%v, nameserver=%s, proto=%s, cnt=%d", r, nameserver, proto, cnt)
+		rr1, err := res.formatA("google.com.", "1.1.1.1")
+		if err != nil {
+			return nil, err
+		}
+		rr2, err := res.formatA("google.com.", "2.2.2.2")
+		if err != nil {
+			return nil, err
+		}
+		msg := &dns.Msg{
+			Answer: []dns.RR{rr1, rr2},
+		}
+		msg.SetReply(r)
+		return msg, nil
+	}
 	if err != nil {
 		t.Error(err)
 	}

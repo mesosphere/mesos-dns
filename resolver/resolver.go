@@ -38,14 +38,19 @@ type Resolver struct {
 	rsLock     sync.RWMutex
 	leader     string
 	leaderLock sync.RWMutex
+
+	// pluggable external DNS resolution, mainly for unit testing
+	extResolver func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error)
 }
 
 func New(version string, config records.Config) *Resolver {
-	return &Resolver{
+	r := &Resolver{
 		version: version,
 		config:  config,
 		rs:      &records.RecordGenerator{},
 	}
+	r.extResolver = r.defaultExtResolver
+	return r
 }
 
 // return the current (read-only) record set. attempts to write to the returned
@@ -155,8 +160,9 @@ func (res *Resolver) Reload() {
 	}
 }
 
-// resolveOut queries other nameserver, potentially recurses
-func (res *Resolver) resolveOut(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
+// defaultExtResolver queries other nameserver, potentially recurses; callers should probably be invoking extResolver
+// instead since that's the pluggable entrypoint into external resolution.
+func (res *Resolver) defaultExtResolver(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
 	var in *dns.Msg
 	var err error
 
@@ -186,7 +192,7 @@ func (res *Resolver) resolveOut(r *dns.Msg, nameserver string, proto string, cnt
 
 		if cnt > 0 {
 			if soa, ok := (in.Ns[0]).(*dns.SOA); ok {
-				return res.resolveOut(r, soa.Ns+":53", proto, cnt-1)
+				return res.defaultExtResolver(r, soa.Ns+":53", proto, cnt-1)
 			}
 		}
 
@@ -310,14 +316,14 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 
 		for _, resolver := range res.config.Resolvers {
 			nameserver := resolver + ":53"
-			m, err = res.resolveOut(r, nameserver, proto, recurseCnt)
+			m, err = res.extResolver(r, nameserver, proto, recurseCnt)
 			if err == nil {
 				break
 			}
 		}
 	}
 
-	// resolveOut returns nil Msg sometimes cause of perf
+	// extResolver returns nil Msg sometimes cause of perf
 	if m == nil {
 		m = new(dns.Msg)
 		m.SetRcode(r, 2)
