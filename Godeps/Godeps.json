@@ -37,7 +37,7 @@
 		},
 		{
 			"ImportPath": "github.com/samuel/go-zookeeper/zk",
-			"Rev": "fa6674abf3f4580b946a01bf7a1ce4ba8766205b"
+			"Rev": "d0e0d8e11f318e000a8cc434616d69e329edc374"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",
