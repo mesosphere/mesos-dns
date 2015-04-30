@@ -64,28 +64,38 @@ func (res *Resolver) LaunchDNS() <-chan error {
 	dns.HandleFunc(".", panicRecover(res.HandleNonMesos))
 
 	errCh := make(chan error, 2)
-	go func() { errCh <- res.Serve("tcp") }()
-	go func() { errCh <- res.Serve("udp") }()
+	_, e1 := res.Serve("tcp")
+	go func() { errCh <- <-e1 }()
+	_, e2 := res.Serve("udp")
+	go func() { errCh <- <-e2 }()
 	return errCh
 }
 
-// starts a DNS server for net protocol (tcp/udp), blocks until service has stopped
-func (res *Resolver) Serve(net string) error {
+// starts a DNS server for net protocol (tcp/udp), returns immediately.
+// the returned signal chan is closed upon the server successfully entering the listening phase.
+// if the server aborts then an error is sent on the error chan.
+func (res *Resolver) Serve(net string) (<-chan struct{}, <-chan error) {
 	defer util.HandleCrash()
 
+	ch := make(chan struct{})
 	server := &dns.Server{
-		Addr:       res.config.Listener + ":" + strconv.Itoa(res.config.Port),
-		Net:        net,
-		TsigSecret: nil,
+		Addr:              res.config.Listener + ":" + strconv.Itoa(res.config.Port),
+		Net:               net,
+		TsigSecret:        nil,
+		NotifyStartedFunc: func() { close(ch) },
 	}
 
-	err := server.ListenAndServe()
-	if err != nil {
-		return fmt.Errorf("Failed to setup %q server: %v", net, err)
-	} else {
-		logging.Error.Printf("Not listening/serving any more requests.")
-	}
-	return nil
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(errCh)
+		err := server.ListenAndServe()
+		if err != nil {
+			errCh <- fmt.Errorf("Failed to setup %q server: %v", net, err)
+		} else {
+			logging.Error.Printf("Not listening/serving any more requests.")
+		}
+	}()
+	return ch, errCh
 }
 
 // launches Zookeeper detector, returns immediately two chans: the first fires an empty
@@ -446,10 +456,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 }
 
-// starts an http server for mesos-dns queries, returns immediately
-func (res *Resolver) LaunchHTTP() <-chan error {
-	defer util.HandleCrash()
-
+func (res *Resolver) configureHTTP() {
 	// webserver + available routes
 	ws := new(restful.WebService)
 	ws.Route(ws.GET("/v1/version").To(res.RestVersion))
@@ -458,7 +465,13 @@ func (res *Resolver) LaunchHTTP() <-chan error {
 	ws.Route(ws.GET("/v1/hosts/{host}/ports").To(res.RestPorts))
 	ws.Route(ws.GET("/v1/services/{service}").To(res.RestService))
 	restful.Add(ws)
+}
 
+// starts an http server for mesos-dns queries, returns immediately
+func (res *Resolver) LaunchHTTP() <-chan error {
+	defer util.HandleCrash()
+
+	res.configureHTTP()
 	portString := ":" + strconv.Itoa(res.config.HttpPort)
 
 	errCh := make(chan error, 1)
