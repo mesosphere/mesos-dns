@@ -33,7 +33,7 @@
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
-			"Rev": "f01e44c2fdbf755201344b5b7917f974a4badd13"
+			"Rev": "c13058f493c3756207ced654dce2986e812f2bcf"
 		},
 		{
 			"ImportPath": "github.com/samuel/go-zookeeper/zk",
