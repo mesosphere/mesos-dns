@@ -41,6 +41,8 @@ type Resolver struct {
 
 	// pluggable external DNS resolution, mainly for unit testing
 	extResolver func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error)
+	// pluggable ZK detection, mainly for unit testing
+	startZKdetection func(zkurl string, leaderChanged func(string)) error
 }
 
 func New(version string, config records.Config) *Resolver {
@@ -50,6 +52,7 @@ func New(version string, config records.Config) *Resolver {
 		rs:      &records.RecordGenerator{},
 	}
 	r.extResolver = r.defaultExtResolver
+	r.startZKdetection = startDefaultZKdetector
 	return r
 }
 
@@ -104,25 +107,29 @@ func (res *Resolver) Serve(net string) (<-chan struct{}, <-chan error) {
 }
 
 // launches Zookeeper detector, returns immediately two chans: the first fires an empty
-// struct whenever there's a new mesos leader, the second if there's an unrecoverable
+// struct whenever there's a new (non-nil) mesos leader, the second if there's an unrecoverable
 // error in the master detector.
 func (res *Resolver) LaunchZK(initialDetectionTimeout time.Duration) (<-chan struct{}, <-chan error) {
+	var startedOnce sync.Once
+	startedCh := make(chan struct{})
 	errCh := make(chan error, 1)
-	leaderCh := make(chan struct{}, 1)
-	listenerFunc := func(newLeader bool) {
-		if newLeader {
-			// don't block if the buffer is full
-			select {
-			case leaderCh <- struct{}{}:
-			default:
-			}
-		}
-	}
+	leaderCh := make(chan struct{}, 1) // the first write never blocks
 
+	listenerFunc := func(newLeader string) {
+		defer func() {
+			if newLeader != "" {
+				leaderCh <- struct{}{}
+				startedOnce.Do(func() { close(startedCh) })
+			}
+		}()
+		res.leaderLock.Lock()
+		defer res.leaderLock.Unlock()
+		res.leader = newLeader
+	}
 	go func() {
 		defer util.HandleCrash()
 
-		startedCh, err := res.ZKdetect(listenerFunc)
+		err := res.startZKdetection(res.config.Zk, listenerFunc)
 		if err != nil {
 			errCh <- err
 			return
@@ -131,7 +138,7 @@ func (res *Resolver) LaunchZK(initialDetectionTimeout time.Duration) (<-chan str
 		logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
 		select {
 		case <-startedCh:
-			logging.VeryVerbose.Println("Warning: got initial information from Zookeper.")
+			logging.VeryVerbose.Println("Info: got initial information from Zookeper.")
 		case <-time.After(initialDetectionTimeout):
 			errCh <- fmt.Errorf("timed out waiting for initial ZK detection, exiting")
 		}
@@ -639,52 +646,45 @@ func panicRecover(f func(w dns.ResponseWriter, r *dns.Msg)) func(w dns.ResponseW
 	}
 }
 
-// Start a Zookeeper listener to track leading master, returns a signal chan
-// that closes upon the first leader detection notification (and c.leader is
-// meaningfully readable).
-func (res *Resolver) ZKdetect(leaderChanged func(bool)) (<-chan struct{}, error) {
+// Start a Zookeeper listener to track leading master, invokes callback function when
+// master changes are reported.
+func startDefaultZKdetector(zkurl string, leaderChanged func(string)) error {
 
 	// start listener
-	logging.Verbose.Println("Starting master detector for ZK ", res.config.Zk)
-	md, err := detector.New(res.config.Zk)
+	logging.Verbose.Println("Starting master detector for ZK ", zkurl)
+	md, err := detector.New(zkurl)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create master detector: %v", err)
+		return fmt.Errorf("failed to create master detector: %v", err)
 	}
 
 	// and listen for master changes
-	var startedOnce sync.Once
-	started := make(chan struct{})
 	if err := md.Detect(detector.OnMasterChanged(func(info *mesos.MasterInfo) {
-		// making this atomic
-		res.leaderLock.Lock()
-		defer res.leaderLock.Unlock()
+		leader := ""
 		if leaderChanged != nil {
 			defer func() {
-				leaderChanged(res.leader != "")
+				leaderChanged(leader)
 			}()
 		}
 		logging.VeryVerbose.Println("Updated Zookeeper info: ", info)
 		if info == nil {
-			res.leader = ""
 			logging.Error.Println("No leader available in Zookeeper.")
-		} else if host := info.GetHostname(); host != "" {
-			res.leader = host
 		} else {
-			// unpack IPv4
-			octets := make([]byte, 4, 4)
-			binary.BigEndian.PutUint32(octets, info.GetIp())
-			ipv4 := net.IP(octets)
-			res.leader = ipv4.String()
+			if host := info.GetHostname(); host != "" {
+				leader = host
+			} else {
+				// unpack IPv4
+				octets := make([]byte, 4, 4)
+				binary.BigEndian.PutUint32(octets, info.GetIp())
+				ipv4 := net.IP(octets)
+				leader = ipv4.String()
+			}
+			leader = fmt.Sprintf("%s:%d", leader, info.GetPort())
+			logging.Verbose.Println("new master in Zookeeper ", leader)
 		}
-		if len(res.leader) > 0 {
-			res.leader = fmt.Sprintf("%s:%d", res.leader, info.GetPort())
-		}
-		logging.Verbose.Println("New master in Zookeeper ", res.leader)
-		startedOnce.Do(func() { close(started) })
 	})); err != nil {
-		return nil, fmt.Errorf("failed to initialize master detector: %v", err)
+		return fmt.Errorf("failed to initialize master detector: %v", err)
 	}
-	return started, nil
+	return nil
 }
 
 // cleanWild strips any wildcards out thus mapping cleanly to the
