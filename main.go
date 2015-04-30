@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	zkInitialDetectionTimeout = 4 * time.Minute
+	zkInitialDetectionTimeout = 30 * time.Second
 )
 
 func main() {
@@ -96,7 +96,7 @@ func main() {
 		}
 	}()
 
-        // infinite loop until there is fatal error
+	// infinite loop until there is fatal error
 	for {
 		select {
 		case <-newLeader:
