@@ -30,6 +30,8 @@ var (
 	recurseCnt = 3
 )
 
+type Reloader func(*records.RecordGenerator) *records.RecordGenerator
+
 // holds configuration state and the resource records
 type Resolver struct {
 	version    string
@@ -39,6 +41,8 @@ type Resolver struct {
 	leader     string
 	leaderLock sync.RWMutex
 
+	// pluggable record loaders
+	reloaders []Reloader
 	// pluggable external DNS resolution, mainly for unit testing
 	extResolver func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error)
 	// pluggable ZK detection, mainly for unit testing
@@ -54,6 +58,14 @@ func New(version string, config records.Config) *Resolver {
 	r.extResolver = r.defaultExtResolver
 	r.startZKdetection = startDefaultZKdetector
 	return r
+}
+
+// execute a Reloader func at Reload time. should only be invoked during
+// bootstrapping (before processing begins) since this is not "thread-safe".
+func (res *Resolver) OnReload(r Reloader) {
+	if r != nil {
+		res.reloaders = append(res.reloaders, r)
+	}
 }
 
 // return the current (read-only) record set. attempts to write to the returned
@@ -156,12 +168,16 @@ func (res *Resolver) Reload() {
 	err := t.ParseState(currentLeader, res.config)
 
 	if err == nil {
+		state := &t
+		for _, r := range res.reloaders {
+			state = r(state)
+		}
 		timestamp := uint32(time.Now().Unix())
 		// may need to refactor for fairness
 		res.rsLock.Lock()
 		defer res.rsLock.Unlock()
-		res.config.SOASerial = timestamp
-		res.rs = &t
+		res.config.SOASerial = timestamp // TODO(jdef) data race, unprotected read access happens in other places
+		res.rs = state
 	} else {
 		logging.VeryVerbose.Println("Warning: master not found; keeping old DNS state")
 	}

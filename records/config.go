@@ -13,6 +13,11 @@ import (
 	"github.com/miekg/dns"
 )
 
+type PluginConfig struct {
+	Name     string          `json:"name,omitempty"`
+	Settings json.RawMessage `json:"settings,omitempty"`
+}
+
 // Config holds mesos dns configuration
 type Config struct {
 
@@ -68,6 +73,9 @@ type Config struct {
 
 	// Enable replies for external requests
 	ExternalOn bool
+
+	// allow plugins to consume their own JSON configuration
+	Plugins []PluginConfig
 }
 
 // SetConfig instantiates a Config struct read in from config.json
@@ -110,7 +118,11 @@ func SetConfig(cjson string) (c Config) {
 	}
 	c.File = path
 
-	err = json.Unmarshal(b, &c)
+	return ParseConfig(b, c)
+}
+
+func ParseConfig(actualjson []byte, c Config) Config {
+	err := json.Unmarshal(actualjson, &c)
 	if err != nil {
 		logging.Error.Println(err)
 	}
