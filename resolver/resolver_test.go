@@ -109,7 +109,8 @@ func fakeMsg(dom string, rrHeader uint16, proto string) (*dns.Msg, error) {
 		Qtype:  rrHeader,
 		Qclass: qc,
 	}
-
+	m.RecursionDesired = true
+	
 	in, _, err := c.Exchange(m, "127.0.0.1:8053")
 	return in, err
 
@@ -118,7 +119,7 @@ func fakeMsg(dom string, rrHeader uint16, proto string) (*dns.Msg, error) {
 func fakeQuery(dom string, rrHeader uint16, proto string) ([]dns.RR, error) {
 	in, err := fakeMsg(dom, rrHeader, proto)
 	if err != nil {
-		return in.Answer, err
+		return nil, err
 	}
 
 	return in.Answer, nil
@@ -247,7 +248,7 @@ func TestHandler(t *testing.T) {
 func TestNonMesosHandler(t *testing.T) {
 	var msg []dns.RR
 
-	res, err := fakeDNS(8054)
+	res, err := fakeDNS(8053)
 	if err != nil {
 		t.Error(err)
 	}

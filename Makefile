@@ -8,31 +8,36 @@ restoredeps:
 	@echo "--> Restoring build dependencies"
 	@godep restore
 
-savedeps: 
+savedeps:
 	@echo "--> Saving build dependencies"
 	@godep save
 
-updatedeps: 
+updatedeps:
 	@echo "--> Updating build dependencies"
 	@godep update ${ARGS}
 
-format: 
+format:
 	@echo "--> Running go fmt"
 	@godep go fmt ./...
 
-vet: 
+vet:
 	@echo "--> Running go vet"
 	@godep go vet ./...
 
-build: 
+build:
 	@echo "--> Building mesos-dns"
 	@godep go build -o mesos-dns
 
-test: 
+test_banner:
 	@echo "--> Testing mesos-dns"
+
+test: test_banner
 	@godep go test ./...
 
-testrace: 
+test.v: test_banner
+	@godep go test -test.v ./...
+
+testrace:
 	@godep go test -race ./...
 
 clean:
