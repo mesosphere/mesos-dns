@@ -24,7 +24,7 @@ type FilterSet []Filter
 // Apply this filter set to the given handler func. Filter implementations are not
 // obligated to invoke the chain, so the handler may never actually be called. This
 // particular implementation iterates through the filter set in a LIFO manner.
-func (fs FilterSet) Handler(handler dns.Handler) dns.Handler {
+func (fs FilterSet) Apply(handler dns.Handler) dns.Handler {
 	index := len(fs)
 	var chain dns.HandlerFunc
 	chain = dns.HandlerFunc(func(w dns.ResponseWriter, r *dns.Msg) {

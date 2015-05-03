@@ -77,11 +77,11 @@ func (res *Resolver) records() *records.RecordGenerator {
 }
 
 // launches DNS server for a resolver, returns immediately
-func (res *Resolver) LaunchDNS() <-chan error {
+func (res *Resolver) LaunchDNS(applyFilters func(dns.Handler) dns.Handler) <-chan error {
 	// Handers for Mesos requests
-	dns.HandleFunc(res.config.Domain+".", panicRecover(res.HandleMesos))
+	dns.Handle(res.config.Domain+".", panicRecover(applyFilters(dns.HandlerFunc(res.HandleMesos))))
 	// Handler for nonMesos requests
-	dns.HandleFunc(".", panicRecover(res.HandleNonMesos))
+	dns.Handle(".", panicRecover(applyFilters(dns.HandlerFunc(res.HandleNonMesos))))
 
 	errCh := make(chan error, 2)
 	_, e1 := res.Serve("tcp")
@@ -648,8 +648,8 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 
 // panicRecover catches any panics from the resolvers and sets an error
 // code of server failure
-func panicRecover(f func(w dns.ResponseWriter, r *dns.Msg)) func(w dns.ResponseWriter, r *dns.Msg) {
-	return func(w dns.ResponseWriter, r *dns.Msg) {
+func panicRecover(h dns.Handler) dns.Handler {
+	return dns.HandlerFunc(func(w dns.ResponseWriter, r *dns.Msg) {
 		defer func() {
 			if rec := recover(); rec != nil {
 				m := new(dns.Msg)
@@ -658,8 +658,8 @@ func panicRecover(f func(w dns.ResponseWriter, r *dns.Msg)) func(w dns.ResponseW
 				logging.Error.Println(rec)
 			}
 		}()
-		f(w, r)
-	}
+		h.ServeDNS(w, r)
+	})
 }
 
 // Start a Zookeeper listener to track leading master, invokes callback function when

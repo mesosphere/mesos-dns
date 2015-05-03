@@ -67,7 +67,6 @@ func (c *app) AddFilter(f plugins.Filter) {
 	default:
 	}
 	if f != nil {
-		//TODO(jdef) wrap plugin filters to handle plugin panic()s?
 		c.filters = append(c.filters, f)
 	}
 }
@@ -174,7 +173,9 @@ func (c *app) run() {
 	}
 
 	// launch async server procs
-	dnsErr := launchServer(c.config.DnsOn, c.resolver.LaunchDNS)
+	dnsErr := launchServer(c.config.DnsOn, func() <-chan error {
+		return c.resolver.LaunchDNS(c.filters.Apply)
+	})
 	httpErr := launchServer(c.config.HttpOn, c.resolver.LaunchHTTP)
 	newLeader, zkErr := c.launchZK()
 	tryReload := c.launchReloader()

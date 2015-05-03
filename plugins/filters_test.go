@@ -11,7 +11,7 @@ func TestFilters_Empty(t *testing.T) {
 	h := dns.HandlerFunc(func(w dns.ResponseWriter, r *dns.Msg) {
 		invoked = true
 	})
-	filtered := FilterSet(nil).Handler(h)
+	filtered := FilterSet(nil).Apply(h)
 	filtered.ServeDNS(nil, nil)
 	if !invoked {
 		t.Fatalf("end of filter chain not invoked")
@@ -35,7 +35,7 @@ func TestFilters_Single(t *testing.T) {
 		chain.ServeDNS(w, r)
 	}))
 
-	filteredHandler := filters.Handler(h)
+	filteredHandler := filters.Apply(h)
 	filteredHandler.ServeDNS(nil, nil)
 
 	if !filtered {
@@ -62,7 +62,7 @@ func TestFilters_SingleAbortive(t *testing.T) {
 		// don't invoke chain, abort processing
 	}))
 
-	filteredHandler := filters.Handler(h)
+	filteredHandler := filters.Apply(h)
 	filteredHandler.ServeDNS(nil, nil)
 
 	if !filtered {
@@ -101,7 +101,7 @@ func TestFilters_Multi(t *testing.T) {
 		}))
 	}
 
-	filteredHandler := filters.Handler(h)
+	filteredHandler := filters.Apply(h)
 	filteredHandler.ServeDNS(nil, nil)
 
 	for i, f := range filtered {
@@ -144,7 +144,7 @@ func TestFilters_MultiAbortive(t *testing.T) {
 		}))
 	}
 
-	filteredHandler := filters.Handler(h)
+	filteredHandler := filters.Apply(h)
 	filteredHandler.ServeDNS(nil, nil)
 
 	if !filtered[2] {
