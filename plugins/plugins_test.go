@@ -16,13 +16,13 @@ type FakePluginConfig struct {
 
 type fakePlugin struct {
 	FakePluginConfig
-	startFunc func(Context) <-chan error
+	startFunc func(InitialContext) <-chan error
 	stopFunc  func()
 	done      chan struct{}
 	doneOnce  sync.Once
 }
 
-func (p *fakePlugin) Start(ctx Context) (errCh <-chan error) {
+func (p *fakePlugin) Start(ctx InitialContext) (errCh <-chan error) {
 	if p.startFunc != nil {
 		errCh = p.startFunc(ctx)
 	}
@@ -54,7 +54,7 @@ func TestPluginConfig(t *testing.T) {
 		return &fakePlugin{
 			FakePluginConfig: c,
 			done:             make(chan struct{}),
-			startFunc: func(ctx Context) <-chan error {
+			startFunc: func(ctx InitialContext) <-chan error {
 				foo = c.Foo
 				return nil
 			},

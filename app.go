@@ -80,6 +80,17 @@ func (c *app) RegisterWS(ws *restful.WebService) {
 	}
 }
 
+// return a clone of the global configuration, minus any plugin-specific JSON
+func (c *app) Config() *records.Config {
+	cfg := c.config
+	cfg.Plugins = nil
+	cfg.Masters = make([]string, len(c.config.Masters))
+	copy(cfg.Masters, c.config.Masters)
+	cfg.Resolvers = make([]string, len(c.config.Resolvers))
+	copy(cfg.Resolvers, c.config.Resolvers)
+	return &cfg
+}
+
 func (c *app) initialize() {
 	select {
 	case <-c.ready:

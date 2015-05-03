@@ -16,7 +16,7 @@ type Plugin interface {
 	// Pre-server-startup actions such as Filter or resolver.Reloader registration must
 	// be completed before this func returns. This func is not expected to block for long
 	// and should return relatively quickly.
-	Start(Context) <-chan error
+	Start(InitialContext) <-chan error
 	// Stops any running background tasks for the plugin, should return immediately.
 	Stop()
 	// Returns a signal chan that's closed once the plugin has terminated.
@@ -34,7 +34,11 @@ type Resolver interface {
 	OnReload(r Reloader)
 }
 
-type Context interface {
+type InitialContext interface {
+
+	// Return a copy of the global configuration
+	Config() *records.Config
+
 	// Return a pointer to the mesos-dns Resolver.
 	Resolver() Resolver
 

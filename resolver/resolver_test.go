@@ -343,6 +343,8 @@ func TestHTTP(t *testing.T) {
 
 	plugin := NewAPIPlugin(res)
 	restful.Add(plugin.ws)
+	plugin.config = &res.config
+
 	ts := httptest.NewServer(http.DefaultServeMux)
 	defer ts.Close()
 

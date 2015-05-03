@@ -12,14 +12,16 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/plugins"
+	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/util"
 )
 
 // HTTP API resolver plugin
 type APIPlugin struct {
-	res  *Resolver
-	ws   *restful.WebService
-	done chan struct{}
+	res    *Resolver
+	ws     *restful.WebService
+	config *records.Config
+	done   chan struct{}
 }
 
 func NewAPIPlugin(res *Resolver) *APIPlugin {
@@ -39,11 +41,13 @@ func NewAPIPlugin(res *Resolver) *APIPlugin {
 }
 
 // starts an http server for mesos-dns queries, returns immediately
-func (api *APIPlugin) Start(ctx plugins.Context) <-chan error {
+func (api *APIPlugin) Start(ctx plugins.InitialContext) <-chan error {
 	defer util.HandleCrash()
 
 	ctx.RegisterWS(api.ws)
-	portString := ":" + strconv.Itoa(api.res.config.HttpPort)
+	api.config = ctx.Config()
+
+	portString := ":" + strconv.Itoa(api.config.HttpPort)
 	errCh := make(chan error, 1)
 	go func() {
 		select {
@@ -75,7 +79,7 @@ func (api *APIPlugin) Done() <-chan struct{} {
 
 // Reports configuration through REST interface
 func (api *APIPlugin) RestConfig(req *restful.Request, resp *restful.Response) {
-	output, err := json.Marshal(api.res.config)
+	output, err := json.Marshal(api.config)
 	if err != nil {
 		logging.Error.Println(err)
 	}
@@ -125,7 +129,7 @@ func (api *APIPlugin) RestHost(req *restful.Request, resp *restful.Response) {
 	io.WriteString(resp, string(output))
 
 	// stats
-	mesosrq := strings.HasSuffix(dom, api.res.config.Domain+".")
+	mesosrq := strings.HasSuffix(dom, api.config.Domain+".")
 	if mesosrq {
 		logging.CurLog.MesosRequests.Inc()
 		if empty {
@@ -187,7 +191,7 @@ func (api *APIPlugin) RestService(req *restful.Request, resp *restful.Response) 
 	io.WriteString(resp, string(output))
 
 	// stats
-	mesosrq := strings.HasSuffix(dom, api.res.config.Domain+".")
+	mesosrq := strings.HasSuffix(dom, api.config.Domain+".")
 	if mesosrq {
 		logging.CurLog.MesosRequests.Inc()
 		if empty {
