@@ -120,7 +120,7 @@ func launchServer(enabled bool, f func() <-chan error) (errCh <-chan error) {
 }
 
 // launch Zookeeper listener
-func (c *app) launchZK() (newLeader <-chan struct{}, zkErr <-chan error) {
+func (c *app) beginLeaderWatch() (newLeader <-chan struct{}, zkErr <-chan error) {
 	if c.config.Zk != "" {
 		newLeader, zkErr = c.resolver.LaunchZK(zkInitialDetectionTimeout)
 	} else {
@@ -133,7 +133,7 @@ func (c *app) launchZK() (newLeader <-chan struct{}, zkErr <-chan error) {
 }
 
 // periodically reload DNS records, either because the reload timer expired or else
-// because a celler invoked the tryReload func returned by this func.
+// because a caller invoked the tryReload func returned by this func.
 func (c *app) launchReloader() (tryReload func()) {
 	// generate reload signal; up to 1 reload pending at any time
 	reloadSignal := make(chan struct{}, 1)
@@ -177,7 +177,7 @@ func (c *app) run() {
 		return c.resolver.LaunchDNS(c.filters.Apply)
 	})
 	httpErr := launchServer(c.config.HttpOn, c.resolver.LaunchHTTP)
-	newLeader, zkErr := c.launchZK()
+	newLeader, zkErr := c.beginLeaderWatch()
 	tryReload := c.launchReloader()
 
 	// infinite loop until there is fatal error
