@@ -2,9 +2,6 @@ package resolver
 
 import (
 	"encoding/json"
-	"github.com/mesosphere/mesos-dns/logging"
-	"github.com/mesosphere/mesos-dns/records"
-	"github.com/miekg/dns"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +10,11 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/emicklei/go-restful"
+	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/records"
+	"github.com/miekg/dns"
 )
 
 func init() {
@@ -339,7 +341,8 @@ func TestHTTP(t *testing.T) {
 	}
 	res.version = "0.1.1"
 
-	res.configureHTTP()
+	plugin := NewAPIPlugin(res)
+	restful.Add(plugin.ws)
 	ts := httptest.NewServer(http.DefaultServeMux)
 	defer ts.Close()
 

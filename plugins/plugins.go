@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/emicklei/go-restful"
-	"github.com/mesosphere/mesos-dns/resolver"
+	"github.com/mesosphere/mesos-dns/records"
 )
 
 // A plugin has a single use lifecycle: once started, it may be stopped. once stopped,
@@ -16,7 +16,7 @@ type Plugin interface {
 	// Pre-server-startup actions such as Filter or resolver.Reloader registration must
 	// be completed before this func returns. This func is not expected to block for long
 	// and should return relatively quickly.
-	Start(Context)
+	Start(Context) <-chan error
 	// Stops any running background tasks for the plugin, should return immediately.
 	Stop()
 	// Returns a signal chan that's closed once the plugin has terminated.
@@ -26,9 +26,12 @@ type Plugin interface {
 // Build a new instance of a Plugin given some JSON configuration data.
 type Factory func(json.RawMessage) (Plugin, error)
 
+// same spec as in resolver
+type Reloader func(*records.RecordGenerator) *records.RecordGenerator
+
 // Plugins use this interface to communicate with the underlying DNS resolver.
 type Resolver interface {
-	OnReload(r resolver.Reloader)
+	OnReload(r Reloader)
 }
 
 type Context interface {

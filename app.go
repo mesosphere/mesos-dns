@@ -51,12 +51,12 @@ func (c *app) Done() <-chan struct{} {
 }
 
 // implements plugin.Resolver interface, panics if invoked outside of initialization process
-func (c *app) OnReload(r resolver.Reloader) {
+func (c *app) OnReload(r plugins.Reloader) {
 	select {
 	case <-c.ready:
 		panic("cannot OnReload after initialization has completed")
 	default:
-		c.resolver.OnReload(r)
+		c.resolver.OnReload(resolver.Reloader(r))
 	}
 }
 
@@ -90,26 +90,44 @@ func (c *app) initialize() {
 
 	c.config = records.SetConfig(*cjson)
 	c.resolver = resolver.New(version, c.config)
+
+	// launch built-in plugins
+	if c.config.HttpOn {
+		c.launchPlugin("HTTP server", resolver.NewAPIPlugin(c.resolver))
+	}
+
+	// launch third-party plugins
 	for _, pconfig := range c.config.Plugins {
-		if pconfig.Name == "" {
+		pluginName := pconfig.Name
+		if pluginName == "" {
 			logging.Error.Printf("failed to register plugin with empty name")
 			continue
 		}
-		plugin, err := plugins.New(pconfig.Name, pconfig.Settings)
+		plugin, err := plugins.New(pluginName, pconfig.Settings)
 		if err != nil {
 			logging.Error.Printf("failed to create plugin: %v", err)
 			continue
 		}
-		logging.Verbose.Printf("starting plugin %q", pconfig.Name)
-		pctx := &pluginContext{pluginName: pconfig.Name, app: c}
-		plugin.Start(pctx)
-		go func(pluginName string) {
-			select {
-			case <-plugin.Done():
-				logging.Verbose.Printf("plugin %q terminated", pluginName)
-			}
-		}(pconfig.Name)
+		c.launchPlugin(pluginName, plugin)
 	}
+}
+
+func (c *app) launchPlugin(pluginName string, plugin plugins.Plugin) {
+	logging.Verbose.Printf("starting plugin %q", pluginName)
+	pctx := &pluginContext{pluginName: pluginName, app: c}
+	if errCh := plugin.Start(pctx); errCh != nil {
+		go func() {
+			for err := range errCh {
+				c.errHandler(pluginName, err)
+			}
+		}()
+	}
+	go func() {
+		select {
+		case <-plugin.Done():
+			logging.Verbose.Printf("plugin %q terminated", pluginName)
+		}
+	}()
 }
 
 func launchServer(enabled bool, f func() <-chan error) (errCh <-chan error) {
@@ -176,7 +194,6 @@ func (c *app) run() {
 	dnsErr := launchServer(c.config.DnsOn, func() <-chan error {
 		return c.resolver.LaunchDNS(c.filters.Apply)
 	})
-	httpErr := launchServer(c.config.HttpOn, c.resolver.LaunchHTTP)
 	newLeader, zkErr := c.beginLeaderWatch()
 	tryReload := c.launchReloader()
 
@@ -188,8 +205,6 @@ func (c *app) run() {
 			tryReload()
 		case err := <-dnsErr:
 			c.errHandler("DNS server", err)
-		case err := <-httpErr:
-			c.errHandler("HTTP server", err)
 		case err := <-zkErr:
 			c.errHandler("ZK watcher", err)
 		}
