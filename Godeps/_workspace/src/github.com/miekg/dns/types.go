@@ -10,9 +10,12 @@ import (
 )
 
 type (
-	Type  uint16 // Type is a DNS type.
-	Class uint16 // Class is a DNS class.
-	Name  string // Name is a DNS domain name.
+	// Type is a DNS type.
+	Type uint16
+	// Class is a DNS class.
+	Class uint16
+	// Name is a DNS domain name.
+	Name string
 )
 
 // Packet formats
@@ -20,6 +23,7 @@ type (
 // Wire constants and supported types.
 const (
 	// valid RR_Header.Rrtype and Question.qtype
+
 	TypeNone       uint16 = 0
 	TypeA          uint16 = 1
 	TypeNS         uint16 = 2
@@ -91,7 +95,9 @@ const (
 
 	TypeTKEY uint16 = 249
 	TypeTSIG uint16 = 250
+
 	// valid Question.Qtype only
+
 	TypeIXFR  uint16 = 251
 	TypeAXFR  uint16 = 252
 	TypeMAILB uint16 = 253
@@ -105,6 +111,7 @@ const (
 	TypeReserved uint16 = 65535
 
 	// valid Question.Qclass
+
 	ClassINET   = 1
 	ClassCSNET  = 2
 	ClassCHAOS  = 3
@@ -113,6 +120,7 @@ const (
 	ClassANY    = 255
 
 	// Msg.rcode
+
 	RcodeSuccess        = 0
 	RcodeFormatError    = 1
 	RcodeServerFailure  = 2
@@ -133,11 +141,11 @@ const (
 	RcodeBadAlg         = 21
 	RcodeBadTrunc       = 22 // TSIG
 
-	// Opcode
+	// Opcode, there is no 3
+
 	OpcodeQuery  = 0
 	OpcodeIQuery = 1
 	OpcodeStatus = 2
-	// There is no 3
 	OpcodeNotify = 4
 	OpcodeUpdate = 5
 )
@@ -160,10 +168,14 @@ const (
 	_AD = 1 << 5  // authticated data
 	_CD = 1 << 4  // checking disabled
 
-)
+	LOC_EQUATOR       = 1 << 31 // RFC 1876, Section 2.
+	LOC_PRIMEMERIDIAN = 1 << 31 // RFC 1876, Section 2.
 
-// RFC 1876, Section 2
-const _LOC_EQUATOR = 1 << 31
+	LOC_HOURS   = 60 * 1000
+	LOC_DEGREES = 60 * LOC_HOURS
+
+	LOC_ALTITUDEBASE = 100000
+)
 
 // RFC 4398, Section 2.1
 const (
@@ -194,7 +206,8 @@ var CertTypeToString = map[uint16]string{
 
 var StringToCertType = reverseInt16(CertTypeToString)
 
-// DNS queries.
+// Question holds a DNS question. There can be multiple questions in the
+// question section of a message. Usually there is just one.
 type Question struct {
 	Name   string `dns:"cdomain-name"` // "cdomain-name" specifies encoding (and may be compressed)
 	Qtype  uint16
@@ -783,48 +796,69 @@ func (rr *LOC) copy() RR {
 	return &LOC{*rr.Hdr.copyHeader(), rr.Version, rr.Size, rr.HorizPre, rr.VertPre, rr.Latitude, rr.Longitude, rr.Altitude}
 }
 
+// cmToM takes a cm value expressed in RFC1876 SIZE mantissa/exponent
+// format and returns a string in m (two decimals for the cm)
+func cmToM(m, e uint8) string {
+	if e < 2 {
+		if e == 1 {
+			m *= 10
+		}
+
+		return fmt.Sprintf("0.%02d", m)
+	}
+
+	s := fmt.Sprintf("%d", m)
+	for e > 2 {
+		s += "0"
+		e--
+	}
+	return s
+}
+
+// String returns a string version of a LOC
 func (rr *LOC) String() string {
 	s := rr.Hdr.String()
-	// Copied from ldns
-	// Latitude
-	lat := rr.Latitude
-	north := "N"
-	if lat > _LOC_EQUATOR {
-		lat = lat - _LOC_EQUATOR
-	} else {
-		north = "S"
-		lat = _LOC_EQUATOR - lat
-	}
-	h := lat / (1000 * 60 * 60)
-	lat = lat % (1000 * 60 * 60)
-	m := lat / (1000 * 60)
-	lat = lat % (1000 * 60)
-	s += fmt.Sprintf("%02d %02d %0.3f %s ", h, m, (float32(lat) / 1000), north)
-	// Longitude
-	lon := rr.Longitude
-	east := "E"
-	if lon > _LOC_EQUATOR {
-		lon = lon - _LOC_EQUATOR
-	} else {
-		east = "W"
-		lon = _LOC_EQUATOR - lon
-	}
-	h = lon / (1000 * 60 * 60)
-	lon = lon % (1000 * 60 * 60)
-	m = lon / (1000 * 60)
-	lon = lon % (1000 * 60)
-	s += fmt.Sprintf("%02d %02d %0.3f %s ", h, m, (float32(lon) / 1000), east)
 
-	s1 := rr.Altitude / 100.00
-	s1 -= 100000
-	if rr.Altitude%100 == 0 {
-		s += fmt.Sprintf("%.2fm ", float32(s1))
+	lat := rr.Latitude
+	ns := "N"
+	if lat > LOC_EQUATOR {
+		lat = lat - LOC_EQUATOR
 	} else {
-		s += fmt.Sprintf("%.0fm ", float32(s1))
+		ns = "S"
+		lat = LOC_EQUATOR - lat
 	}
-	s += cmToString((rr.Size&0xf0)>>4, rr.Size&0x0f) + "m "
-	s += cmToString((rr.HorizPre&0xf0)>>4, rr.HorizPre&0x0f) + "m "
-	s += cmToString((rr.VertPre&0xf0)>>4, rr.VertPre&0x0f) + "m"
+	h := lat / LOC_DEGREES
+	lat = lat % LOC_DEGREES
+	m := lat / LOC_HOURS
+	lat = lat % LOC_HOURS
+	s += fmt.Sprintf("%02d %02d %0.3f %s ", h, m, (float64(lat) / 1000), ns)
+
+	lon := rr.Longitude
+	ew := "E"
+	if lon > LOC_PRIMEMERIDIAN {
+		lon = lon - LOC_PRIMEMERIDIAN
+	} else {
+		ew = "W"
+		lon = LOC_PRIMEMERIDIAN - lon
+	}
+	h = lon / LOC_DEGREES
+	lon = lon % LOC_DEGREES
+	m = lon / LOC_HOURS
+	lon = lon % LOC_HOURS
+	s += fmt.Sprintf("%02d %02d %0.3f %s ", h, m, (float64(lon) / 1000), ew)
+
+	var alt = float64(rr.Altitude) / 100
+	alt -= LOC_ALTITUDEBASE
+	if rr.Altitude%100 != 0 {
+		s += fmt.Sprintf("%.2fm ", alt)
+	} else {
+		s += fmt.Sprintf("%.0fm ", alt)
+	}
+
+	s += cmToM((rr.Size&0xf0)>>4, rr.Size&0x0f) + "m "
+	s += cmToM((rr.HorizPre&0xf0)>>4, rr.HorizPre&0x0f) + "m "
+	s += cmToM((rr.VertPre&0xf0)>>4, rr.VertPre&0x0f) + "m"
+
 	return s
 }
 
@@ -1004,30 +1038,59 @@ func (rr *SSHFP) String() string {
 }
 
 type IPSECKEY struct {
-	Hdr         RR_Header
-	Precedence  uint8
+	Hdr        RR_Header
+	Precedence uint8
+	// GatewayType: 1: A record, 2: AAAA record, 3: domainname.
+	// 0 is use for no type and GatewayName should be "." then.
 	GatewayType uint8
 	Algorithm   uint8
-	Gateway     string `dns:"ipseckey"`
+	// Gateway can be an A record, AAAA record or a domain name.
+	GatewayA    net.IP `dns:"a"`
+	GatewayAAAA net.IP `dns:"aaaa"`
+	GatewayName string `dns:"domain-name"`
 	PublicKey   string `dns:"base64"`
 }
 
 func (rr *IPSECKEY) Header() *RR_Header { return &rr.Hdr }
 func (rr *IPSECKEY) copy() RR {
-	return &IPSECKEY{*rr.Hdr.copyHeader(), rr.Precedence, rr.GatewayType, rr.Algorithm, rr.Gateway, rr.PublicKey}
+	return &IPSECKEY{*rr.Hdr.copyHeader(), rr.Precedence, rr.GatewayType, rr.Algorithm, rr.GatewayA, rr.GatewayAAAA, rr.GatewayName, rr.PublicKey}
 }
 
 func (rr *IPSECKEY) String() string {
-	return rr.Hdr.String() + strconv.Itoa(int(rr.Precedence)) +
+	s := rr.Hdr.String() + strconv.Itoa(int(rr.Precedence)) +
 		" " + strconv.Itoa(int(rr.GatewayType)) +
-		" " + strconv.Itoa(int(rr.Algorithm)) +
-		" " + rr.Gateway +
-		" " + rr.PublicKey
+		" " + strconv.Itoa(int(rr.Algorithm))
+	switch rr.GatewayType {
+	case 0:
+		fallthrough
+	case 3:
+		s += " " + rr.GatewayName
+	case 1:
+		s += " " + rr.GatewayA.String()
+	case 2:
+		s += " " + rr.GatewayAAAA.String()
+	default:
+		s += " ."
+	}
+	s += " " + rr.PublicKey
+	return s
 }
 
 func (rr *IPSECKEY) len() int {
-	return rr.Hdr.len() + 3 + len(rr.Gateway) + 1 +
-		base64.StdEncoding.DecodedLen(len(rr.PublicKey))
+	l := rr.Hdr.len() + 3 + 1
+	switch rr.GatewayType {
+	default:
+		fallthrough
+	case 0:
+		fallthrough
+	case 3:
+		l += len(rr.GatewayName)
+	case 1:
+		l += 4
+	case 2:
+		l += 16
+	}
+	return l + base64.StdEncoding.DecodedLen(len(rr.PublicKey))
 }
 
 type KEY struct {
@@ -1369,6 +1432,7 @@ func (rr *WKS) String() (s string) {
 	if rr.Address != nil {
 		s += rr.Address.String()
 	}
+	// TODO(miek): missing protocol here, see /etc/protocols
 	for i := 0; i < len(rr.BitMap); i++ {
 		// should lookup the port
 		s += " " + strconv.Itoa(int(rr.BitMap[i]))
@@ -1580,23 +1644,6 @@ func saltToString(s string) string {
 	return strings.ToUpper(s)
 }
 
-func cmToString(mantissa, exponent uint8) string {
-	switch exponent {
-	case 0, 1:
-		if exponent == 1 {
-			mantissa *= 10
-		}
-		return fmt.Sprintf("%.02f", float32(mantissa))
-	default:
-		s := fmt.Sprintf("%d", mantissa)
-		for i := uint8(0); i < exponent-2; i++ {
-			s += "0"
-		}
-		return s
-	}
-	panic("dns: not reached")
-}
-
 func euiToString(eui uint64, bits int) (hex string) {
 	switch bits {
 	case 64:
@@ -1640,6 +1687,7 @@ var typeToRR = map[uint16]func() RR{
 	TypeEID:        func() RR { return new(EID) },
 	TypeHINFO:      func() RR { return new(HINFO) },
 	TypeHIP:        func() RR { return new(HIP) },
+	TypeIPSECKEY:   func() RR { return new(IPSECKEY) },
 	TypeKX:         func() RR { return new(KX) },
 	TypeL32:        func() RR { return new(L32) },
 	TypeL64:        func() RR { return new(L64) },

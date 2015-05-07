@@ -38,14 +38,22 @@ type Resolver struct {
 	rsLock     sync.RWMutex
 	leader     string
 	leaderLock sync.RWMutex
+
+	// pluggable external DNS resolution, mainly for unit testing
+	extResolver func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error)
+	// pluggable ZK detection, mainly for unit testing
+	startZKdetection func(zkurl string, leaderChanged func(string)) error
 }
 
 func New(version string, config records.Config) *Resolver {
-	return &Resolver{
+	r := &Resolver{
 		version: version,
 		config:  config,
 		rs:      &records.RecordGenerator{},
 	}
+	r.extResolver = r.defaultExtResolver
+	r.startZKdetection = startDefaultZKdetector
+	return r
 }
 
 // return the current (read-only) record set. attempts to write to the returned
@@ -64,50 +72,64 @@ func (res *Resolver) LaunchDNS() <-chan error {
 	dns.HandleFunc(".", panicRecover(res.HandleNonMesos))
 
 	errCh := make(chan error, 2)
-	go func() { errCh <- res.Serve("tcp") }()
-	go func() { errCh <- res.Serve("udp") }()
+	_, e1 := res.Serve("tcp")
+	go func() { errCh <- <-e1 }()
+	_, e2 := res.Serve("udp")
+	go func() { errCh <- <-e2 }()
 	return errCh
 }
 
-// starts a DNS server for net protocol (tcp/udp), blocks until service has stopped
-func (res *Resolver) Serve(net string) error {
+// starts a DNS server for net protocol (tcp/udp), returns immediately.
+// the returned signal chan is closed upon the server successfully entering the listening phase.
+// if the server aborts then an error is sent on the error chan.
+func (res *Resolver) Serve(net string) (<-chan struct{}, <-chan error) {
 	defer util.HandleCrash()
 
+	ch := make(chan struct{})
 	server := &dns.Server{
-		Addr:       res.config.Listener + ":" + strconv.Itoa(res.config.Port),
-		Net:        net,
-		TsigSecret: nil,
+		Addr:              res.config.Listener + ":" + strconv.Itoa(res.config.Port),
+		Net:               net,
+		TsigSecret:        nil,
+		NotifyStartedFunc: func() { close(ch) },
 	}
 
-	err := server.ListenAndServe()
-	if err != nil {
-		return fmt.Errorf("Failed to setup %q server: %v", net, err)
-	} else {
-		logging.Error.Printf("Not listening/serving any more requests.")
-	}
-	return nil
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(errCh)
+		err := server.ListenAndServe()
+		if err != nil {
+			errCh <- fmt.Errorf("Failed to setup %q server: %v", net, err)
+		} else {
+			logging.Error.Printf("Not listening/serving any more requests.")
+		}
+	}()
+	return ch, errCh
 }
 
 // launches Zookeeper detector, returns immediately two chans: the first fires an empty
-// struct whenever there's a new mesos leader, the second if there's an unrecoverable
+// struct whenever there's a new (non-nil) mesos leader, the second if there's an unrecoverable
 // error in the master detector.
 func (res *Resolver) LaunchZK(initialDetectionTimeout time.Duration) (<-chan struct{}, <-chan error) {
+	var startedOnce sync.Once
+	startedCh := make(chan struct{})
 	errCh := make(chan error, 1)
-	leaderCh := make(chan struct{}, 1)
-	listenerFunc := func(newLeader bool) {
-		if newLeader {
-			// don't block if the buffer is full
-			select {
-			case leaderCh <- struct{}{}:
-			default:
-			}
-		}
-	}
+	leaderCh := make(chan struct{}, 1) // the first write never blocks
 
+	listenerFunc := func(newLeader string) {
+		defer func() {
+			if newLeader != "" {
+				leaderCh <- struct{}{}
+				startedOnce.Do(func() { close(startedCh) })
+			}
+		}()
+		res.leaderLock.Lock()
+		defer res.leaderLock.Unlock()
+		res.leader = newLeader
+	}
 	go func() {
 		defer util.HandleCrash()
 
-		startedCh, err := res.ZKdetect(listenerFunc)
+		err := res.startZKdetection(res.config.Zk, listenerFunc)
 		if err != nil {
 			errCh <- err
 			return
@@ -116,7 +138,7 @@ func (res *Resolver) LaunchZK(initialDetectionTimeout time.Duration) (<-chan str
 		logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
 		select {
 		case <-startedCh:
-			logging.VeryVerbose.Println("Warning: got initial information from Zookeper.")
+			logging.VeryVerbose.Println("Info: got initial information from Zookeper.")
 		case <-time.After(initialDetectionTimeout):
 			errCh <- fmt.Errorf("timed out waiting for initial ZK detection, exiting")
 		}
@@ -145,8 +167,9 @@ func (res *Resolver) Reload() {
 	}
 }
 
-// resolveOut queries other nameserver, potentially recurses
-func (res *Resolver) resolveOut(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
+// defaultExtResolver queries other nameserver, potentially recurses; callers should probably be invoking extResolver
+// instead since that's the pluggable entrypoint into external resolution.
+func (res *Resolver) defaultExtResolver(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
 	var in *dns.Msg
 	var err error
 
@@ -176,7 +199,7 @@ func (res *Resolver) resolveOut(r *dns.Msg, nameserver string, proto string, cnt
 
 		if cnt > 0 {
 			if soa, ok := (in.Ns[0]).(*dns.SOA); ok {
-				return res.resolveOut(r, soa.Ns+":53", proto, cnt-1)
+				return res.defaultExtResolver(r, soa.Ns+":53", proto, cnt-1)
 			}
 		}
 
@@ -300,14 +323,14 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 
 		for _, resolver := range res.config.Resolvers {
 			nameserver := resolver + ":53"
-			m, err = res.resolveOut(r, nameserver, proto, recurseCnt)
+			m, err = res.extResolver(r, nameserver, proto, recurseCnt)
 			if err == nil {
 				break
 			}
 		}
 	}
 
-	// resolveOut returns nil Msg sometimes cause of perf
+	// extResolver returns nil Msg sometimes cause of perf
 	if m == nil {
 		m = new(dns.Msg)
 		m.SetRcode(r, 2)
@@ -446,10 +469,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 }
 
-// starts an http server for mesos-dns queries, returns immediately
-func (res *Resolver) LaunchHTTP() <-chan error {
-	defer util.HandleCrash()
-
+func (res *Resolver) configureHTTP() {
 	// webserver + available routes
 	ws := new(restful.WebService)
 	ws.Route(ws.GET("/v1/version").To(res.RestVersion))
@@ -458,7 +478,13 @@ func (res *Resolver) LaunchHTTP() <-chan error {
 	ws.Route(ws.GET("/v1/hosts/{host}/ports").To(res.RestPorts))
 	ws.Route(ws.GET("/v1/services/{service}").To(res.RestService))
 	restful.Add(ws)
+}
 
+// starts an http server for mesos-dns queries, returns immediately
+func (res *Resolver) LaunchHTTP() <-chan error {
+	defer util.HandleCrash()
+
+	res.configureHTTP()
 	portString := ":" + strconv.Itoa(res.config.HttpPort)
 
 	errCh := make(chan error, 1)
@@ -620,52 +646,45 @@ func panicRecover(f func(w dns.ResponseWriter, r *dns.Msg)) func(w dns.ResponseW
 	}
 }
 
-// Start a Zookeeper listener to track leading master, returns a signal chan
-// that closes upon the first leader detection notification (and c.leader is
-// meaningfully readable).
-func (res *Resolver) ZKdetect(leaderChanged func(bool)) (<-chan struct{}, error) {
+// Start a Zookeeper listener to track leading master, invokes callback function when
+// master changes are reported.
+func startDefaultZKdetector(zkurl string, leaderChanged func(string)) error {
 
 	// start listener
-	logging.Verbose.Println("Starting master detector for ZK ", res.config.Zk)
-	md, err := detector.New(res.config.Zk)
+	logging.Verbose.Println("Starting master detector for ZK ", zkurl)
+	md, err := detector.New(zkurl)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create master detector: %v", err)
+		return fmt.Errorf("failed to create master detector: %v", err)
 	}
 
 	// and listen for master changes
-	var startedOnce sync.Once
-	started := make(chan struct{})
 	if err := md.Detect(detector.OnMasterChanged(func(info *mesos.MasterInfo) {
-		// making this atomic
-		res.leaderLock.Lock()
-		defer res.leaderLock.Unlock()
+		leader := ""
 		if leaderChanged != nil {
 			defer func() {
-				leaderChanged(res.leader != "")
+				leaderChanged(leader)
 			}()
 		}
 		logging.VeryVerbose.Println("Updated Zookeeper info: ", info)
 		if info == nil {
-			res.leader = ""
 			logging.Error.Println("No leader available in Zookeeper.")
-		} else if host := info.GetHostname(); host != "" {
-			res.leader = host
 		} else {
-			// unpack IPv4
-			octets := make([]byte, 4, 4)
-			binary.BigEndian.PutUint32(octets, info.GetIp())
-			ipv4 := net.IP(octets)
-			res.leader = ipv4.String()
+			if host := info.GetHostname(); host != "" {
+				leader = host
+			} else {
+				// unpack IPv4
+				octets := make([]byte, 4, 4)
+				binary.BigEndian.PutUint32(octets, info.GetIp())
+				ipv4 := net.IP(octets)
+				leader = ipv4.String()
+			}
+			leader = fmt.Sprintf("%s:%d", leader, info.GetPort())
+			logging.Verbose.Println("new master in Zookeeper ", leader)
 		}
-		if len(res.leader) > 0 {
-			res.leader = fmt.Sprintf("%s:%d", res.leader, info.GetPort())
-		}
-		logging.Verbose.Println("New master in Zookeeper ", res.leader)
-		startedOnce.Do(func() { close(started) })
 	})); err != nil {
-		return nil, fmt.Errorf("failed to initialize master detector: %v", err)
+		return fmt.Errorf("failed to initialize master detector: %v", err)
 	}
-	return started, nil
+	return nil
 }
 
 // cleanWild strips any wildcards out thus mapping cleanly to the

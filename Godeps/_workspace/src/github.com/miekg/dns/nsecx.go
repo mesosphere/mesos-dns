@@ -47,9 +47,11 @@ func HashName(label string, ha uint8, iter uint16, salt string) string {
 		io.WriteString(s, string(nsec3))
 		nsec3 = s.Sum(nil)
 	}
-	return unpackBase32(nsec3)
+	return toBase32(nsec3)
 }
 
+// Denialer is an interface that should be implemented by types that are used to denial
+// answers in DNSSEC.
 type Denialer interface {
 	// Cover will check if the (unhashed) name is being covered by this NSEC or NSEC3.
 	Cover(name string) bool

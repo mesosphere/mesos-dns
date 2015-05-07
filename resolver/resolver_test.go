@@ -7,8 +7,10 @@ import (
 	"github.com/miekg/dns"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
@@ -96,7 +98,7 @@ func fakeDNS(port int) (*Resolver, error) {
 	return res, nil
 }
 
-func fakeMsg(dom string, rrHeader uint16, proto string) (*dns.Msg, error) {
+func fakeMsg(dom string, rrHeader uint16, proto string, serverPort int) (*dns.Msg, error) {
 	qc := uint16(dns.ClassINET)
 
 	c := new(dns.Client)
@@ -110,14 +112,13 @@ func fakeMsg(dom string, rrHeader uint16, proto string) (*dns.Msg, error) {
 		Qclass: qc,
 	}
 	m.RecursionDesired = true
-	
-	in, _, err := c.Exchange(m, "127.0.0.1:8053")
+	in, _, err := c.Exchange(m, "127.0.0.1:"+strconv.Itoa(serverPort))
 	return in, err
 
 }
 
-func fakeQuery(dom string, rrHeader uint16, proto string) ([]dns.RR, error) {
-	in, err := fakeMsg(dom, rrHeader, proto)
+func fakeQuery(dom string, rrHeader uint16, proto string, serverPort int) ([]dns.RR, error) {
+	in, err := fakeMsg(dom, rrHeader, proto, serverPort)
 	if err != nil {
 		return nil, err
 	}
@@ -137,23 +138,69 @@ func identicalResults(msg_a []dns.RR, msg_b []dns.RR) bool {
 	return true
 }
 
+func onError(abort <-chan struct{}, errCh <-chan error, f func(error)) <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		select {
+		case <-abort:
+		case e := <-errCh:
+			if e != nil {
+				defer close(ch)
+				f(e)
+			}
+		}
+	}()
+	return ch
+}
+
+func onSignal(abort <-chan struct{}, s <-chan struct{}, f func()) {
+	go func() {
+		select {
+		case <-abort:
+		case <-s:
+			f()
+		}
+	}()
+}
+
+// start TCP and UDP DNS servers and block, waiting for the server listeners to come up before returning
+func safeStartDNSResolver(t *testing.T, res *Resolver) {
+	var abortOnce sync.Once
+	abort := make(chan struct{})
+	doAbort := func() {
+		abortOnce.Do(func() { close(abort) })
+	}
+
+	s1, e := res.Serve("udp")
+	f1 := onError(abort, e, func(err error) { t.Fatalf("udp server failed: %v", err) })
+	s2, e := res.Serve("tcp")
+	f2 := onError(abort, e, func(err error) { t.Fatalf("tcp server failed: %v", err) })
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	onSignal(abort, s1, wg.Done)
+	onSignal(abort, s2, wg.Done)
+	onSignal(abort, f1, doAbort)
+	onSignal(abort, f2, doAbort)
+
+	wg.Wait()
+}
+
 func TestHandler(t *testing.T) {
 	var msg []dns.RR
 
-	res, err := fakeDNS(8053)
+	const port = 8053
+	res, err := fakeDNS(port)
 	if err != nil {
 		t.Error(err)
 	}
 
 	dns.HandleFunc("mesos.", res.HandleMesos)
-	go res.Serve("udp")
-	go res.Serve("tcp")
-
-	// wait for startup ? lame
-	time.Sleep(10 * time.Millisecond)
+	safeStartDNSResolver(t, res)
 
 	// test A records
-	msg, err = fakeQuery("chronos.marathon.mesos.", dns.TypeA, "udp")
+	msg, err = fakeQuery("chronos.marathon.mesos.", dns.TypeA, "udp", port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -164,7 +211,7 @@ func TestHandler(t *testing.T) {
 
 	// Test case sensitivity -- this test depends on one above
 	msg_a := msg
-	msg, err = fakeQuery("cHrOnOs.MARATHON.mesoS.", dns.TypeA, "udp")
+	msg, err = fakeQuery("cHrOnOs.MARATHON.mesoS.", dns.TypeA, "udp", port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -174,7 +221,7 @@ func TestHandler(t *testing.T) {
 	}
 
 	// test SRV record
-	msg, err = fakeQuery("_liquor-store._udp.marathon.mesos.", dns.TypeSRV, "udp")
+	msg, err = fakeQuery("_liquor-store._udp.marathon.mesos.", dns.TypeSRV, "udp", port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -184,7 +231,7 @@ func TestHandler(t *testing.T) {
 	}
 
 	// test SOA
-	m, err := fakeMsg("non-existing.mesos.", dns.TypeSOA, "udp")
+	m, err := fakeMsg("non-existing.mesos.", dns.TypeSOA, "udp", port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -194,7 +241,7 @@ func TestHandler(t *testing.T) {
 	}
 
 	// test NS
-	m, err = fakeMsg("non-existing2.mesos.", dns.TypeNS, "udp")
+	m, err = fakeMsg("non-existing2.mesos.", dns.TypeNS, "udp", port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -204,7 +251,7 @@ func TestHandler(t *testing.T) {
 	}
 
 	// test non-existing host
-	m, err = fakeMsg("missing.mesos.", dns.TypeA, "udp")
+	m, err = fakeMsg("missing.mesos.", dns.TypeA, "udp", port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -214,7 +261,7 @@ func TestHandler(t *testing.T) {
 	}
 
 	// test tcp
-	msg, err = fakeQuery("chronos.marathon.mesos.", dns.TypeA, "tcp")
+	msg, err = fakeQuery("chronos.marathon.mesos.", dns.TypeA, "tcp", port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -224,7 +271,7 @@ func TestHandler(t *testing.T) {
 	}
 
 	// test AAAA --> NODATA
-	m, err = fakeMsg("chronos.marathon.mesos.", dns.TypeAAAA, "udp")
+	m, err = fakeMsg("chronos.marathon.mesos.", dns.TypeAAAA, "udp", port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -234,7 +281,7 @@ func TestHandler(t *testing.T) {
 	}
 
 	// test AAAA --> NXDOMAIN
-	m, err = fakeMsg("missing.mesos.", dns.TypeAAAA, "udp")
+	m, err = fakeMsg("missing.mesos.", dns.TypeAAAA, "udp", port)
 	if err != nil {
 		t.Error(err)
 	}
@@ -242,34 +289,45 @@ func TestHandler(t *testing.T) {
 	if m.Rcode != 3 {
 		t.Error("not setting NXDOMAIN for AAAA requests")
 	}
-
 }
 
 func TestNonMesosHandler(t *testing.T) {
 	var msg []dns.RR
 
-	res, err := fakeDNS(8053)
+	const port = 8054
+	res, err := fakeDNS(port)
+	res.extResolver = func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
+		t.Logf("ext-resolver: r=%v, nameserver=%s, proto=%s, cnt=%d", r, nameserver, proto, cnt)
+		rr1, err := res.formatA("google.com.", "1.1.1.1")
+		if err != nil {
+			return nil, err
+		}
+		rr2, err := res.formatA("google.com.", "2.2.2.2")
+		if err != nil {
+			return nil, err
+		}
+		msg := &dns.Msg{
+			Answer: []dns.RR{rr1, rr2},
+		}
+		msg.SetReply(r)
+		return msg, nil
+	}
 	if err != nil {
 		t.Error(err)
 	}
 
 	dns.HandleFunc(".", res.HandleNonMesos)
-	go res.Serve("udp")
-	go res.Serve("tcp")
-
-	// wait for startup ? lame
-	time.Sleep(200 * time.Millisecond)
+	safeStartDNSResolver(t, res)
 
 	// test A records
-	msg, err = fakeQuery("google.com", dns.TypeA, "udp")
+	msg, err = fakeQuery("google.com", dns.TypeA, "udp", port)
 	if err != nil {
 		t.Error(err)
 	}
 
 	if len(msg) < 1 {
-		t.Errorf("not serving up A records, expected 2 records instead of %d", len(msg))
+		t.Errorf("not serving up A records, expected 2 records instead of %d: %+v", len(msg), msg)
 	}
-
 }
 
 func TestHTTP(t *testing.T) {
@@ -281,16 +339,12 @@ func TestHTTP(t *testing.T) {
 	}
 	res.version = "0.1.1"
 
-	errCh := res.LaunchHTTP()
-	go func() {
-		err := <-errCh
-		t.Fatalf("HTTP server stopped with err: %v", err)
-	}()
-	// wait for startup ? lame
-	time.Sleep(10 * time.Millisecond)
+	res.configureHTTP()
+	ts := httptest.NewServer(http.DefaultServeMux)
+	defer ts.Close()
 
 	// test /v1/version
-	r1, err := http.Get("http://127.0.0.1:8123/v1/version")
+	r1, err := http.Get(ts.URL + "/v1/version")
 	if err != nil {
 		t.Error(err)
 	}
@@ -307,7 +361,7 @@ func TestHTTP(t *testing.T) {
 	}
 
 	// test /v1/config
-	r2, err := http.Get("http://127.0.0.1:8123/v1/config")
+	r2, err := http.Get(ts.URL + "/v1/config")
 	if err != nil {
 		t.Error(err)
 	}
@@ -323,7 +377,7 @@ func TestHTTP(t *testing.T) {
 	}
 
 	// test /v1/services -- existing record
-	r3, err := http.Get("http://127.0.0.1:8123/v1/services/_leader._tcp.mesos.")
+	r3, err := http.Get(ts.URL + "/v1/services/_leader._tcp.mesos.")
 	if err != nil {
 		t.Error(err)
 	}
@@ -340,7 +394,7 @@ func TestHTTP(t *testing.T) {
 	}
 
 	// test /v1/services -- non existing record
-	r4, err := http.Get("http://127.0.0.1:8123/v1/services/_myservice._tcp.mesos.")
+	r4, err := http.Get(ts.URL + "/v1/services/_myservice._tcp.mesos.")
 	if err != nil {
 		t.Error(err)
 	}
@@ -357,7 +411,7 @@ func TestHTTP(t *testing.T) {
 	}
 
 	// test /v1/host -- existing record
-	r5, err := http.Get("http://127.0.0.1:8123/v1/hosts/leader.mesos")
+	r5, err := http.Get(ts.URL + "/v1/hosts/leader.mesos")
 	if err != nil {
 		t.Error(err)
 	}
@@ -373,4 +427,54 @@ func TestHTTP(t *testing.T) {
 		t.Error("Http hosts API failure")
 	}
 
+}
+
+func TestLaunchZK(t *testing.T) {
+	var closeOnce sync.Once
+	ch := make(chan struct{})
+	closer := func() { closeOnce.Do(func() { close(ch) }) }
+	res := &Resolver{
+		startZKdetection: func(zkurl string, leaderChanged func(string)) error {
+			go func() {
+				defer closer()
+				leaderChanged("")
+				leaderChanged("")
+				leaderChanged("a")
+				leaderChanged("")
+				leaderChanged("")
+				leaderChanged("b")
+				leaderChanged("")
+				leaderChanged("")
+				leaderChanged("c")
+			}()
+			return nil
+		},
+	}
+	leaderSig, errCh := res.LaunchZK(1 * time.Second)
+	onError(ch, errCh, func(err error) { t.Fatalf("unexpected error: %v", err) })
+	getLeader := func() string {
+		res.leaderLock.Lock()
+		defer res.leaderLock.Unlock()
+		return res.leader
+	}
+	for i := 0; i < 3; i++ {
+		select {
+		case <-leaderSig:
+			t.Logf("new leader %d: %s", i, getLeader())
+		case <-time.After(1 * time.Second):
+			t.Fatalf("timed out waiting for new leader")
+		}
+	}
+	select {
+	case <-ch:
+	case <-time.After(1 * time.Second):
+		t.Fatalf("timed out waiting for detector death")
+	}
+	// there should be nothing left in the leader signal chan
+	select {
+	case <-leaderSig:
+		t.Fatalf("unexpected new leader")
+	case <-time.After(200 * time.Millisecond):
+		// expected
+	}
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net"
-	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
@@ -102,14 +101,12 @@ func SetConfig(cjson string) (c Config) {
 
 	path, err := filepath.Abs(cjson)
 	if err != nil {
-		logging.Error.Println("cannot find configuration file")
-		os.Exit(1)
+		logging.Error.Fatalf("cannot find configuration file")
 	}
 
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
-		logging.Error.Println("missing configuration file")
-		os.Exit(1)
+		logging.Error.Fatalf("missing configuration file")
 	}
 	c.File = path
 
@@ -120,12 +117,10 @@ func SetConfig(cjson string) (c Config) {
 
 	// validate and complete configuration file
 	if !(c.DnsOn || c.HttpOn) {
-		logging.Error.Println("Either DNS or HTTP server should be on")
-		os.Exit(1)
+		logging.Error.Fatalf("Either DNS or HTTP server should be on")
 	}
 	if len(c.Masters) == 0 && c.Zk == "" {
-		logging.Error.Println("specify mesos masters or zookeeper in config.json")
-		os.Exit(1)
+		logging.Error.Fatalf("specify mesos masters or zookeeper in config.json")
 	}
 
 	if c.ExternalOn && len(c.Resolvers) == 0 {
@@ -181,8 +176,7 @@ func SetConfig(cjson string) (c Config) {
 func GetLocalDNS() []string {
 	conf, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 	if err != nil {
-		logging.Error.Println(err)
-		os.Exit(2)
+		logging.Error.Fatalf("%v", err)
 	}
 
 	return nonLocalAddies(conf.Servers)

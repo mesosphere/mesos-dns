@@ -1,25 +1,9 @@
-// SIG(0)
-//
-// From RFC 2931:
-//
-//     SIG(0) provides protection for DNS transactions and requests ....
-//     ... protection for glue records, DNS requests, protection for message headers
-//     on requests and responses, and protection of the overall integrity of a response.
-//
-// It works like TSIG, except that SIG(0) uses public key cryptography, instead of the shared
-// secret approach in TSIG.
-// Supported algorithms: DSA, ECDSAP256SHA256, ECDSAP384SHA384, RSASHA1, RSASHA256 and
-// RSASHA512.
-//
-// Signing subsequent messages in multi-message sessions is not implemented.
-//
 package dns
 
 import (
 	"crypto"
 	"crypto/dsa"
 	"crypto/ecdsa"
-	"crypto/rand"
 	"crypto/rsa"
 	"math/big"
 	"strings"
@@ -44,18 +28,7 @@ func (rr *SIG) Sign(k PrivateKey, m *Msg) ([]byte, error) {
 	rr.TypeCovered = 0
 	rr.Labels = 0
 
-	buflen := m.Len() + rr.len()
-	switch k := k.(type) {
-	case *rsa.PrivateKey:
-		buflen += len(k.N.Bytes())
-	case *dsa.PrivateKey:
-		buflen += 40
-	case *ecdsa.PrivateKey:
-		buflen += 96
-	default:
-		return nil, ErrPrivKey
-	}
-	buf := make([]byte, m.Len()+rr.len()+buflen)
+	buf := make([]byte, m.Len()+rr.len())
 	mbuf, err := m.PackBuffer(buf)
 	if err != nil {
 		return nil, err
@@ -88,34 +61,11 @@ func (rr *SIG) Sign(k PrivateKey, m *Msg) ([]byte, error) {
 	hasher.Write(buf[:len(mbuf)])
 	hashed := hasher.Sum(nil)
 
-	var sig []byte
-	switch p := k.(type) {
-	case *dsa.PrivateKey:
-		t := byte((len(p.PublicKey.Y.Bytes()) - 64) / 8)
-		r1, s1, err := dsa.Sign(rand.Reader, p, hashed)
-		if err != nil {
-			return nil, err
-		}
-		sig = make([]byte, 0, 1+len(r1.Bytes())+len(s1.Bytes()))
-		sig = append(sig, t)
-		sig = append(sig, r1.Bytes()...)
-		sig = append(sig, s1.Bytes()...)
-	case *rsa.PrivateKey:
-		sig, err = rsa.SignPKCS1v15(rand.Reader, p, hash, hashed)
-		if err != nil {
-			return nil, err
-		}
-	case *ecdsa.PrivateKey:
-		r1, s1, err := ecdsa.Sign(rand.Reader, p, hashed)
-		if err != nil {
-			return nil, err
-		}
-		sig = r1.Bytes()
-		sig = append(sig, s1.Bytes()...)
-	default:
-		return nil, ErrAlg
+	sig, err := k.Sign(hashed, rr.Algorithm)
+	if err != nil {
+		return nil, err
 	}
-	rr.Signature = unpackBase64(sig)
+	rr.Signature = toBase64(sig)
 	buf = append(buf, sig...)
 	if len(buf) > int(^uint16(0)) {
 		return nil, ErrBuf
@@ -127,7 +77,7 @@ func (rr *SIG) Sign(k PrivateKey, m *Msg) ([]byte, error) {
 	buf[rdoff], buf[rdoff+1] = packUint16(rdlen)
 	// Adjust additional count
 	adc, _ := unpackUint16(buf, 10)
-	adc += 1
+	adc++
 	buf[10], buf[11] = packUint16(adc)
 	return buf, nil
 }
@@ -255,7 +205,7 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 			return rsa.VerifyPKCS1v15(pk, hash, hashed, sig)
 		}
 	case ECDSAP256SHA256, ECDSAP384SHA384:
-		pk := k.publicKeyCurve()
+		pk := k.publicKeyECDSA()
 		r := big.NewInt(0)
 		r.SetBytes(sig[:len(sig)/2])
 		s := big.NewInt(0)
