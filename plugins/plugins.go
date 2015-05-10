@@ -31,7 +31,8 @@ type Reloader func(*records.RecordGenerator) *records.RecordGenerator
 
 // Plugins use this interface to communicate with the underlying DNS resolver.
 type Resolver interface {
-	OnReload(r Reloader)
+	OnPreload(r Reloader)
+	OnPostload(r Reloader)
 }
 
 type InitialContext interface {

@@ -26,7 +26,7 @@ var (
 	recurseCnt = 3
 )
 
-type Reloader func(*records.RecordGenerator) *records.RecordGenerator
+type RecordLoader func(*records.RecordGenerator) *records.RecordGenerator
 
 // holds configuration state and the resource records
 type Resolver struct {
@@ -37,10 +37,15 @@ type Resolver struct {
 	leader     string
 	leaderLock sync.RWMutex
 
-	// pluggable record loaders
-	reloaders []Reloader
+	// preLoaders are invoked at the beginning of the Reload cycle, just prior to state generation
+	preLoaders []RecordLoader
+
+	// postLoaders are invoked at the end of the Reload cycle, after state generation
+	postLoaders []RecordLoader
+
 	// pluggable external DNS resolution, mainly for unit testing
 	extResolver func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error)
+
 	// pluggable ZK detection, mainly for unit testing
 	startZKdetection func(zkurl string, leaderChanged func(string)) error
 }
@@ -56,11 +61,19 @@ func New(version string, config records.Config) *Resolver {
 	return r
 }
 
-// execute a Reloader func at Reload time. should only be invoked during
+// execute a RecordLoader func at Reload time. this func should only be invoked during
 // bootstrapping (before processing begins) since this is not "thread-safe".
-func (res *Resolver) OnReload(r Reloader) {
+func (res *Resolver) OnPreload(r RecordLoader) {
 	if r != nil {
-		res.reloaders = append(res.reloaders, r)
+		res.preLoaders = append(res.preLoaders, r)
+	}
+}
+
+// execute a RecordLoader func at Reload time. this func should only be invoked during
+// bootstrapping (before processing begins) since this is not "thread-safe".
+func (res *Resolver) OnPostload(r RecordLoader) {
+	if r != nil {
+		res.postLoaders = append(res.postLoaders, r)
 	}
 }
 
@@ -157,26 +170,40 @@ func (res *Resolver) LaunchZK(initialDetectionTimeout time.Duration) (<-chan str
 // triggers a new refresh from mesos master
 func (res *Resolver) Reload() {
 	t := records.RecordGenerator{}
+	t.TaskRecordGeneratorFn = t.BuildTaskRecords
+
 	// Being very conservative
 	res.leaderLock.RLock()
 	currentLeader := res.leader
 	res.leaderLock.RUnlock()
-	err := t.ParseState(currentLeader, res.config)
 
-	if err == nil {
-		state := &t
-		for _, r := range res.reloaders {
-			state = r(state)
-		}
-		timestamp := uint32(time.Now().Unix())
-		// may need to refactor for fairness
-		res.rsLock.Lock()
-		defer res.rsLock.Unlock()
-		res.config.SOASerial = timestamp // TODO(jdef) data race, unprotected read access happens in other places
-		res.rs = state
-	} else {
-		logging.VeryVerbose.Println("Warning: master not found; keeping old DNS state")
+	// pre-ParseState phase, preloader plugins can wrap around, or otherwise customize,
+	// a RecordGenerator.TaskRecordGeneratorFn. useful if plugins want to create additional
+	// records based on, for example, task labels.
+	state := &t
+	for _, g := range res.preLoaders {
+		state = g(state)
 	}
+
+	if err := state.ParseState(currentLeader, res.config); err != nil {
+		logging.VeryVerbose.Printf("Warning: master not found; keeping old DNS state: %v", err)
+		return
+	}
+
+	// post-ParseState phase, postloader plugins can modify generated records.
+	// useful if, for example, plugins wish to append records that are independent
+	// of the generated tasks.
+	for _, r := range res.postLoaders {
+		state = r(state)
+	}
+
+	timestamp := uint32(time.Now().Unix())
+
+	// may need to refactor for fairness
+	res.rsLock.Lock()
+	defer res.rsLock.Unlock()
+	res.config.SOASerial = timestamp // TODO(jdef) data race, unprotected read access happens in other places
+	res.rs = state
 }
 
 // defaultExtResolver queries other nameserver, potentially recurses; callers should probably be invoking extResolver

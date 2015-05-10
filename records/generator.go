@@ -5,6 +5,7 @@ package records
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"hash/fnv"
 	"io/ioutil"
 	"net"
@@ -21,12 +22,15 @@ import (
 // Will likely become map[string][]discoveryinfo
 type rrs map[string][]string
 
+type TaskRecordGeneratorFn func(task *Task, frameworkName, slaveHost, domain string)
+
 // Mesos-DNS state
 // Refactor when discovery id is available
 type RecordGenerator struct {
 	As     rrs
 	SRVs   rrs
 	Slaves map[string]string
+	TaskRecordGeneratorFn
 }
 
 // The following types help parse state.json
@@ -35,8 +39,8 @@ type Resources struct {
 	Ports string `json:"ports"`
 }
 
-// Tasks holds mesos task information read in from state.json
-type Tasks []struct {
+// Task holds mesos task information read in from state.json
+type Task struct {
 	FrameworkId string `json:"framework_id"`
 	Id          string `json:"id"`
 	Name        string `json:"name"`
@@ -46,23 +50,22 @@ type Tasks []struct {
 }
 
 // Frameworks holds mesos frameworks information read in from state.json
-type Frameworks []struct {
-	Tasks `json:"tasks"`
+type Framework struct {
+	Tasks []Task `json:"tasks"`
 	Name  string `json:"name"`
 }
 
 // Slaves is a mapping of id to hostname read in from state.json
-type slave struct {
+type Slave struct {
 	Id       string `json:"id"`
 	Hostname string `json:"hostname"`
 }
-type Slaves []slave
 
 // StateJSON is a representation of mesos master state.json
 type StateJSON struct {
-	Frameworks `json:"frameworks"`
-	Slaves     `json:"slaves"`
-	Leader     string `json:"leader"`
+	Frameworks []Framework `json:"frameworks"`
+	Slaves     []Slave     `json:"slaves"`
+	Leader     string      `json:"leader"`
 }
 
 // Finds the master and inserts DNS state
@@ -238,6 +241,11 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	rg.SRVs = make(rrs)
 	rg.As = make(rrs)
 
+	trecGenerator := rg.TaskRecordGeneratorFn
+	if trecGenerator == nil {
+		trecGenerator = rg.BuildTaskRecords
+	}
+
 	// complete crap - refactor me
 	for _, f := range sj.Frameworks {
 		fname := labels.AsDomainFrag(f.Name)
@@ -248,35 +256,39 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 			if !ok || (task.State != "TASK_RUNNING") {
 				continue
 			}
-
-			tname := labels.AsDNS952(task.Name)
-			sid := slaveIdTail(task.SlaveId)
-			tag := hashString(task.Id)
-			tail := fname + "." + domain + "."
-
-			// A records for task and task-sid
-			arec := tname + "." + tail
-			rg.insertRR(arec, host, "A")
-			trec := tname + "-" + tag + "-" + sid + "." + tail
-			rg.insertRR(trec, host, "A")
-
-			// SRV records
-			if task.Resources.Ports != "" {
-				ports := yankPorts(task.Resources.Ports)
-				for _, port := range ports {
-					var srvhost string = trec + ":" + port
-					tcp := "_" + tname + "._tcp." + tail
-					udp := "_" + tname + "._udp." + tail
-					rg.insertRR(tcp, srvhost, "SRV")
-					rg.insertRR(udp, srvhost, "SRV")
-				}
-			}
+			trecGenerator(&task, fname, host, domain)
 		}
 	}
 
 	rg.listenerRecord(listener, ns)
 	rg.masterRecord(domain, masters, sj.Leader)
 	return nil
+}
+
+// default implementation of a TaskRecordGeneratorFn
+func (rg *RecordGenerator) BuildTaskRecords(task *Task, fname, host, domain string) {
+	tname := labels.AsDNS952(task.Name)
+	sid := slaveIdTail(task.SlaveId)
+	tag := hashString(task.Id)
+	tail := fname + "." + domain + "."
+
+	// A records for task and task-sid
+	arec := tname + "." + tail
+	rg.AddA(arec, host)
+	trec := tname + "-" + tag + "-" + sid + "." + tail
+	rg.AddA(trec, host)
+
+	// SRV records
+	if task.Resources.Ports != "" {
+		ports := yankPorts(task.Resources.Ports)
+		for _, port := range ports {
+			var srvhost string = trec + ":" + port
+			tcp := "_" + tname + "._tcp." + tail
+			udp := "_" + tname + "._udp." + tail
+			rg.AddSRV(tcp, srvhost)
+			rg.AddSRV(udp, srvhost)
+		}
+	}
 }
 
 // A records for the mesos masters
@@ -375,36 +387,48 @@ func (rg *RecordGenerator) setFromLocal(host string, ns string) {
 	}
 }
 
+func (rg *RecordGenerator) AddA(name string, host string) {
+	if val, ok := rg.As[name]; ok {
+		// check if A record already exists
+		// identical tasks on same slave
+		for _, b := range val {
+			if b == host {
+				return
+			}
+		}
+		rg.As[name] = append(val, host)
+	} else {
+		rg.As[name] = []string{host}
+	}
+}
+
+func (rg *RecordGenerator) AddSRV(name string, host string) {
+	if val, ok := rg.SRVs[name]; ok {
+		// check if SRV record already exists
+		for _, b := range val {
+			if b == host {
+				return
+			}
+		}
+		rg.SRVs[name] = append(val, host)
+	} else {
+		rg.SRVs[name] = []string{host}
+	}
+}
+
 // insertRR inserts host to name's map
 // REFACTOR when storage is updated
+// @deprecated use AddA or AddSRV instead
 func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
 	logging.VeryVerbose.Println("[" + rtype + "]\t" + name + ": " + host)
 
-	if rtype == "A" {
-		if val, ok := rg.As[name]; ok {
-			// check if A record already exists
-			// identical tasks on same slave
-			for _, b := range val {
-				if b == host {
-					return
-				}
-			}
-			rg.As[name] = append(val, host)
-		} else {
-			rg.As[name] = []string{host}
-		}
-	} else {
-		if val, ok := rg.SRVs[name]; ok {
-			// check if SRV record already exists
-			for _, b := range val {
-				if b == host {
-					return
-				}
-			}
-			rg.SRVs[name] = append(val, host)
-		} else {
-			rg.SRVs[name] = []string{host}
-		}
+	switch rtype {
+	case "A":
+		rg.AddA(name, host)
+	case "SRV":
+		rg.AddSRV(name, host)
+	default:
+		panic(fmt.Sprintf("unexpected record type: %q", rtype))
 	}
 }
 

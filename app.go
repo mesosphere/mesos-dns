@@ -51,12 +51,21 @@ func (c *app) Done() <-chan struct{} {
 }
 
 // implements plugin.Resolver interface, panics if invoked outside of initialization process
-func (c *app) OnReload(r plugins.Reloader) {
+func (c *app) OnPreload(r plugins.Reloader) {
 	select {
 	case <-c.ready:
-		panic("cannot OnReload after initialization has completed")
+		panic("cannot OnPreload after initialization has completed")
 	default:
-		c.resolver.OnReload(resolver.Reloader(r))
+		c.resolver.OnPreload(resolver.RecordLoader(r))
+	}
+}
+
+func (c *app) OnPostload(r plugins.Reloader) {
+	select {
+	case <-c.ready:
+		panic("cannot OnPostload after initialization has completed")
+	default:
+		c.resolver.OnPostload(resolver.RecordLoader(r))
 	}
 }
 
