@@ -3,8 +3,6 @@ package main
 import (
 	"time"
 
-	"github.com/emicklei/go-restful"
-	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/plugins"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/records/config"
@@ -25,13 +23,6 @@ type app struct {
 	done         chan struct{} // when closed, indicates that run has completed
 	errHandler   errorHandlerFunc
 	recordConfig *config.RecordConfig
-	onPreload    func(config.RecordLoader)
-	onPostload   func(config.RecordLoader)
-}
-
-type pluginContext struct {
-	*app
-	pluginName string
 }
 
 func newApp(eh errorHandlerFunc) *app {
@@ -42,74 +33,6 @@ func newApp(eh errorHandlerFunc) *app {
 	}
 	c.initialize()
 	return c
-}
-
-func (c *app) Events() plugins.RecordEvents {
-	return c
-}
-
-func (c *app) Done() <-chan struct{} {
-	// clients that use this chan will block until run completes
-	return c.done
-}
-
-// implements plugin.RecordEvents interface, panics if invoked outside of initialization process
-func (c *app) OnPreload(r plugins.RecordLoader) {
-	select {
-	case <-c.ready:
-		panic("cannot OnPreload after initialization has completed")
-	default:
-		c.onPreload(config.RecordLoader(r))
-	}
-}
-
-func (c *app) OnPostload(r plugins.RecordLoader) {
-	select {
-	case <-c.ready:
-		panic("cannot OnPostload after initialization has completed")
-	default:
-		c.onPostload(config.RecordLoader(r))
-	}
-}
-
-func (c *app) AddFilter(f plugins.Filter) {
-	select {
-	case <-c.ready:
-		panic("cannot AddFilter after initialization has completed")
-	default:
-	}
-	if f != nil {
-		c.filters = append(c.filters, f)
-	}
-}
-
-func (c *app) RegisterSource(source string) chan<- interface{} {
-	select {
-	case <-c.ready:
-		panic("cannot RegisterSource after initialization has completed")
-	default:
-		return c.recordConfig.Channel(source)
-	}
-}
-
-func (c *app) RegisterWS(ws *restful.WebService) {
-	select {
-	case <-c.ready:
-		panic("cannot RegisterWS after initialization has completed")
-	default:
-		restful.Add(ws)
-	}
-}
-
-// return a clone of the global configuration, minus any plugin-specific JSON
-func (c *app) Config() *records.Config {
-	cfg := c.config
-	cfg.Plugins = nil
-	cfg.Masters = make([]string, len(c.config.Masters))
-	copy(cfg.Masters, c.config.Masters)
-	cfg.Resolvers = make([]string, len(c.config.Resolvers))
-	copy(cfg.Resolvers, c.config.Resolvers)
-	return &cfg
 }
 
 func (c *app) initialize() {
@@ -124,53 +47,20 @@ func (c *app) initialize() {
 	c.resolver = resolver.New(version, c.config)
 
 	c.recordConfig = config.New(config.RecordConfigNotificationSnapshotAndUpdates)
-
 	masterSource := config.NewSourceMaster(c.config, c.errHandler, c.recordConfig.Channel(records.MasterSource))
-	c.onPreload = masterSource.OnPreload
-	c.onPostload = masterSource.OnPostload
+	pctx := newPluginContext(c, masterSource)
 
 	// launch http plugin first, so that we claim the endpoint namespace that we want
 	if c.config.HttpOn {
-		c.launchPlugin("HTTP server", resolver.NewAPIPlugin(c.resolver))
+		pctx.launchPlugin("HTTP server", resolver.NewAPIPlugin(c.resolver))
 	}
 
-	// launch third-party plugins
-	for _, pconfig := range c.config.Plugins {
-		pluginName := pconfig.Name
-		if pluginName == "" {
-			logging.Error.Printf("failed to register plugin with empty name")
-			continue
-		}
-		plugin, err := plugins.New(pluginName, pconfig.Settings)
-		if err != nil {
-			logging.Error.Printf("failed to create plugin: %v", err)
-			continue
-		}
-		c.launchPlugin(pluginName, plugin)
-	}
+	pctx.initAddonPlugins()
 
 	// this is launched last because other plugins may have registered filters
 	if c.config.DnsOn {
-		c.launchPlugin("DNS server", resolver.NewDNSPlugin(c.resolver, c.filters.Apply))
+		pctx.launchPlugin("DNS server", resolver.NewDNSPlugin(c.resolver, c.filters.Apply))
 	}
-}
-
-func (c *app) launchPlugin(pluginName string, plugin plugins.Plugin) {
-	logging.Verbose.Printf("starting plugin %q", pluginName)
-	pctx := &pluginContext{pluginName: pluginName, app: c}
-	if errCh := plugin.Start(pctx); errCh != nil {
-		go func() {
-			for err := range errCh {
-				c.errHandler(pluginName, err)
-			}
-		}()
-	}
-	go func() {
-		select {
-		case <-plugin.Done():
-			logging.Verbose.Printf("plugin %q terminated", pluginName)
-		}
-	}()
 }
 
 func (c *app) run() {
@@ -185,6 +75,9 @@ func (c *app) run() {
 	default:
 		panic("cannot run, not yet initialized")
 	}
+
+	//TODO(jdef) we probably want to wait for plugin teardown upon this method returning, and
+	//then exit gracefully. ala OnSignal(c.done, c.pluginWaitGroup.Wait()).Then(func() { os.Exit(0) })
 
 	// block until the updates chan is closed
 	c.resolver.Run(c.recordConfig.Updates())
