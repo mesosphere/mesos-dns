@@ -163,6 +163,75 @@ func (s *recordStorage) Merge(source string, change interface{}) error {
 	return nil
 }
 
+func mergeAddUpdate(sourceRecords *records.RecordSet, addUpdateEvent, adds, updates *records.Update) {
+	addUpdate := func(eventRRS records.RRS, sourceRRS, addsRRS, updatesRRS *records.RRS) {
+		for name, ref := range eventRRS {
+			if existing, found := (*sourceRRS).Get(name); found {
+				if !reflect.DeepEqual(existing, ref) {
+					// this is an update
+					records.Put(sourceRRS, name, ref)
+					records.Put(updatesRRS, name, ref)
+					continue
+				}
+				// this is a no-op
+				continue
+			}
+			records.Put(sourceRRS, name, ref)
+			records.Put(addsRRS, name, ref)
+		}
+	}
+	addUpdate(addUpdateEvent.Records.As, &sourceRecords.As, &adds.Records.As, &updates.Records.As)
+	addUpdate(addUpdateEvent.Records.SRVs, &sourceRecords.SRVs, &adds.Records.SRVs, &updates.Records.SRVs)
+}
+
+func mergeRemove(sourceRecords *records.RecordSet, removeEvent, deletes *records.Update) {
+	deleteFn := func(eventRRS, sourceRRS records.RRS, deletesRRS *records.RRS) {
+		for name, _ := range eventRRS {
+			if existing, found := sourceRRS.Get(name); found {
+				// this is a delete
+				sourceRRS.Delete(name)
+				records.Put(deletesRRS, name, existing)
+				continue
+			}
+			// this is a no-op
+		}
+	}
+	deleteFn(removeEvent.Records.As, sourceRecords.As, &deletes.Records.As)
+	deleteFn(removeEvent.Records.SRVs, sourceRecords.SRVs, &deletes.Records.SRVs)
+}
+
+func mergeSet(sourceRecords *records.RecordSet, setEvent, adds, updates, deletes *records.Update) {
+	addUpdateDelete := func(eventRRS records.RRS, sourceRRS, addsRRS, updatesRRS, deletesRRS *records.RRS) {
+		// Clear the old entries
+		old := *sourceRRS
+		*sourceRRS = nil
+
+		for name, ref := range eventRRS {
+			if existing, found := old.Get(name); found {
+				records.Put(sourceRRS, name, existing)
+				if !reflect.DeepEqual(existing, ref) {
+					// this is an update
+					records.Put(sourceRRS, name, ref)
+					records.Put(updatesRRS, name, ref)
+					continue
+				}
+				// this is a no-op
+				continue
+			}
+			records.Put(sourceRRS, name, ref)
+			records.Put(addsRRS, name, ref)
+		}
+		for name, existing := range old {
+			if _, found := (*sourceRRS).Get(name); !found {
+				// this is a delete
+				records.Put(deletesRRS, name, existing)
+			}
+		}
+	}
+	addUpdateDelete(setEvent.Records.As, &sourceRecords.As, &adds.Records.As, &updates.Records.As, &deletes.Records.As)
+	addUpdateDelete(setEvent.Records.SRVs, &sourceRecords.SRVs, &adds.Records.SRVs, &updates.Records.SRVs, &deletes.Records.SRVs)
+}
+
 func (s *recordStorage) merge(source string, change interface{}) (adds, updates, deletes *records.Update) {
 	s.recordLock.Lock()
 	defer s.recordLock.Unlock()
@@ -171,9 +240,9 @@ func (s *recordStorage) merge(source string, change interface{}) (adds, updates,
 	updates = &records.Update{Op: records.UPDATE}
 	deletes = &records.Update{Op: records.REMOVE}
 
-	recordSets := s.records[source]
-	if recordSets == nil {
-		recordSets = &records.RecordSet{}
+	sourceRecords := s.records[source]
+	if sourceRecords == nil {
+		sourceRecords = &records.RecordSet{}
 	}
 
 	update := change.(records.Update)
@@ -188,121 +257,27 @@ func (s *recordStorage) merge(source string, change interface{}) (adds, updates,
 		//TODO(jdef) reinstitute this at some point
 		//filtered := filterInvalidRecords(update.Records, source)
 
-		for name, ref := range update.Records.As {
-			if existing, found := recordSets.As.Get(name); found {
-				if !reflect.DeepEqual(existing, ref) {
-					// this is an update
-					existing = ref
-					update.Records.As = update.Records.As.Put(name, existing)
-					continue
-				}
-				// this is a no-op
-				continue
-			}
-			recordSets.As = recordSets.As.Put(name, ref)
-			adds.Records.As = adds.Records.As.Put(name, ref)
-		}
-		for name, ref := range update.Records.SRVs {
-			if existing, found := recordSets.SRVs.Get(name); found {
-				if !reflect.DeepEqual(existing, ref) {
-					// this is an update
-					existing = ref
-					update.Records.SRVs = update.Records.SRVs.Put(name, existing)
-					continue
-				}
-				// this is a no-op
-				continue
-			}
-			recordSets.SRVs = recordSets.SRVs.Put(name, ref)
-			adds.Records.SRVs = adds.Records.SRVs.Put(name, ref)
-		}
+		mergeAddUpdate(sourceRecords, &update, adds, updates)
 
 	case records.REMOVE:
 		logging.VeryVerbose.Printf("Removing records %v", update)
-		for name, _ := range update.Records.As {
-			if existing, found := recordSets.As.Get(name); found {
-				// this is a delete
-				recordSets.As.Delete(name)
-				deletes.Records.As = deletes.Records.As.Put(name, existing)
-				continue
-			}
-			// this is a no-op
-		}
-		for name, _ := range update.Records.SRVs {
-			if existing, found := recordSets.SRVs.Get(name); found {
-				// this is a delete
-				recordSets.SRVs.Delete(name)
-				deletes.Records.SRVs = deletes.Records.SRVs.Put(name, existing)
-				continue
-			}
-			// this is a no-op
-		}
+		mergeRemove(sourceRecords, &update, deletes)
 
 	case records.SET:
 		logging.VeryVerbose.Printf("Setting records for source %s : %v", source, update)
 		s.markSourceSet(source)
 
-		// Clear the old entries
-		oldAs := recordSets.As
-		recordSets.As = nil
-
 		//TODO(jdef) reinstitute this at some point
 		//filtered := filterInvalidRecords(update.RecordSets, source)
 
-		for name, ref := range update.Records.As {
-			if existing, found := oldAs.Get(name); found {
-				recordSets.As.Put(name, existing)
-				if !reflect.DeepEqual(existing, ref) {
-					// this is an update
-					existing = ref
-					updates.Records.As = updates.Records.As.Put(name, existing)
-					continue
-				}
-				// this is a no-op
-				continue
-			}
-			recordSets.As = recordSets.As.Put(name, ref)
-			adds.Records.As = adds.Records.As.Put(name, ref)
-		}
-		for name, existing := range oldAs {
-			if _, found := recordSets.As.Get(name); !found {
-				// this is a delete
-				deletes.Records.As = deletes.Records.As.Put(name, existing)
-			}
-		}
-
-		// Clear the old entries
-		oldSRVs := recordSets.SRVs
-		recordSets.SRVs = nil
-
-		for name, ref := range update.Records.SRVs {
-			if existing, found := oldSRVs.Get(name); found {
-				recordSets.SRVs.Put(name, existing)
-				if !reflect.DeepEqual(existing, ref) {
-					// this is an update
-					existing = ref
-					updates.Records.SRVs = updates.Records.SRVs.Put(name, existing)
-					continue
-				}
-				// this is a no-op
-				continue
-			}
-			recordSets.SRVs = recordSets.SRVs.Put(name, ref)
-			adds.Records.SRVs = adds.Records.SRVs.Put(name, ref)
-		}
-		for name, existing := range oldSRVs {
-			if _, found := recordSets.SRVs.Get(name); !found {
-				// this is a delete
-				deletes.Records.SRVs = deletes.Records.SRVs.Put(name, existing)
-			}
-		}
+		s.markSourceSet(source)
+		mergeSet(sourceRecords, &update, adds, updates, deletes)
 
 	default:
 		logging.Error.Printf("Received invalid update type: %v", update)
-
 	}
 
-	s.records[source] = recordSets
+	s.records[source] = sourceRecords
 	return adds, updates, deletes
 }
 
@@ -333,12 +308,10 @@ func (s *recordStorage) MergedState() interface{} {
 	recordSet := &records.RecordSet{}
 	for _, sourceRecords := range s.records {
 		for name, recordRef := range sourceRecords.As {
-			ans := recordRef.Clone()
-			recordSet.As = recordSet.As.Put(name, ans)
+			recordSet.As = recordSet.As.Put(name, recordRef)
 		}
 		for name, recordRef := range sourceRecords.SRVs {
-			ans := recordRef.Clone()
-			recordSet.SRVs = recordSet.SRVs.Put(name, ans)
+			recordSet.SRVs = recordSet.SRVs.Put(name, recordRef)
 		}
 	}
 	return recordSet

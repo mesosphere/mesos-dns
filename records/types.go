@@ -44,6 +44,11 @@ func (rrs RRS) Delete(name string) {
 	delete(rrs, name)
 }
 
+func Put(rrs *RRS, name string, ans Answer) {
+	x := (*rrs).Put(name, ans)
+	*rrs = x
+}
+
 func (rs *RecordSet) Size() int {
 	if rs == nil {
 		return 0
