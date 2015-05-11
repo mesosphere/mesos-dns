@@ -85,13 +85,20 @@ func (p *DNSPlugin) Done() <-chan struct{} {
 // starts a DNS server for net protocol (tcp/udp), returns immediately.
 // the returned signal chan is closed upon the server successfully entering the listening phase.
 // if the server aborts then an error is sent on the error chan.
-func (p *DNSPlugin) serveDNS(net string) (<-chan struct{}, <-chan error) {
+func (p *DNSPlugin) serveDNS(proto string) (<-chan struct{}, <-chan error) {
 	defer util.HandleCrash()
 
+	var address string
+	portString := strconv.Itoa(p.config.Port)
+	if p.config.Listener != "" {
+		address = net.JoinHostPort(p.config.Listener, portString)
+	} else {
+		address = ":" + portString
+	}
 	ch := make(chan struct{})
 	server := &dns.Server{
-		Addr:              p.config.Listener + ":" + strconv.Itoa(p.config.Port),
-		Net:               net,
+		Addr:              address,
+		Net:               proto,
 		TsigSecret:        nil,
 		NotifyStartedFunc: func() { close(ch) },
 	}
@@ -101,7 +108,7 @@ func (p *DNSPlugin) serveDNS(net string) (<-chan struct{}, <-chan error) {
 		defer close(errCh)
 		err := server.ListenAndServe()
 		if err != nil {
-			errCh <- fmt.Errorf("Failed to setup %q server: %v", net, err)
+			errCh <- fmt.Errorf("Failed to setup %q server: %v", proto, err)
 		} else {
 			logging.Error.Printf("Not listening/serving any more requests.")
 		}

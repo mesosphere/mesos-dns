@@ -52,7 +52,7 @@ func (api *APIPlugin) Start(ctx plugins.InitialContext) <-chan error {
 	ctx.RegisterWS(api.ws)
 	api.config = ctx.Config()
 
-	portString := ":" + strconv.Itoa(api.config.HttpPort)
+	portString := strconv.Itoa(api.config.HttpPort)
 	errCh := make(chan error, 1)
 	go func() {
 		select {
@@ -65,7 +65,13 @@ func (api *APIPlugin) Start(ctx plugins.InitialContext) <-chan error {
 		var err error
 		defer func() { errCh <- err }()
 
-		if err = http.ListenAndServe(portString, nil); err != nil {
+		var address string
+		if api.config.Listener != "" {
+			address = net.JoinHostPort(api.config.Listener, portString)
+		} else {
+			address = ":" + portString
+		}
+		if err = http.ListenAndServe(address, nil); err != nil {
 			err = fmt.Errorf("Failed to setup http server: %v", err)
 		} else {
 			logging.Error.Println("Not serving http requests any more.")
