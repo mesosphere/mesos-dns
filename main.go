@@ -32,7 +32,8 @@ func main() {
 	// initialize logging
 	logging.SetupLogs()
 
-	// print error and terminate
+	// print error and terminate.
+	// TODO(jdef) this doesn't allow plugins to gracefully terminate
 	eh := func(name string, err error) {
 		if err != nil {
 			logging.Error.Fatalf("%s failed: %v", name, err)

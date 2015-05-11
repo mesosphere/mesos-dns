@@ -50,9 +50,11 @@ type InitialContext interface {
 	// Register the given plugin REST web service
 	RegisterWS(*restful.WebService)
 
+	// Register a records source plugin
 	RegisterSource(source string) chan<- interface{}
 
-	// Return a signal chan that closes when the server enters shutdown mode.
+	// Return a signal chan that closes when the server enters shutdown mode. Plugins
+	// can react to this by performing cleanup operations before the server terminates.
 	Done() <-chan struct{}
 }
 
