@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mesosphere/mesos-dns/logging"
@@ -120,7 +121,7 @@ func (res *Resolver) updateRecords(u records.Update) {
 		panic("updateRecords does not support incremental changes")
 	}
 	timestamp := uint32(time.Now().Unix())
-	res.config.SOASerial = timestamp // TODO(jdef) data race, unprotected read access happens in other places
+	atomic.StoreUint32(&res.config.SOASerial, timestamp)
 }
 
 func applyUpdates(changed, current *records.RecordSet) *records.RecordSet {
@@ -244,7 +245,7 @@ func (res *Resolver) formatSOA(dom string) (*dns.SOA, error) {
 		},
 		Ns:      res.config.SOARname,
 		Mbox:    res.config.SOAMname,
-		Serial:  res.config.SOASerial,
+		Serial:  atomic.LoadUint32(&res.config.SOASerial),
 		Refresh: res.config.SOARefresh,
 		Retry:   res.config.SOARetry,
 		Expire:  res.config.SOAExpire,
