@@ -16,18 +16,23 @@ import (
 	"github.com/mesosphere/mesos-dns/util"
 )
 
+type httpResolverInterface interface {
+	records() *records.RecordSet
+	getVersion() string
+}
+
 // HTTP API resolver plugin
 type APIPlugin struct {
-	res    *Resolver
+	httpi  httpResolverInterface
 	ws     *restful.WebService
 	config *records.Config
 	done   chan struct{}
 }
 
-func NewAPIPlugin(res *Resolver) *APIPlugin {
+func NewAPIPlugin(httpi httpResolverInterface) *APIPlugin {
 	api := &APIPlugin{
-		res:  res,
-		done: make(chan struct{}),
+		httpi: httpi,
+		done:  make(chan struct{}),
 	}
 	// webserver + available routes
 	ws := new(restful.WebService)
@@ -90,7 +95,7 @@ func (api *APIPlugin) RestConfig(req *restful.Request, resp *restful.Response) {
 // Reports Mesos-DNS version through REST interface
 func (api *APIPlugin) RestVersion(req *restful.Request, resp *restful.Response) {
 	mapV := map[string]string{"Service": "Mesos-DNS",
-		"Version": api.res.version,
+		"Version": api.httpi.getVersion(),
 		"URL":     "https://github.com/mesosphere/mesos-dns"}
 	output, err := json.Marshal(mapV)
 	if err != nil {
@@ -110,7 +115,7 @@ func (api *APIPlugin) RestHost(req *restful.Request, resp *restful.Response) {
 	}
 
 	mapH := make([]map[string]string, 0)
-	rs := api.res.records()
+	rs := api.httpi.records()
 
 	for _, ip := range rs.As[dom] {
 		t := map[string]string{"host": dom, "ip": ip}
@@ -163,7 +168,7 @@ func (api *APIPlugin) RestService(req *restful.Request, resp *restful.Response) 
 	}
 
 	mapS := make([]map[string]string, 0)
-	rs := api.res.records()
+	rs := api.httpi.records()
 
 	for _, srv := range rs.SRVs[dom] {
 		h, port, _ := net.SplitHostPort(srv)
