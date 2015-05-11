@@ -66,20 +66,24 @@ func (res *Resolver) syncLoop(updates <-chan records.Update) {
 }
 
 func (res *Resolver) updateRecords(u records.Update) {
-	res.rsLock.Lock()
-	defer res.rsLock.Unlock()
+	var rs *records.RecordSet
 	switch u.Op {
 	case records.SET:
 		logging.Verbose.Println("SET: records changed")
-		res.rs = &u.Records
+		rs = &u.Records
 	case records.UPDATE:
 		logging.Verbose.Println("UPDATE: records changed")
-		res.rs = applyUpdates(&u.Records, res.rs)
+		rs = applyUpdates(&u.Records, res.rs)
 	default:
 		panic("updateRecords does not support incremental changes")
 	}
+
 	timestamp := uint32(time.Now().Unix())
 	atomic.StoreUint32(&res.config.SOASerial, timestamp)
+
+	res.rsLock.Lock()
+	defer res.rsLock.Unlock()
+	res.rs = rs
 }
 
 func (res *Resolver) getSOASerial() uint32 {
@@ -87,24 +91,19 @@ func (res *Resolver) getSOASerial() uint32 {
 }
 
 func applyUpdates(changed, current *records.RecordSet) *records.RecordSet {
-	updated := &records.RecordSet{}
-	for name, currentAns := range current.As {
-		if ans, found := changed.As.Get(name); found {
-			updated.As = updated.As.Put(name, ans)
-			logging.VeryVerbose.Printf("record named %q has a new spec %+v", name, ans)
-		} else {
-			updated.As = updated.As.Put(name, currentAns)
-			logging.VeryVerbose.Printf("record named %q stay with the same spec %+v", name, currentAns)
+	updated := records.RecordSet{}
+	updateFn := func(currentRRS, changedRRS records.RRS, updatesRRS *records.RRS) {
+		for name, currentAns := range currentRRS {
+			if ans, found := changedRRS.Get(name); found {
+				records.Put(updatesRRS, name, ans)
+				logging.VeryVerbose.Printf("record named %q has a new spec %+v", name, ans)
+			} else {
+				records.Put(updatesRRS, name, currentAns)
+				logging.VeryVerbose.Printf("record named %q stay with the same spec %+v", name, currentAns)
+			}
 		}
 	}
-	for name, currentAns := range current.SRVs {
-		if ans, found := changed.SRVs.Get(name); found {
-			updated.SRVs = updated.SRVs.Put(name, ans)
-			logging.VeryVerbose.Printf("record named %q has a new spec %+v", name, ans)
-		} else {
-			updated.SRVs = updated.SRVs.Put(name, currentAns)
-			logging.VeryVerbose.Printf("record named %q stay with the same spec %+v", name, currentAns)
-		}
-	}
-	return updated
+	updateFn(current.As, changed.As, &updated.As)
+	updateFn(current.SRVs, changed.SRVs, &updated.SRVs)
+	return &updated
 }
