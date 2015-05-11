@@ -67,16 +67,6 @@ func (c *RecordConfig) Channel(source string) chan<- interface{} {
 	return c.mux.Channel(source)
 }
 
-// SeenAllSources returns true if this config has received a SET
-// message from all configured sources, false otherwise.
-func (c *RecordConfig) SeenAllSources() bool {
-	if c.records == nil {
-		return false
-	}
-	logging.VeryVerbose.Printf("Looking for %v, have seen %v", c.sources.List(), c.records.sourcesSeen)
-	return c.records.seenSources(c.sources.List()...)
-}
-
 // Updates returns a channel of updates to the configuration, properly denormalized.
 func (c *RecordConfig) Updates() <-chan records.Update {
 	return c.updates
@@ -101,10 +91,6 @@ type recordStorage struct {
 	// on the updates channel
 	updateLock sync.Mutex
 	updates    chan<- records.Update
-
-	// contains the set of all sources that have sent at least one SET
-	sourcesSeenLock sync.Mutex
-	sourcesSeen     util.StringSet
 }
 
 // TODO: RecordConfigNotificationMode could be handled by a listener to the updates channel
@@ -112,10 +98,9 @@ type recordStorage struct {
 // TODO: allow initialization of the current state of the store with snapshotted version.
 func newRecordStorage(updates chan<- records.Update, mode RecordConfigNotificationMode) *recordStorage {
 	return &recordStorage{
-		records:     make(map[string]*records.RecordSet),
-		mode:        mode,
-		updates:     updates,
-		sourcesSeen: util.StringSet{},
+		records: make(map[string]*records.RecordSet),
+		mode:    mode,
+		updates: updates,
 	}
 }
 
@@ -265,12 +250,10 @@ func (s *recordStorage) merge(source string, change interface{}) (adds, updates,
 
 	case records.SET:
 		logging.VeryVerbose.Printf("Setting records for source %s : %v", source, update)
-		s.markSourceSet(source)
 
 		//TODO(jdef) reinstitute this at some point
 		//filtered := filterInvalidRecords(update.RecordSets, source)
 
-		s.markSourceSet(source)
 		mergeSet(sourceRecords, &update, adds, updates, deletes)
 
 	default:
@@ -279,18 +262,6 @@ func (s *recordStorage) merge(source string, change interface{}) (adds, updates,
 
 	s.records[source] = sourceRecords
 	return adds, updates, deletes
-}
-
-func (s *recordStorage) markSourceSet(source string) {
-	s.sourcesSeenLock.Lock()
-	defer s.sourcesSeenLock.Unlock()
-	s.sourcesSeen.Insert(source)
-}
-
-func (s *recordStorage) seenSources(sources ...string) bool {
-	s.sourcesSeenLock.Lock()
-	defer s.sourcesSeenLock.Unlock()
-	return s.sourcesSeen.HasAll(sources...)
 }
 
 // Sync sends a copy of the current state through the update channel.
