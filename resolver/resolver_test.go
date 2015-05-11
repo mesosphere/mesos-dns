@@ -34,13 +34,14 @@ func TestCleanWild(t *testing.T) {
 }
 
 func TestShuffleAnswers(t *testing.T) {
-	var res Resolver
+	var pl DNSPlugin
+	pl.config = &records.Config{}
 
 	m := new(dns.Msg)
 
 	for i := 0; i < 10; i++ {
 		name := "10.0.0." + strconv.Itoa(i)
-		rr, err := res.formatA("blah.com", name)
+		rr, err := pl.formatA("blah.com", name)
 		if err != nil {
 			t.Error(err)
 		}
@@ -152,16 +153,22 @@ func onSignal(abort <-chan struct{}, s <-chan struct{}, f func()) {
 }
 
 // start TCP and UDP DNS servers and block, waiting for the server listeners to come up before returning
-func safeStartDNSResolver(t *testing.T, res *Resolver) {
+func safeStartDNSPlugin(t *testing.T, res *Resolver, initf func(*DNSPlugin)) {
 	var abortOnce sync.Once
 	abort := make(chan struct{})
 	doAbort := func() {
+		t.Logf("aborting..")
 		abortOnce.Do(func() { close(abort) })
 	}
 
-	s1, e := res.Serve("udp")
+	pl := NewDNSPlugin(res, func(h dns.Handler) dns.Handler { return h })
+	if initf != nil {
+		pl.config = &res.config
+		initf(pl)
+	}
+	s1, e := pl.serveDNS("udp")
 	f1 := util.OnError(abort, e, func(err error) { t.Fatalf("udp server failed: %v", err) })
-	s2, e := res.Serve("tcp")
+	s2, e := pl.serveDNS("tcp")
 	f2 := util.OnError(abort, e, func(err error) { t.Fatalf("tcp server failed: %v", err) })
 
 	var wg sync.WaitGroup
@@ -184,8 +191,9 @@ func TestHandler(t *testing.T) {
 		t.Error(err)
 	}
 
-	dns.HandleFunc("mesos.", res.HandleMesos)
-	safeStartDNSResolver(t, res)
+	safeStartDNSPlugin(t, res, func(pl *DNSPlugin) {
+		dns.HandleFunc("mesos.", pl.handleMesos)
+	})
 
 	// test A records
 	msg, err = fakeQuery("chronos.marathon.mesos.", dns.TypeA, "udp", port)
@@ -221,7 +229,7 @@ func TestHandler(t *testing.T) {
 	// test SOA
 	m, err := fakeMsg("non-existing.mesos.", dns.TypeSOA, "udp", port)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	if m.Ns == nil {
@@ -284,28 +292,28 @@ func TestNonMesosHandler(t *testing.T) {
 
 	const port = 8054
 	res, err := fakeDNS(port)
-	res.extResolver = func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
-		t.Logf("ext-resolver: r=%v, nameserver=%s, proto=%s, cnt=%d", r, nameserver, proto, cnt)
-		rr1, err := res.formatA("google.com.", "1.1.1.1")
+	safeStartDNSPlugin(t, res, func(pl *DNSPlugin) {
+		pl.extResolver = func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
+			t.Logf("ext-resolver: r=%v, nameserver=%s, proto=%s, cnt=%d", r, nameserver, proto, cnt)
+			rr1, err := pl.formatA("google.com.", "1.1.1.1")
+			if err != nil {
+				return nil, err
+			}
+			rr2, err := pl.formatA("google.com.", "2.2.2.2")
+			if err != nil {
+				return nil, err
+			}
+			msg := &dns.Msg{
+				Answer: []dns.RR{rr1, rr2},
+			}
+			msg.SetReply(r)
+			return msg, nil
+		}
 		if err != nil {
-			return nil, err
+			t.Error(err)
 		}
-		rr2, err := res.formatA("google.com.", "2.2.2.2")
-		if err != nil {
-			return nil, err
-		}
-		msg := &dns.Msg{
-			Answer: []dns.RR{rr1, rr2},
-		}
-		msg.SetReply(r)
-		return msg, nil
-	}
-	if err != nil {
-		t.Error(err)
-	}
-
-	dns.HandleFunc(".", res.HandleNonMesos)
-	safeStartDNSResolver(t, res)
+		dns.HandleFunc(".", pl.handleNonMesos)
+	})
 
 	// test A records
 	msg, err = fakeQuery("google.com", dns.TypeA, "udp", port)

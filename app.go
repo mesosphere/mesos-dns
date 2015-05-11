@@ -129,7 +129,7 @@ func (c *app) initialize() {
 	c.onPreload = masterSource.OnPreload
 	c.onPostload = masterSource.OnPostload
 
-	// launch built-in plugins
+	// launch http plugin first, so that we claim the endpoint namespace that we want
 	if c.config.HttpOn {
 		c.launchPlugin("HTTP server", resolver.NewAPIPlugin(c.resolver))
 	}
@@ -147,6 +147,11 @@ func (c *app) initialize() {
 			continue
 		}
 		c.launchPlugin(pluginName, plugin)
+	}
+
+	// this is launched last because other plugins may have registered filters
+	if c.config.DnsOn {
+		c.launchPlugin("DNS server", resolver.NewDNSPlugin(c.resolver, c.filters.Apply))
 	}
 }
 
@@ -168,13 +173,6 @@ func (c *app) launchPlugin(pluginName string, plugin plugins.Plugin) {
 	}()
 }
 
-func launchServer(enabled bool, f func() <-chan error) (errCh <-chan error) {
-	if enabled {
-		errCh = f()
-	}
-	return
-}
-
 func (c *app) run() {
 	select {
 	case <-c.ready:
@@ -188,18 +186,6 @@ func (c *app) run() {
 		panic("cannot run, not yet initialized")
 	}
 
-	// launch DNS server procs
-	//TODO(jdef) make DNS a plugin
-	dnsErr := launchServer(c.config.DnsOn, func() <-chan error {
-		return c.resolver.LaunchDNS(c.filters.Apply)
-	})
-	if dnsErr != nil {
-		go func() {
-			for err := range dnsErr {
-				c.errHandler("DNS server", err)
-			}
-		}()
-	}
-
+	// block until the updates chan is closed
 	c.resolver.Run(c.recordConfig.Updates())
 }
