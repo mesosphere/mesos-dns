@@ -17,18 +17,12 @@ import (
 	"github.com/mesosphere/mesos-dns/records/labels"
 )
 
-// Map host/service name to DNS answer
-// REFACTOR - when discoveryinfo is integrated
-// Will likely become map[string][]discoveryinfo
-type rrs map[string][]string
-
 type TaskRecordGeneratorFn func(task *Task, frameworkName, slaveHost, domain string)
 
 // Mesos-DNS state
 // Refactor when discovery id is available
 type RecordGenerator struct {
-	As     rrs
-	SRVs   rrs
+	RecordSet
 	Slaves map[string]string
 	TaskRecordGeneratorFn
 }
@@ -238,8 +232,8 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 		rg.Slaves[slave.Id] = sanitizedSlaveAddress(slave.Hostname)
 	}
 
-	rg.SRVs = make(rrs)
-	rg.As = make(rrs)
+	rg.SRVs = make(RRS)
+	rg.As = make(RRS)
 
 	trecGenerator := rg.TaskRecordGeneratorFn
 	if trecGenerator == nil {

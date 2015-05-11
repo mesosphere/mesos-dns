@@ -7,8 +7,8 @@ import (
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/plugins"
 	"github.com/mesosphere/mesos-dns/records"
+	"github.com/mesosphere/mesos-dns/records/config"
 	"github.com/mesosphere/mesos-dns/resolver"
-	"github.com/mesosphere/mesos-dns/util"
 )
 
 const (
@@ -18,12 +18,15 @@ const (
 type errorHandlerFunc func(string, error)
 
 type app struct {
-	config     records.Config
-	resolver   *resolver.Resolver
-	filters    plugins.FilterSet
-	ready      chan struct{} // when closed, indicates that initialization has completed
-	done       chan struct{} // when closed, indicates that run has completed
-	errHandler errorHandlerFunc
+	config       records.Config
+	resolver     *resolver.Resolver
+	filters      plugins.FilterSet
+	ready        chan struct{} // when closed, indicates that initialization has completed
+	done         chan struct{} // when closed, indicates that run has completed
+	errHandler   errorHandlerFunc
+	recordConfig *config.RecordConfig
+	onPreload    func(config.RecordLoader)
+	onPostload   func(config.RecordLoader)
 }
 
 type pluginContext struct {
@@ -56,7 +59,7 @@ func (c *app) OnPreload(r plugins.Reloader) {
 	case <-c.ready:
 		panic("cannot OnPreload after initialization has completed")
 	default:
-		c.resolver.OnPreload(resolver.RecordLoader(r))
+		c.onPreload(config.RecordLoader(r))
 	}
 }
 
@@ -65,7 +68,7 @@ func (c *app) OnPostload(r plugins.Reloader) {
 	case <-c.ready:
 		panic("cannot OnPostload after initialization has completed")
 	default:
-		c.resolver.OnPostload(resolver.RecordLoader(r))
+		c.onPostload(config.RecordLoader(r))
 	}
 }
 
@@ -77,6 +80,15 @@ func (c *app) AddFilter(f plugins.Filter) {
 	}
 	if f != nil {
 		c.filters = append(c.filters, f)
+	}
+}
+
+func (c *app) RegisterSource(source string) chan<- interface{} {
+	select {
+	case <-c.ready:
+		panic("cannot RegisterSource after initialization has completed")
+	default:
+		return c.recordConfig.Channel(source)
 	}
 }
 
@@ -110,6 +122,12 @@ func (c *app) initialize() {
 
 	c.config = records.SetConfig(*cjson)
 	c.resolver = resolver.New(version, c.config)
+
+	c.recordConfig = config.New(config.RecordConfigNotificationSnapshotAndUpdates)
+
+	masterSource := config.NewSourceMaster(c.config, c.errHandler, c.recordConfig.Channel(records.MasterSource))
+	c.onPreload = masterSource.OnPreload
+	c.onPostload = masterSource.OnPostload
 
 	// launch built-in plugins
 	if c.config.HttpOn {
@@ -157,46 +175,6 @@ func launchServer(enabled bool, f func() <-chan error) (errCh <-chan error) {
 	return
 }
 
-// launch Zookeeper listener
-func (c *app) beginLeaderWatch() (newLeader <-chan struct{}, zkErr <-chan error) {
-	if c.config.Zk != "" {
-		newLeader, zkErr = c.resolver.LaunchZK(zkInitialDetectionTimeout)
-	} else {
-		// uniform behavior when new leader from masters field
-		leader := make(chan struct{}, 1)
-		leader <- struct{}{}
-		newLeader = leader
-	}
-	return
-}
-
-// periodically reload DNS records, either because the reload timer expired or else
-// because a caller invoked the tryReload func returned by this func.
-func (c *app) launchReloader() (tryReload func()) {
-	// generate reload signal; up to 1 reload pending at any time
-	reloadSignal := make(chan struct{}, 1)
-	tryReload = func() {
-		// non-blocking, attempt to queue a reload
-		select {
-		case reloadSignal <- struct{}{}:
-		default:
-		}
-	}
-
-	// periodic loading of DNS state (pull from Master)
-	go func() {
-		defer util.HandleCrash()
-		reloadTimeout := time.Second * time.Duration(c.config.RefreshSeconds)
-		reloadTimer := time.AfterFunc(reloadTimeout, tryReload)
-		for _ = range reloadSignal {
-			c.resolver.Reload()
-			logging.PrintCurLog()
-			reloadTimer.Reset(reloadTimeout)
-		}
-	}()
-	return
-}
-
 func (c *app) run() {
 	select {
 	case <-c.ready:
@@ -210,23 +188,18 @@ func (c *app) run() {
 		panic("cannot run, not yet initialized")
 	}
 
-	// launch async server procs
+	// launch DNS server procs
+	//TODO(jdef) make DNS a plugin
 	dnsErr := launchServer(c.config.DnsOn, func() <-chan error {
 		return c.resolver.LaunchDNS(c.filters.Apply)
 	})
-	newLeader, zkErr := c.beginLeaderWatch()
-	tryReload := c.launchReloader()
-
-	// infinite loop until there is fatal error
-	// TODO(jdef) it would be nice to extend error handling to plugins
-	for {
-		select {
-		case <-newLeader:
-			tryReload()
-		case err := <-dnsErr:
-			c.errHandler("DNS server", err)
-		case err := <-zkErr:
-			c.errHandler("ZK watcher", err)
-		}
+	if dnsErr != nil {
+		go func() {
+			for err := range dnsErr {
+				c.errHandler("DNS server", err)
+			}
+		}()
 	}
+
+	c.resolver.Run(c.recordConfig.Updates())
 }

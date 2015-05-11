@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+	"time"
 )
 
 // For testing, bypass HandleCrash.
@@ -51,4 +52,46 @@ func logPanic(r interface{}) {
 		callers = callers + fmt.Sprintf("%v:%v\n", file, line)
 	}
 	log.Printf("Recovered from panic: %#v (%v)\n%v", r, r, callers)
+}
+
+func Forever(f func(), period time.Duration) {
+	Until(f, period, nil)
+}
+
+// periodically execute the given function, stopping once stopCh is closed.
+// this func blocks until stopCh is closed, it's intended to be run as a goroutine.
+func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
+	if f == nil {
+		return
+	}
+	for {
+		select {
+		case <-stopCh:
+			return
+		default:
+		}
+		func() {
+			defer HandleCrash()
+			f()
+		}()
+		select {
+		case <-stopCh:
+		case <-time.After(period):
+		}
+	}
+}
+
+func OnError(abort <-chan struct{}, errCh <-chan error, f func(error)) <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		select {
+		case <-abort:
+		case e := <-errCh:
+			if e != nil {
+				defer close(ch)
+				f(e)
+			}
+		}
+	}()
+	return ch
 }

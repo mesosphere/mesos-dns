@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/emicklei/go-restful"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
+	"github.com/mesosphere/mesos-dns/util"
 	"github.com/miekg/dns"
 )
 
@@ -94,8 +94,9 @@ func fakeDNS(port int) (*Resolver, error) {
 	}
 
 	masters := []string{"144.76.157.37:5050"}
-	res.rs = &records.RecordGenerator{}
-	res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
+	rg := &records.RecordGenerator{}
+	rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
+	res.rs = &rg.RecordSet
 
 	return res, nil
 }
@@ -140,21 +141,6 @@ func identicalResults(msg_a []dns.RR, msg_b []dns.RR) bool {
 	return true
 }
 
-func onError(abort <-chan struct{}, errCh <-chan error, f func(error)) <-chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		select {
-		case <-abort:
-		case e := <-errCh:
-			if e != nil {
-				defer close(ch)
-				f(e)
-			}
-		}
-	}()
-	return ch
-}
-
 func onSignal(abort <-chan struct{}, s <-chan struct{}, f func()) {
 	go func() {
 		select {
@@ -174,9 +160,9 @@ func safeStartDNSResolver(t *testing.T, res *Resolver) {
 	}
 
 	s1, e := res.Serve("udp")
-	f1 := onError(abort, e, func(err error) { t.Fatalf("udp server failed: %v", err) })
+	f1 := util.OnError(abort, e, func(err error) { t.Fatalf("udp server failed: %v", err) })
 	s2, e := res.Serve("tcp")
-	f2 := onError(abort, e, func(err error) { t.Fatalf("tcp server failed: %v", err) })
+	f2 := util.OnError(abort, e, func(err error) { t.Fatalf("tcp server failed: %v", err) })
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -432,54 +418,4 @@ func TestHTTP(t *testing.T) {
 		t.Error("Http hosts API failure")
 	}
 
-}
-
-func TestLaunchZK(t *testing.T) {
-	var closeOnce sync.Once
-	ch := make(chan struct{})
-	closer := func() { closeOnce.Do(func() { close(ch) }) }
-	res := &Resolver{
-		startZKdetection: func(zkurl string, leaderChanged func(string)) error {
-			go func() {
-				defer closer()
-				leaderChanged("")
-				leaderChanged("")
-				leaderChanged("a")
-				leaderChanged("")
-				leaderChanged("")
-				leaderChanged("b")
-				leaderChanged("")
-				leaderChanged("")
-				leaderChanged("c")
-			}()
-			return nil
-		},
-	}
-	leaderSig, errCh := res.LaunchZK(1 * time.Second)
-	onError(ch, errCh, func(err error) { t.Fatalf("unexpected error: %v", err) })
-	getLeader := func() string {
-		res.leaderLock.Lock()
-		defer res.leaderLock.Unlock()
-		return res.leader
-	}
-	for i := 0; i < 3; i++ {
-		select {
-		case <-leaderSig:
-			t.Logf("new leader %d: %s", i, getLeader())
-		case <-time.After(1 * time.Second):
-			t.Fatalf("timed out waiting for new leader")
-		}
-	}
-	select {
-	case <-ch:
-	case <-time.After(1 * time.Second):
-		t.Fatalf("timed out waiting for detector death")
-	}
-	// there should be nothing left in the leader signal chan
-	select {
-	case <-leaderSig:
-		t.Fatalf("unexpected new leader")
-	case <-time.After(200 * time.Millisecond):
-		// expected
-	}
 }

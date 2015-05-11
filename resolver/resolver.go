@@ -3,7 +3,6 @@
 package resolver
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -13,9 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mesos/mesos-go/detector"
-	_ "github.com/mesos/mesos-go/detector/zoo"
-	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/util"
@@ -26,60 +22,30 @@ var (
 	recurseCnt = 3
 )
 
-type RecordLoader func(*records.RecordGenerator) *records.RecordGenerator
-
 // holds configuration state and the resource records
 type Resolver struct {
-	version    string
-	config     records.Config
-	rs         *records.RecordGenerator
-	rsLock     sync.RWMutex
-	leader     string
-	leaderLock sync.RWMutex
-
-	// preLoaders are invoked at the beginning of the Reload cycle, just prior to state generation
-	preLoaders []RecordLoader
-
-	// postLoaders are invoked at the end of the Reload cycle, after state generation
-	postLoaders []RecordLoader
+	version string
+	config  records.Config
+	rs      *records.RecordSet
+	rsLock  sync.RWMutex
 
 	// pluggable external DNS resolution, mainly for unit testing
 	extResolver func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error)
-
-	// pluggable ZK detection, mainly for unit testing
-	startZKdetection func(zkurl string, leaderChanged func(string)) error
 }
 
 func New(version string, config records.Config) *Resolver {
 	r := &Resolver{
 		version: version,
 		config:  config,
-		rs:      &records.RecordGenerator{},
+		rs:      &records.RecordSet{},
 	}
 	r.extResolver = r.defaultExtResolver
-	r.startZKdetection = startDefaultZKdetector
 	return r
-}
-
-// execute a RecordLoader func at Reload time. this func should only be invoked during
-// bootstrapping (before processing begins) since this is not "thread-safe".
-func (res *Resolver) OnPreload(r RecordLoader) {
-	if r != nil {
-		res.preLoaders = append(res.preLoaders, r)
-	}
-}
-
-// execute a RecordLoader func at Reload time. this func should only be invoked during
-// bootstrapping (before processing begins) since this is not "thread-safe".
-func (res *Resolver) OnPostload(r RecordLoader) {
-	if r != nil {
-		res.postLoaders = append(res.postLoaders, r)
-	}
 }
 
 // return the current (read-only) record set. attempts to write to the returned
 // object will likely result in a data race.
-func (res *Resolver) records() *records.RecordGenerator {
+func (res *Resolver) records() *records.RecordSet {
 	res.rsLock.RLock()
 	defer res.rsLock.RUnlock()
 	return res.rs
@@ -127,83 +93,57 @@ func (res *Resolver) Serve(net string) (<-chan struct{}, <-chan error) {
 	return ch, errCh
 }
 
-// launches Zookeeper detector, returns immediately two chans: the first fires an empty
-// struct whenever there's a new (non-nil) mesos leader, the second if there's an unrecoverable
-// error in the master detector.
-func (res *Resolver) LaunchZK(initialDetectionTimeout time.Duration) (<-chan struct{}, <-chan error) {
-	var startedOnce sync.Once
-	startedCh := make(chan struct{})
-	errCh := make(chan error, 1)
-	leaderCh := make(chan struct{}, 1) // the first write never blocks
-
-	listenerFunc := func(newLeader string) {
-		defer func() {
-			if newLeader != "" {
-				leaderCh <- struct{}{}
-				startedOnce.Do(func() { close(startedCh) })
-			}
-		}()
-		res.leaderLock.Lock()
-		defer res.leaderLock.Unlock()
-		res.leader = newLeader
-	}
-	go func() {
-		defer util.HandleCrash()
-
-		err := res.startZKdetection(res.config.Zk, listenerFunc)
-		if err != nil {
-			errCh <- err
-			return
-		}
-
-		logging.VeryVerbose.Println("Warning: waiting for initial information from Zookeper.")
-		select {
-		case <-startedCh:
-			logging.VeryVerbose.Println("Info: got initial information from Zookeper.")
-		case <-time.After(initialDetectionTimeout):
-			errCh <- fmt.Errorf("timed out waiting for initial ZK detection, exiting")
-		}
-	}()
-	return leaderCh, errCh
+func (res *Resolver) Run(updates <-chan records.Update) {
+	util.Forever(func() { res.syncLoop(updates) }, 0)
 }
 
-// triggers a new refresh from mesos master
-func (res *Resolver) Reload() {
-	t := records.RecordGenerator{}
-	t.TaskRecordGeneratorFn = t.BuildTaskRecords
-
-	// Being very conservative
-	res.leaderLock.RLock()
-	currentLeader := res.leader
-	res.leaderLock.RUnlock()
-
-	// pre-ParseState phase, preloader plugins can wrap around, or otherwise customize,
-	// a RecordGenerator.TaskRecordGeneratorFn. useful if plugins want to create additional
-	// records based on, for example, task labels.
-	state := &t
-	for _, g := range res.preLoaders {
-		state = g(state)
+// syncLoop is the main loop for processing changes. It watches for changes from
+// the global update channel. For any new change seen, will run a sync against desired
+// state and running state. Never returns.
+func (res *Resolver) syncLoop(updates <-chan records.Update) {
+	for u := range updates {
+		res.updateRecords(u)
 	}
+}
 
-	if err := state.ParseState(currentLeader, res.config); err != nil {
-		logging.VeryVerbose.Printf("Warning: master not found; keeping old DNS state: %v", err)
-		return
-	}
-
-	// post-ParseState phase, postloader plugins can modify generated records.
-	// useful if, for example, plugins wish to append records that are independent
-	// of the generated tasks.
-	for _, r := range res.postLoaders {
-		state = r(state)
-	}
-
-	timestamp := uint32(time.Now().Unix())
-
-	// may need to refactor for fairness
+func (res *Resolver) updateRecords(u records.Update) {
 	res.rsLock.Lock()
 	defer res.rsLock.Unlock()
+	switch u.Op {
+	case records.SET:
+		logging.Verbose.Println("SET: records changed")
+		res.rs = &u.Records
+	case records.UPDATE:
+		logging.Verbose.Println("UPDATE: records changed")
+		res.rs = applyUpdates(&u.Records, res.rs)
+	default:
+		panic("updateRecords does not support incremental changes")
+	}
+	timestamp := uint32(time.Now().Unix())
 	res.config.SOASerial = timestamp // TODO(jdef) data race, unprotected read access happens in other places
-	res.rs = state
+}
+
+func applyUpdates(changed, current *records.RecordSet) *records.RecordSet {
+	updated := &records.RecordSet{}
+	for name, currentAns := range current.As {
+		if ans, found := changed.As.Get(name); found {
+			updated.As = updated.As.Put(name, ans)
+			logging.VeryVerbose.Printf("record named %q has a new spec %+v", name, ans)
+		} else {
+			updated.As = updated.As.Put(name, currentAns)
+			logging.VeryVerbose.Printf("record named %q stay with the same spec %+v", name, currentAns)
+		}
+	}
+	for name, currentAns := range current.SRVs {
+		if ans, found := changed.SRVs.Get(name); found {
+			updated.SRVs = updated.SRVs.Put(name, ans)
+			logging.VeryVerbose.Printf("record named %q has a new spec %+v", name, ans)
+		} else {
+			updated.SRVs = updated.SRVs.Put(name, currentAns)
+			logging.VeryVerbose.Printf("record named %q stay with the same spec %+v", name, currentAns)
+		}
+	}
+	return updated
 }
 
 // defaultExtResolver queries other nameserver, potentially recurses; callers should probably be invoking extResolver
@@ -522,47 +462,6 @@ func panicRecover(h dns.Handler) dns.Handler {
 		}()
 		h.ServeDNS(w, r)
 	})
-}
-
-// Start a Zookeeper listener to track leading master, invokes callback function when
-// master changes are reported.
-func startDefaultZKdetector(zkurl string, leaderChanged func(string)) error {
-
-	// start listener
-	logging.Verbose.Println("Starting master detector for ZK ", zkurl)
-	md, err := detector.New(zkurl)
-	if err != nil {
-		return fmt.Errorf("failed to create master detector: %v", err)
-	}
-
-	// and listen for master changes
-	if err := md.Detect(detector.OnMasterChanged(func(info *mesos.MasterInfo) {
-		leader := ""
-		if leaderChanged != nil {
-			defer func() {
-				leaderChanged(leader)
-			}()
-		}
-		logging.VeryVerbose.Println("Updated Zookeeper info: ", info)
-		if info == nil {
-			logging.Error.Println("No leader available in Zookeeper.")
-		} else {
-			if host := info.GetHostname(); host != "" {
-				leader = host
-			} else {
-				// unpack IPv4
-				octets := make([]byte, 4, 4)
-				binary.BigEndian.PutUint32(octets, info.GetIp())
-				ipv4 := net.IP(octets)
-				leader = ipv4.String()
-			}
-			leader = fmt.Sprintf("%s:%d", leader, info.GetPort())
-			logging.Verbose.Println("new master in Zookeeper ", leader)
-		}
-	})); err != nil {
-		return fmt.Errorf("failed to initialize master detector: %v", err)
-	}
-	return nil
 }
 
 // cleanWild strips any wildcards out thus mapping cleanly to the

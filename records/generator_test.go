@@ -186,7 +186,7 @@ func TestInsertState(t *testing.T) {
 // ensure we only generate one A record for each host
 func TestNTasks(t *testing.T) {
 	rg := RecordGenerator{}
-	rg.As = make(rrs)
+	rg.As = make(RRS)
 
 	rg.insertRR("blah.mesos", "10.0.0.1", "A")
 	rg.insertRR("blah.mesos", "10.0.0.1", "A")
