@@ -44,7 +44,7 @@ func newApp(eh errorHandlerFunc) *app {
 	return c
 }
 
-func (c *app) Resolver() plugins.Resolver {
+func (c *app) Events() plugins.RecordEvents {
 	return c
 }
 
@@ -53,8 +53,8 @@ func (c *app) Done() <-chan struct{} {
 	return c.done
 }
 
-// implements plugin.Resolver interface, panics if invoked outside of initialization process
-func (c *app) OnPreload(r plugins.Reloader) {
+// implements plugin.RecordEvents interface, panics if invoked outside of initialization process
+func (c *app) OnPreload(r plugins.RecordLoader) {
 	select {
 	case <-c.ready:
 		panic("cannot OnPreload after initialization has completed")
@@ -63,7 +63,7 @@ func (c *app) OnPreload(r plugins.Reloader) {
 	}
 }
 
-func (c *app) OnPostload(r plugins.Reloader) {
+func (c *app) OnPostload(r plugins.RecordLoader) {
 	select {
 	case <-c.ready:
 		panic("cannot OnPostload after initialization has completed")

@@ -13,7 +13,7 @@ import (
 // it may not be restarted.
 type Plugin interface {
 	// Performs initialization and starts any requisite background tasks for the plugin.
-	// Pre-server-startup actions such as Filter or resolver.Reloader registration must
+	// Pre-server-startup actions such as Filter or RecordLoader registration must
 	// be completed before this func returns. This func is not expected to block for long
 	// and should return relatively quickly.
 	Start(InitialContext) <-chan error
@@ -27,12 +27,12 @@ type Plugin interface {
 type Factory func(json.RawMessage) (Plugin, error)
 
 // same spec as in resolver
-type Reloader func(*records.RecordGenerator) *records.RecordGenerator
+type RecordLoader func(*records.RecordGenerator) *records.RecordGenerator
 
 // Plugins use this interface to communicate with the underlying DNS resolver.
-type Resolver interface {
-	OnPreload(r Reloader)
-	OnPostload(r Reloader)
+type RecordEvents interface {
+	OnPreload(r RecordLoader)
+	OnPostload(r RecordLoader)
 }
 
 type InitialContext interface {
@@ -40,8 +40,8 @@ type InitialContext interface {
 	// Return a copy of the global configuration
 	Config() *records.Config
 
-	// Return a pointer to the mesos-dns Resolver.
-	Resolver() Resolver
+	// Return a reference to an object that generates record loading events
+	Events() RecordEvents
 
 	// Adds a new filter handle some kind of pre- or post-processing of
 	// DNS requests and/or responses.
