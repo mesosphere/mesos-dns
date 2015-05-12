@@ -38,6 +38,7 @@ func TestAsDNS952(t *testing.T) {
 		"89fdgsf---gs7-fgs--d7fddg-123":   "fdgsf---gs7-fgs--d7fddg1",
 		"89fdgsf---gs7-fgs--d7fddg---123": "fdgsf---gs7-fgs--d7fddg1",
 		"89fdgsf---gs7-fgs--d7fddg-":      "fdgsf---gs7-fgs--d7fddg",
+		"r29f.dev.angrypigs":              "r29f-dev-angrypigs",
 	}
 	for untrusted, expected := range tests {
 		actual := AsDNS952(untrusted)
