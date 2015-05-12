@@ -13,6 +13,28 @@ func init() {
 	logging.SetupLogs()
 }
 
+func TestSanitizedSlaveAddress(t *testing.T) {
+	x := sanitizedSlaveAddress("1.2.3.4")
+	if x != "1.2.3.4" {
+		t.Fatalf("unexpected slave address %q", x)
+	}
+
+	x = sanitizedSlaveAddress("localhost")
+	if x != "127.0.0.1" {
+		t.Fatalf("unexpected slave address %q", x)
+	}
+
+	x = sanitizedSlaveAddress("unbelievable.domain.acme")
+	if x != "unbelievable.domain.acme" {
+		t.Fatalf("unexpected slave address %q", x)
+	}
+
+	x = sanitizedSlaveAddress("unbelievable<>.domain!@#...acme")
+	if x != "unbelievable.domain.acme" {
+		t.Fatalf("unexpected slave address %q", x)
+	}
+}
+
 func TestYankPorts(t *testing.T) {
 	p := "[31328-31328]"
 

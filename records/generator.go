@@ -199,6 +199,32 @@ func hashString(s string) string {
 	return strconv.Itoa(int(sum))
 }
 
+// attempt to translate the hostname into an IPv4 address. logs an error if IP
+// lookup fails. if an IP address cannot be found, returns the same hostname
+// that was given. upon success returns the IP address as a string.
+func hostToIP4(hostname string) (string, bool) {
+	ip := net.ParseIP(hostname)
+	if ip == nil {
+		t, err := net.ResolveIPAddr("ip4", hostname)
+		if err != nil {
+			logging.Error.Printf("cannot translate hostname %q into an ip4 address", hostname)
+			return hostname, false
+		}
+		ip = t.IP
+	}
+	return ip.String(), true
+}
+
+// attempt to convert the slave hostname to an IP4 address. if that fails, then
+// sanitize the hostname for DNS compat.
+func sanitizedSlaveAddress(hostname string) string {
+	address, ok := hostToIP4(hostname)
+	if !ok {
+		address = labels.AsDomainFrag(address)
+	}
+	return address
+}
+
 // InsertState transforms a StateJSON into RecordGenerator RRs
 func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	listener string, masters []string) error {
@@ -206,16 +232,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	// creates a map with slave IP addresses (IPv4)
 	rg.Slaves = make(map[string]string)
 	for _, slave := range sj.Slaves {
-		// if slave is a hostname, translate it
-		if net.ParseIP(slave.Hostname) == nil {
-			t, err := net.ResolveIPAddr("ip4", slave.Hostname)
-			if err != nil {
-				logging.Error.Println("cannot translate hostname " + slave.Hostname)
-			}
-			rg.Slaves[slave.Id] = t.IP.String()
-		} else {
-			rg.Slaves[slave.Id] = slave.Hostname
-		}
+		rg.Slaves[slave.Id] = sanitizedSlaveAddress(slave.Hostname)
 	}
 
 	rg.SRVs = make(rrs)
