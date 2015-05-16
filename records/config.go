@@ -123,8 +123,13 @@ func SetConfig(cjson string) (c Config) {
 		logging.Error.Fatalf("specify mesos masters or zookeeper in config.json")
 	}
 
-	if c.ExternalOn && len(c.Resolvers) == 0 {
-		c.Resolvers = GetLocalDNS()
+	if c.ExternalOn {
+		if len(c.Resolvers) == 0 {
+			c.Resolvers = GetLocalDNS()
+		}
+		if err = validateResolvers(c.Resolvers); err != nil {
+			logging.Error.Fatalf("Resovlers validation failed: %v", err)
+		}
 	}
 
 	c.Domain = strings.ToLower(c.Domain)
