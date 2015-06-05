@@ -7,9 +7,12 @@ import (
 
 // validateMasters checks that each master in the list is a properly formatted host:ip pair.
 // duplicate masters in the list are not allowed.
-// returns nil if the masters list if empty, or else all masters in the list are valid.
+// returns nil if the masters list is empty, or else all masters in the list are valid.
 func validateMasters(ms []string) error {
-	valid := map[string]struct{}{}
+	if len(ms) == 0 {
+		return nil
+	}
+	valid := make(map[string]struct{}, len(ms))
 	for i, m := range ms {
 		h, p, err := net.SplitHostPort(m)
 		if err != nil {
@@ -33,7 +36,10 @@ func validateMasters(ms []string) error {
 // duplicate resolvers in the list are not allowed.
 // returns nil if the resolver list is empty, or else all resolvers in the list are valid.
 func validateResolvers(rs []string) error {
-	ips := map[string]struct{}{}
+	if len(rs) == 0 {
+		return nil
+	}
+	ips := make(map[string]struct{}, len(rs))
 	for _, r := range rs {
 		ip := net.ParseIP(r)
 		if ip == nil {
