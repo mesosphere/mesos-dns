@@ -82,13 +82,13 @@ func (res *Resolver) LaunchDNS() <-chan error {
 // starts a DNS server for net protocol (tcp/udp), returns immediately.
 // the returned signal chan is closed upon the server successfully entering the listening phase.
 // if the server aborts then an error is sent on the error chan.
-func (res *Resolver) Serve(net string) (<-chan struct{}, <-chan error) {
+func (res *Resolver) Serve(proto string) (<-chan struct{}, <-chan error) {
 	defer util.HandleCrash()
 
 	ch := make(chan struct{})
 	server := &dns.Server{
-		Addr:              res.config.Listener + ":" + strconv.Itoa(res.config.Port),
-		Net:               net,
+		Addr:              net.JoinHostPort(res.config.Listener, strconv.Itoa(res.config.Port)),
+		Net:               proto,
 		TsigSecret:        nil,
 		NotifyStartedFunc: func() { close(ch) },
 	}
@@ -98,7 +98,7 @@ func (res *Resolver) Serve(net string) (<-chan struct{}, <-chan error) {
 		defer close(errCh)
 		err := server.ListenAndServe()
 		if err != nil {
-			errCh <- fmt.Errorf("Failed to setup %q server: %v", net, err)
+			errCh <- fmt.Errorf("Failed to setup %q server: %v", proto, err)
 		} else {
 			logging.Error.Printf("Not listening/serving any more requests.")
 		}
@@ -199,7 +199,7 @@ func (res *Resolver) defaultExtResolver(r *dns.Msg, nameserver string, proto str
 
 		if cnt > 0 {
 			if soa, ok := (in.Ns[0]).(*dns.SOA); ok {
-				return res.defaultExtResolver(r, soa.Ns+":53", proto, cnt-1)
+				return res.defaultExtResolver(r, net.JoinHostPort(soa.Ns, "53"), proto, cnt-1)
 			}
 		}
 
@@ -322,7 +322,7 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 		}
 
 		for _, resolver := range res.config.Resolvers {
-			nameserver := resolver + ":53"
+			nameserver := net.JoinHostPort(resolver, "53")
 			m, err = res.extResolver(r, nameserver, proto, recurseCnt)
 			if err == nil {
 				break
