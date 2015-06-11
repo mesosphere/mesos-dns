@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/mesosphere/mesos-dns/logging"
 	"io/ioutil"
+	"reflect"
 	"testing"
 )
 
@@ -11,6 +12,129 @@ func init() {
 	logging.VerboseFlag = false
 	logging.VeryVerboseFlag = false
 	logging.SetupLogs()
+}
+
+func TestMasterRecord(t *testing.T) {
+	// masterRecord(domain string, masters []string, leader string)
+	type expectedRR struct {
+		name  string
+		host  string
+		rtype string
+	}
+	tt := []struct {
+		domain  string
+		masters []string
+		leader  string
+		exists  []expectedRR
+	}{
+		{"foo.com", nil, "", nil},
+		{"foo.com", nil, "@", nil},
+		{"foo.com", nil, "1@", nil},
+		{"foo.com", nil, "@2", nil},
+		{"foo.com", nil, "3@4", nil},
+		{"foo.com", nil, "5@6:7",
+			[]expectedRR{
+				{"leader.foo.com.", "6", "A"},
+				{"master.foo.com.", "6", "A"},
+				{"master0.foo.com.", "6", "A"},
+				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
+				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
+			}},
+		{"foo.com", []string{"6:7"}, "5@6:7",
+			[]expectedRR{
+				{"leader.foo.com.", "6", "A"},
+				{"master.foo.com.", "6", "A"},
+				{"master0.foo.com.", "6", "A"},
+				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
+				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
+			}},
+		{"foo.com", []string{"8:9"}, "5@6:7",
+			[]expectedRR{
+				{"leader.foo.com.", "6", "A"},
+				{"master.foo.com.", "6", "A"},
+				{"master.foo.com.", "8", "A"},
+				{"master1.foo.com.", "6", "A"},
+				{"master0.foo.com.", "8", "A"},
+				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
+				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
+			}},
+		{"foo.com", []string{"8:9", "8:9"}, "5@6:7",
+			[]expectedRR{
+				{"leader.foo.com.", "6", "A"},
+				{"master.foo.com.", "6", "A"},
+				{"master.foo.com.", "8", "A"},
+				{"master1.foo.com.", "6", "A"},
+				{"master0.foo.com.", "8", "A"},
+				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
+				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
+			}},
+		{"foo.com", []string{"8:9", "6:7"}, "5@6:7",
+			[]expectedRR{
+				{"leader.foo.com.", "6", "A"},
+				{"master.foo.com.", "6", "A"},
+				{"master.foo.com.", "8", "A"},
+				{"master1.foo.com.", "6", "A"},
+				{"master0.foo.com.", "8", "A"},
+				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
+				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
+			}},
+		{"foo.com", []string{"8:9", "6:7", "6:7"}, "5@6:7",
+			[]expectedRR{
+				{"leader.foo.com.", "6", "A"},
+				{"master.foo.com.", "6", "A"},
+				{"master.foo.com.", "8", "A"},
+				{"master1.foo.com.", "6", "A"},
+				{"master0.foo.com.", "8", "A"},
+				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
+				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
+			}},
+		{"foo.com", []string{"8:9", "6:7", "bob:0"}, "5@6:7",
+			[]expectedRR{
+				{"leader.foo.com.", "6", "A"},
+				{"master.foo.com.", "6", "A"},
+				{"master.foo.com.", "8", "A"},
+				{"master.foo.com.", "bob", "A"},
+				{"master0.foo.com.", "8", "A"},
+				{"master1.foo.com.", "6", "A"},
+				{"master2.foo.com.", "bob", "A"},
+				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
+				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
+			}},
+	}
+	for i, tc := range tt {
+		rg := RecordGenerator{}
+		rg.As = make(rrs)
+		rg.SRVs = make(rrs)
+		t.Logf("test case %d", i+1)
+		rg.masterRecord(tc.domain, tc.masters, tc.leader)
+		if tc.exists == nil {
+			if len(rg.As) > 0 {
+				t.Fatalf("test case %d: unexpected As: %v", i+1, rg.As)
+			}
+			if len(rg.SRVs) > 0 {
+				t.Fatalf("test case %d: unexpected SRVs: %v", i+1, rg.SRVs)
+			}
+		}
+		expectedA := make(rrs)
+		expectedSRV := make(rrs)
+		for _, e := range tc.exists {
+			found := rg.exists(e.name, e.host, e.rtype)
+			if !found {
+				t.Fatalf("test case %d: missing expected record: name=%q host=%q rtype=%s, As=%v", i+1, e.name, e.host, e.rtype, rg.As)
+			}
+			if e.rtype == "A" {
+				expectedA[e.name] = append(expectedA[e.name], e.host)
+			} else {
+				expectedSRV[e.name] = append(expectedSRV[e.name], e.host)
+			}
+		}
+		if !reflect.DeepEqual(rg.As, expectedA) {
+			t.Fatalf("test case %d: expected As of %v instead of %v", i+1, expectedA, rg.As)
+		}
+		if !reflect.DeepEqual(rg.SRVs, expectedSRV) {
+			t.Fatalf("test case %d: expected SRVs of %v instead of %v", i+1, expectedSRV, rg.SRVs)
+		}
+	}
 }
 
 func TestSanitizedSlaveAddress(t *testing.T) {
