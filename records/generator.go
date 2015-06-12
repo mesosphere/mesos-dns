@@ -5,6 +5,7 @@ package records
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"hash/fnv"
 	"io/ioutil"
 	"net"
@@ -279,22 +280,51 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	return nil
 }
 
-// A records for the mesos masters
+// masterRecord injects A and SRV records into the generator store:
+//     master.domain.  // resolves to IPs of all masters
+//     masterN.domain. // one IP address for each master
+//     leader.domain.  // one IP address for the leading master
+//
+// The current func implementation makes an assumption about the order of masters:
+// it's the order in which you expect the enumerated masterN records to be created.
+// This is probably important: if a new leader is elected, you may not want it to
+// become master0 simply because it's the leader. You probably want your DNS records
+// to change as little as possible. And this func should have the least impact on
+// enumeration order, or name/IP mappings - it's just creating the records. So let
+// the caller do the work of ordering/sorting (if desired) the masters list if a
+// different outcome is desired.
+//
+// Another consequence of the current overall mesos-dns app implementation is that
+// the leader may not even be in the masters list at some point in time. masters is
+// really fallback-masters (only consider these to be masters if I can't find a
+// leader via ZK). At some point in time, they may not actually be masters any more.
+// Consider a cluster of 3 nodes that suffers the loss of a member, and gains a new
+// member (VM crashed, was replaced by another VM). And the cycle repeats several
+// times. You end up with a set of running masters (and leader) that's different
+// than the set of statically configured fallback masters.
+//
+// So the func tries to index the masters as they're listed and begrudgingly assigns
+// the leading master an index out-of-band if it's not actually listed in the masters
+// list. There are probably better ways to do it.
 func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader string) {
 	// create records for leader
 	// A records
 	h := strings.Split(leader, "@")
 	if len(h) < 2 {
 		logging.Error.Println(leader)
+		return // avoid a panic later
 	}
-	ip, port, err := getProto(h[1])
+	leaderAddress := h[1]
+	ip, port, err := getProto(leaderAddress)
 	if err != nil {
 		logging.Error.Println(err)
+		return
 	}
 	arec := "leader." + domain + "."
 	rg.insertRR(arec, ip, "A")
 	arec = "master." + domain + "."
 	rg.insertRR(arec, ip, "A")
+
 	// SRV records
 	tcp := "_leader._tcp." + domain + "."
 	udp := "_leader._udp." + domain + "."
@@ -303,22 +333,46 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 	rg.insertRR(udp, host, "SRV")
 
 	// if there is a list of masters, insert that as well
-	for i, master := range masters {
-
-		// skip leader
-		if leader == master {
-			continue
-		}
+	addedLeaderMasterN := false
+	idx := 0
+	for _, master := range masters {
 
 		ip, _, err := getProto(master)
 		if err != nil {
 			logging.Error.Println(err)
+			continue
 		}
 
 		// A records (master and masterN)
-		arec := "master." + domain + "."
+		if master != leaderAddress {
+			arec := "master." + domain + "."
+			added := rg.insertRR(arec, ip, "A")
+			if !added {
+				// duplicate master?!
+				continue
+			}
+		}
+
+		if master == leaderAddress && addedLeaderMasterN {
+			// duplicate leader in masters list?!
+			continue
+		}
+
+		arec := "master" + strconv.Itoa(idx) + "." + domain + "."
 		rg.insertRR(arec, ip, "A")
-		arec = "master" + strconv.Itoa(i) + "." + domain + "."
+		idx++
+
+		if master == leaderAddress {
+			addedLeaderMasterN = true
+		}
+	}
+	// flake: we ended up with a leader that's not in the list of all masters?
+	if !addedLeaderMasterN {
+		// only a flake if there were fallback masters configured
+		if len(masters) > 0 {
+			logging.Error.Printf("warning: leader %q is not in master list", leader)
+		}
+		arec = "master" + strconv.Itoa(idx) + "." + domain + "."
 		rg.insertRR(arec, ip, "A")
 	}
 }
@@ -375,37 +429,47 @@ func (rg *RecordGenerator) setFromLocal(host string, ns string) {
 	}
 }
 
-// insertRR inserts host to name's map
-// REFACTOR when storage is updated
-func (rg *RecordGenerator) insertRR(name string, host string, rtype string) {
-	logging.VeryVerbose.Println("[" + rtype + "]\t" + name + ": " + host)
-
+func (rg *RecordGenerator) exists(name, host, rtype string) bool {
 	if rtype == "A" {
 		if val, ok := rg.As[name]; ok {
 			// check if A record already exists
 			// identical tasks on same slave
 			for _, b := range val {
 				if b == host {
-					return
+					return true
 				}
 			}
-			rg.As[name] = append(val, host)
-		} else {
-			rg.As[name] = []string{host}
 		}
 	} else {
 		if val, ok := rg.SRVs[name]; ok {
 			// check if SRV record already exists
 			for _, b := range val {
 				if b == host {
-					return
+					return true
 				}
 			}
-			rg.SRVs[name] = append(val, host)
-		} else {
-			rg.SRVs[name] = []string{host}
 		}
 	}
+	return false
+}
+
+// insertRR adds a record to the appropriate record map for the given name/host pair,
+// but only if the pair is unique. returns true if added, false otherwise.
+// TODO(???): REFACTOR when storage is updated
+func (rg *RecordGenerator) insertRR(name, host, rtype string) bool {
+	logging.VeryVerbose.Println("[" + rtype + "]\t" + name + ": " + host)
+
+	if rg.exists(name, host, rtype) {
+		return false
+	}
+	if rtype == "A" {
+		val := rg.As[name]
+		rg.As[name] = append(val, host)
+	} else {
+		val := rg.SRVs[name]
+		rg.SRVs[name] = append(val, host)
+	}
+	return true
 }
 
 // returns an array of ports from a range
@@ -448,6 +512,9 @@ func slaveIdTail(slaveID string) string {
 // zk://username:password@host1:port1,host2:port2,.../path
 // file:///path/to/file (where file contains one of the above)
 func getProto(pair string) (string, string, error) {
-	h := strings.Split(pair, ":")
+	h := strings.SplitN(pair, ":", 2)
+	if len(h) != 2 {
+		return "", "", fmt.Errorf("unable to parse proto from %q", pair)
+	}
 	return h[0], h[1], nil
 }
