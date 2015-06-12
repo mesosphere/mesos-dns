@@ -280,7 +280,32 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	return nil
 }
 
-// A records for the mesos masters
+// masterRecord injects A and SRV records into the generator store:
+//     master.domain.  // resolves to IPs of all masters
+//     masterN.domain. // one IP address for each master
+//     leader.domain.  // one IP address for the leading master
+//
+// The current func implementation makes an assumption about the order of masters:
+// it's the order in which you expect the enumerated masterN records to be created.
+// This is probably important: if a new leader is elected, you may not want it to
+// become master0 simply because it's the leader. You probably want your DNS records
+// to change as little as possible. And this func should have the least impact on
+// enumeration order, or name/IP mappings - it's just creating the records. So let
+// the caller do the work of ordering/sorting (if desired) the masters list if a
+// different outcome is desired.
+//
+// Another consequence of the current overall mesos-dns app implementation is that
+// the leader may not even be in the masters list at some point in time. masters is
+// really fallback-masters (only consider these to be masters if I can't find a
+// leader via ZK). At some point in time, they may not actually be masters any more.
+// Consider a cluster of 3 nodes that suffers the loss of a member, and gains a new
+// member (VM crashed, was replaced by another VM). And the cycle repeats several
+// times. You end up with a set of running masters (and leader) that's different
+// than the set of statically configured fallback masters.
+//
+// So the func tries to index the masters as they're listed and begrudgingly assigns
+// the leading master an index out-of-band if it's not actually listed in the masters
+// list. There are probably better ways to do it.
 func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader string) {
 	// create records for leader
 	// A records
@@ -401,7 +426,7 @@ func (rg *RecordGenerator) setFromLocal(host string, ns string) {
 	}
 }
 
-func (rg *RecordGenerator) exists(name string, host string, rtype string) bool {
+func (rg *RecordGenerator) exists(name, host, rtype string) bool {
 	if rtype == "A" {
 		if val, ok := rg.As[name]; ok {
 			// check if A record already exists
@@ -428,7 +453,7 @@ func (rg *RecordGenerator) exists(name string, host string, rtype string) bool {
 // insertRR adds a record to the appropriate record map for the given name/host pair,
 // but only if the pair is unique. returns true if added, false otherwise.
 // TODO(???): REFACTOR when storage is updated
-func (rg *RecordGenerator) insertRR(name string, host string, rtype string) bool {
+func (rg *RecordGenerator) insertRR(name, host, rtype string) bool {
 	logging.VeryVerbose.Println("[" + rtype + "]\t" + name + ": " + host)
 
 	if rg.exists(name, host, rtype) {

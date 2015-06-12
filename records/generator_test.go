@@ -25,7 +25,7 @@ func TestMasterRecord(t *testing.T) {
 		domain  string
 		masters []string
 		leader  string
-		exists  []expectedRR
+		expect  []expectedRR
 	}{
 		{"foo.com", nil, "", nil},
 		{"foo.com", nil, "@", nil},
@@ -40,6 +40,7 @@ func TestMasterRecord(t *testing.T) {
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
 			}},
+		// single master: leader and fallback
 		{"foo.com", []string{"6:7"}, "5@6:7",
 			[]expectedRR{
 				{"leader.foo.com.", "6", "A"},
@@ -48,6 +49,7 @@ func TestMasterRecord(t *testing.T) {
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
 			}},
+		// leader not in fallback list
 		{"foo.com", []string{"8:9"}, "5@6:7",
 			[]expectedRR{
 				{"leader.foo.com.", "6", "A"},
@@ -58,6 +60,7 @@ func TestMasterRecord(t *testing.T) {
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
 			}},
+		// duplicate fallback masters, leader not in fallback list
 		{"foo.com", []string{"8:9", "8:9"}, "5@6:7",
 			[]expectedRR{
 				{"leader.foo.com.", "6", "A"},
@@ -68,6 +71,7 @@ func TestMasterRecord(t *testing.T) {
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
 			}},
+		// leader that's also listed in the fallback list (at the end)
 		{"foo.com", []string{"8:9", "6:7"}, "5@6:7",
 			[]expectedRR{
 				{"leader.foo.com.", "6", "A"},
@@ -78,6 +82,7 @@ func TestMasterRecord(t *testing.T) {
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
 			}},
+		// duplicate leading masters in the fallback list
 		{"foo.com", []string{"8:9", "6:7", "6:7"}, "5@6:7",
 			[]expectedRR{
 				{"leader.foo.com.", "6", "A"},
@@ -88,6 +93,7 @@ func TestMasterRecord(t *testing.T) {
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", "SRV"},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", "SRV"},
 			}},
+		// leader that's also listed in the fallback list (in the middle)
 		{"foo.com", []string{"8:9", "6:7", "bob:0"}, "5@6:7",
 			[]expectedRR{
 				{"leader.foo.com.", "6", "A"},
@@ -107,7 +113,7 @@ func TestMasterRecord(t *testing.T) {
 		rg.SRVs = make(rrs)
 		t.Logf("test case %d", i+1)
 		rg.masterRecord(tc.domain, tc.masters, tc.leader)
-		if tc.exists == nil {
+		if tc.expect == nil {
 			if len(rg.As) > 0 {
 				t.Fatalf("test case %d: unexpected As: %v", i+1, rg.As)
 			}
@@ -117,7 +123,7 @@ func TestMasterRecord(t *testing.T) {
 		}
 		expectedA := make(rrs)
 		expectedSRV := make(rrs)
-		for _, e := range tc.exists {
+		for _, e := range tc.expect {
 			found := rg.exists(e.name, e.host, e.rtype)
 			if !found {
 				t.Fatalf("test case %d: missing expected record: name=%q host=%q rtype=%s, As=%v", i+1, e.name, e.host, e.rtype, rg.As)
