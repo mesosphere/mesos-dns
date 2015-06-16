@@ -349,8 +349,8 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 		}
 	}
 
-	err = w.WriteMsg(m)
-	if err != nil {
+	m.Compress = true
+	if err = w.WriteMsg(m); err != nil {
 		logging.Error.Println(err)
 	}
 }
@@ -463,8 +463,8 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 		}
 	}
 
-	err = w.WriteMsg(m)
-	if err != nil {
+	m.Compress = true
+	if err = w.WriteMsg(m); err != nil {
 		logging.Error.Println(err)
 	}
 }
