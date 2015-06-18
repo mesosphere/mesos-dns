@@ -350,7 +350,7 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	m.Compress = true
-	if err = w.WriteMsg(m); err != nil {
+	if err = w.WriteMsg(truncate(m, isUDP(w))); err != nil {
 		logging.Error.Println(err)
 	}
 }
@@ -464,9 +464,22 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	m.Compress = true
-	if err = w.WriteMsg(m); err != nil {
+	if err = w.WriteMsg(truncate(m, isUDP(w))); err != nil {
 		logging.Error.Println(err)
 	}
+}
+
+// isUDP returns true if the transmission channel in use is UDP.
+func isUDP(w dns.ResponseWriter) bool {
+	return strings.HasPrefix(w.RemoteAddr().Network(), "udp")
+}
+
+// truncate sets the TC bit in the given dns.Msg if its length exceeds the
+// permitted length of the given transmission channel.
+// See https://tools.ietf.org/html/rfc1035#section-4.2.1
+func truncate(m *dns.Msg, udp bool) *dns.Msg {
+	m.Truncated = udp && m.Len() > dns.MinMsgSize
+	return m
 }
 
 func (res *Resolver) configureHTTP() {
