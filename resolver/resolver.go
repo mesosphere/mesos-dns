@@ -349,10 +349,7 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 		}
 	}
 
-	m.Compress = true
-	if err = w.WriteMsg(truncate(m, isUDP(w))); err != nil {
-		logging.Error.Println(err)
-	}
+	reply(w, m)
 }
 
 // HandleMesos is a resolver request handler that responds to a resource
@@ -463,8 +460,14 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 		}
 	}
 
-	m.Compress = true
-	if err = w.WriteMsg(truncate(m, isUDP(w))); err != nil {
+	reply(w, m)
+}
+
+// reply writes the given dns.Msg out to the given dns.ResponseWriter,
+// compressing the message first and truncating it accordingly.
+func reply(w dns.ResponseWriter, m *dns.Msg) {
+	m.Compress = true // https://github.com/mesosphere/mesos-dns/issues/{170,173,174}
+	if err := w.WriteMsg(truncate(m, isUDP(w))); err != nil {
 		logging.Error.Println(err)
 	}
 }
