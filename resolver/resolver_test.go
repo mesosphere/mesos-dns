@@ -2,9 +2,6 @@ package resolver
 
 import (
 	"encoding/json"
-	"github.com/mesosphere/mesos-dns/logging"
-	"github.com/mesosphere/mesos-dns/records"
-	"github.com/miekg/dns"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +10,11 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/records"
+	"github.com/mesosphere/mesos-dns/records/labels"
+	"github.com/miekg/dns"
 )
 
 func init() {
@@ -92,8 +94,9 @@ func fakeDNS(port int) (*Resolver, error) {
 	}
 
 	masters := []string{"144.76.157.37:5050"}
+	spec := labels.ForRFC952()
 	res.rs = &records.RecordGenerator{}
-	res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
+	res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters, spec)
 
 	return res, nil
 }

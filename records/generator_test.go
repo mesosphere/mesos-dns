@@ -2,10 +2,12 @@ package records
 
 import (
 	"encoding/json"
-	"github.com/mesosphere/mesos-dns/logging"
 	"io/ioutil"
 	"reflect"
 	"testing"
+
+	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/records/labels"
 )
 
 func init() {
@@ -108,7 +110,7 @@ func TestMasterRecord(t *testing.T) {
 			}},
 	}
 	for i, tc := range tt {
-		rg := RecordGenerator{}
+		rg := &RecordGenerator{}
 		rg.As = make(rrs)
 		rg.SRVs = make(rrs)
 		t.Logf("test case %d", i+1)
@@ -144,22 +146,23 @@ func TestMasterRecord(t *testing.T) {
 }
 
 func TestSanitizedSlaveAddress(t *testing.T) {
-	x := sanitizedSlaveAddress("1.2.3.4")
+	spec := labels.ForRFC952()
+	x := sanitizedSlaveAddress("1.2.3.4", spec)
 	if x != "1.2.3.4" {
 		t.Fatalf("unexpected slave address %q", x)
 	}
 
-	x = sanitizedSlaveAddress("localhost")
+	x = sanitizedSlaveAddress("localhost", spec)
 	if x != "127.0.0.1" {
 		t.Fatalf("unexpected slave address %q", x)
 	}
 
-	x = sanitizedSlaveAddress("unbelievable.domain.acme")
+	x = sanitizedSlaveAddress("unbelievable.domain.acme", spec)
 	if x != "unbelievable.domain.acme" {
 		t.Fatalf("unexpected slave address %q", x)
 	}
 
-	x = sanitizedSlaveAddress("unbelievable<>.domain!@#...acme")
+	x = sanitizedSlaveAddress("unbelievable<>.domain!@#...acme", spec)
 	if x != "unbelievable.domain.acme" {
 		t.Fatalf("unexpected slave address %q", x)
 	}
@@ -243,8 +246,9 @@ func TestInsertState(t *testing.T) {
 	sj.Leader = "master@144.76.157.37:5050"
 
 	masters := []string{"144.76.157.37:5050"}
-	rg := RecordGenerator{}
-	rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters)
+	spec := labels.ForRFC952()
+	rg := &RecordGenerator{}
+	rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters, spec)
 
 	// ensure we are only collecting running tasks
 	_, ok := rg.SRVs["_poseidon._tcp.marathon.mesos."]
@@ -315,7 +319,7 @@ func TestInsertState(t *testing.T) {
 
 // ensure we only generate one A record for each host
 func TestNTasks(t *testing.T) {
-	rg := RecordGenerator{}
+	rg := &RecordGenerator{}
 	rg.As = make(rrs)
 
 	rg.insertRR("blah.mesos", "10.0.0.1", "A")

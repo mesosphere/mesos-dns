@@ -1,9 +1,9 @@
 package labels
 
 // mangles the given name in order to produce a valid domain fragment.
-// a valid domain fragment will consist of one or more dns952 labels
-// concatenated by a '.' char.
-func AsDomainFrag(name string) string {
+// a valid domain fragment will consist of one or more host name labels
+// concatenated by a separatorChar char.
+func AsDomainFrag(name string, spec HostNameSpec) string {
 	if name == "" {
 		return ""
 	}
@@ -12,10 +12,10 @@ func AsDomainFrag(name string) string {
 	ll := 0  // overall fragment length so far
 	li := -1 // last fragment we found ended here
 	for i, c := range name {
-		if c == '.' {
-			if f := AsDNS952(name[li+1 : i]); f != "" {
+		if c == separatorChar {
+			if f := spec.Mangle(name[li+1 : i]); f != "" {
 				if li > -1 {
-					frag[ll] = '.'
+					frag[ll] = separatorChar
 					ll++
 				}
 				// len(f) is <= len(slice-of-name)
@@ -26,9 +26,9 @@ func AsDomainFrag(name string) string {
 		}
 	}
 	// final frag
-	if f := AsDNS952(name[li+1:]); f != "" {
+	if f := spec.Mangle(name[li+1:]); f != "" {
 		if li > -1 {
-			frag[ll] = '.'
+			frag[ll] = separatorChar
 			ll++
 		}
 		copy(frag[ll:], f)
