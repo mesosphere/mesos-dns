@@ -1,0 +1,13 @@
+dependencies:
+    pre:
+        - go get github.com/alecthomas/gometalinter
+        - gometalinter --install
+
+    post:
+        - go install -v ./...
+
+test:
+    override:
+        - ! gofmt -s -d . 2>&1 | read
+        - gometalinter ./...
+        - go test -v -race -timeout=120s ./...
