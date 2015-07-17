@@ -25,9 +25,9 @@ type rrs map[string][]string
 // Mesos-DNS state
 // Refactor when discovery id is available
 type RecordGenerator struct {
-	As     rrs
-	SRVs   rrs
-	Slaves map[string]string
+	As       rrs
+	SRVs     rrs
+	SlaveIPs map[string]string
 }
 
 // The following types help parse state.json
@@ -236,9 +236,9 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	listener string, masters []string, spec labels.HostNameSpec) error {
 
 	// creates a map with slave IP addresses (IPv4)
-	rg.Slaves = make(map[string]string)
+	rg.SlaveIPs = make(map[string]string)
 	for _, slave := range sj.Slaves {
-		rg.Slaves[slave.Id] = sanitizedSlaveAddress(slave.Hostname, spec)
+		rg.SlaveIPs[slave.Id] = sanitizedSlaveAddress(slave.Hostname, spec)
 	}
 
 	rg.SRVs = make(rrs)
@@ -261,9 +261,9 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 
 			// A records for task and task-sid
 			arec := tname + "." + tail
-			rg.insertRR(arec, host, "A")
+			rg.insertRR(arec, hostIP, "A")
 			trec := tname + "-" + tag + "-" + sid + "." + tail
-			rg.insertRR(trec, host, "A")
+			rg.insertRR(trec, hostIP, "A")
 
 			// SRV records
 			if task.Resources.Ports != "" {
