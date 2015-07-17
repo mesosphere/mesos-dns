@@ -231,17 +231,16 @@ func TestLeaderIP(t *testing.T) {
 
 // ensure we are parsing what we think we are
 func TestInsertState(t *testing.T) {
-
 	var sj StateJSON
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
 	if err != nil {
-		t.Error("missing test data")
+		t.Fatal("missing test data")
 	}
 
 	err = json.Unmarshal(b, &sj)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	sj.Leader = "master@144.76.157.37:5050"
 
