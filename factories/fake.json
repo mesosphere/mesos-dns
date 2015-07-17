@@ -186,7 +186,13 @@
                     "statuses": [
                         {
                             "state": "TASK_RUNNING",
-                            "timestamp": 1409096598.68885
+                            "timestamp": 1409096598.68885,
+                            "labels": [
+                                {
+                                    "key": "foo",
+                                    "value": "bar"
+                                }
+                            ]
                         }
                     ]
                 },
@@ -206,7 +212,49 @@
                     "statuses": [
                         {
                             "state": "TASK_RUNNING",
-                            "timestamp": 1413572390.09275
+                            "timestamp": 1413572371.04321,
+                            "labels": [
+                                {
+                                    "key": "foo",
+                                    "value": "bar"
+                                },
+                                {
+                                    "key": "Docker.NetworkSettings.IPAddress",
+                                    "value": "10.3.0.4"
+                                }
+                            ]
+                        },
+                        {
+                            "state": "TASK_RUNNING",
+                            "timestamp": 1413572390.09275,
+                            "labels": [
+                                {
+                                    "key": "foo",
+                                    "value": "bar"
+                                },
+                                {
+                                    "key": "Docker.NetworkSettings.IPAddress",
+                                    "value": "10.3.0.1"
+                                }
+                            ]
+                        },
+                        {
+                            "state": "TASK_RUNNING",
+                            "timestamp": 1413572381.0123,
+                            "labels": [
+                                {
+                                    "key": "foo",
+                                    "value": "bar"
+                                },
+                                {
+                                    "key": "container-ip",
+                                    "value": ""
+                                }
+                            ]
+                        },
+                        {
+                            "state": "TASK_STARTING",
+                            "timestamp": 1413572380.01234
                         }
                     ]
                 },
@@ -226,7 +274,17 @@
                     "statuses": [
                         {
                             "state": "TASK_RUNNING",
-                            "timestamp": 1413572383.04559
+                            "timestamp": 1413572383.04559,
+                            "labels": [
+                                {
+                                    "key": "foo",
+                                    "value": "bar"
+                                },
+                                {
+                                    "key": "Docker.NetworkSettings.IPAddress",
+                                    "value": "10.3.0.2"
+                                }
+                            ]
                         }
                     ]
                 },

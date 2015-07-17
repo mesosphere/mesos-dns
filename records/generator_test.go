@@ -255,14 +255,30 @@ func TestInsertState(t *testing.T) {
 		t.Error("should not find this not-running task - SRV record")
 	}
 
-	_, ok = rg.As["liquor-store.marathon.mesos."]
+	rrs, ok := rg.As["liquor-store.marathon.mesos."]
 	if !ok {
 		t.Error("should find this running task - A record")
+	}
+	if got, want := rrs, []string{"1.2.3.11", "1.2.3.12"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("should return the slave ips 1.2.3.11, 1.2.3.12 for the task, but got %v", rrs)
+	}
+
+	rrs, ok = rg.As["_container.liquor-store.marathon.mesos."]
+	if !ok {
+		t.Error("should find the container ip")
+	}
+	if got, want := rrs, []string{"10.3.0.1", "10.3.0.2"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("should return the container IPs 10.3.0.1, 10.3.0.2 for the task, but got %v", rrs)
 	}
 
 	_, ok = rg.As["poseidon.marathon.mesos."]
 	if ok {
 		t.Error("should not find this not-running task - A record")
+	}
+
+	_, ok = rg.As["_container.poseidon.marathon.mesos."]
+	if ok {
+		t.Error("should not find a container IP")
 	}
 
 	_, ok = rg.As["master.mesos."]
@@ -286,13 +302,13 @@ func TestInsertState(t *testing.T) {
 	}
 
 	// test for 10 SRV names
-	if len(rg.SRVs) != 10 {
-		t.Error("not enough SRVs")
+	if got, want := len(rg.SRVs), 10; got != want {
+		t.Errorf("not enough SRVs, got %d, expected %d", got, want)
 	}
 
 	// test for 5 A names
-	if len(rg.As) != 13 {
-		t.Error("not enough As")
+	if got, want := len(rg.As), 16; got != want {
+		t.Errorf("not enough As, got %d, expected %d", got, want)
 	}
 
 	// ensure we translate the framework name as well
@@ -302,7 +318,7 @@ func TestInsertState(t *testing.T) {
 	}
 
 	// ensure we find this SRV
-	rrs := rg.SRVs["_liquor-store._tcp.marathon.mesos."]
+	rrs = rg.SRVs["_liquor-store._tcp.marathon.mesos."]
 	// ensure there are 3 RRDATA answers for this SRV name
 	if len(rrs) != 3 {
 		t.Error("not enough SRV records")

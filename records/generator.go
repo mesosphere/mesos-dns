@@ -36,19 +36,33 @@ type Resources struct {
 	Ports string `json:"ports"`
 }
 
+// Label holds a key/value pair
+type Label struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// Status holds a task status
+type Status struct {
+	Timestamp float64 `json:"timestamp"`
+	State     string  `json:"state"`
+	Labels    []Label `json:"labels,omitempty"`
+}
+
 // Tasks holds mesos task information read in from state.json
-type Tasks []struct {
-	FrameworkId string `json:"framework_id"`
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	SlaveId     string `json:"slave_id"`
-	State       string `json:"state"`
+type Task struct {
+	FrameworkId string   `json:"framework_id"`
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`
+	SlaveId     string   `json:"slave_id"`
+	State       string   `json:"state"`
+	Statuses    []Status `json:"statuses"`
 	Resources   `json:"resources"`
 }
 
 // Frameworks holds mesos frameworks information read in from state.json
 type Frameworks []struct {
-	Tasks `json:"tasks"`
+	Tasks []Task `json:"tasks"`
 	Name  string `json:"name"`
 }
 
@@ -231,6 +245,30 @@ func sanitizedSlaveAddress(hostname string, spec labels.HostNameSpec) string {
 	return address
 }
 
+func (t *Task) containerIP() string {
+	const containerIPTaskStatusLabel = "Docker.NetworkSettings.IPAddress"
+
+	// find TASK_RUNNING statuses
+	var latestContainerIP string
+	var latestTimestamp float64
+	for _, status := range t.Statuses {
+		if status.State != "TASK_RUNNING" {
+			continue
+		}
+
+		// find the latest docker-inspect label
+		for _, label := range status.Labels {
+			if label.Key == containerIPTaskStatusLabel && status.Timestamp > latestTimestamp {
+				latestContainerIP = label.Value
+				latestTimestamp = status.Timestamp
+				break
+			}
+		}
+	}
+
+	return latestContainerIP
+}
+
 // InsertState transforms a StateJSON into RecordGenerator RRs
 func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	listener string, masters []string, spec labels.HostNameSpec) error {
@@ -248,7 +286,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	for _, f := range sj.Frameworks {
 		fname := labels.AsDomainFrag(f.Name, spec)
 		for _, task := range f.Tasks {
-			host, ok := rg.Slaves[task.SlaveId]
+			hostIP, ok := rg.SlaveIPs[task.SlaveId]
 			// skip not running or not discoverable tasks
 			if !ok || (task.State != "TASK_RUNNING") {
 				continue
@@ -264,6 +302,12 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 			rg.insertRR(arec, hostIP, "A")
 			trec := tname + "-" + tag + "-" + sid + "." + tail
 			rg.insertRR(trec, hostIP, "A")
+
+			// A records with container IP
+			if containerIP := task.containerIP(); containerIP != "" {
+				rg.insertRR("_container."+arec, containerIP, "A")
+				rg.insertRR("_container."+trec, containerIP, "A")
+			}
 
 			// SRV records
 			if task.Resources.Ports != "" {
