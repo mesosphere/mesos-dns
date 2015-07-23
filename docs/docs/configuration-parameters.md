@@ -19,7 +19,7 @@ The configuration file should include the following fields:
   "resolvers": ["169.254.169.254"],
   "timeout": 5, 
   "httpon": true,
-  "dsnon": true,
+  "dnson": true,
   "httpport": 8123,
   "externalon": true,
   "listener": "10.101.160.16",
