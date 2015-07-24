@@ -519,24 +519,21 @@ func (res *Resolver) LaunchHTTP() <-chan error {
 
 // Reports configuration through REST interface
 func (res *Resolver) RestConfig(req *restful.Request, resp *restful.Response) {
-	output, err := json.Marshal(res.config)
-	if err != nil {
+	if err := resp.WriteAsJson(res.config); err != nil {
 		logging.Error.Println(err)
 	}
-
-	io.WriteString(resp, string(output))
 }
 
 // Reports Mesos-DNS version through REST interface
 func (res *Resolver) RestVersion(req *restful.Request, resp *restful.Response) {
-	mapV := map[string]string{"Service": "Mesos-DNS",
+	err := resp.WriteAsJson(map[string]string{
+		"Service": "Mesos-DNS",
 		"Version": res.version,
-		"URL":     "https://github.com/mesosphere/mesos-dns"}
-	output, err := json.Marshal(mapV)
+		"URL":     "https://github.com/mesosphere/mesos-dns",
+	})
 	if err != nil {
 		logging.Error.Println(err)
 	}
-	io.WriteString(resp, string(output))
 }
 
 // Reports Mesos-DNS version through http interface
