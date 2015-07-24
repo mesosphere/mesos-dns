@@ -100,9 +100,7 @@ func (rg *RecordGenerator) ParseState(leader string, c Config) error {
 		hostSpec = labels.ForRFC952()
 	}
 
-	// insert state
-	rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, c.Masters, hostSpec)
-	return nil
+	return rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, c.Masters, hostSpec)
 }
 
 // Tries each master and looks for the leader
