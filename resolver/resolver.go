@@ -549,7 +549,7 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 		dom += "."
 	}
 
-	mapH := make([]map[string]string, 0)
+	var mapH []map[string]string
 	rs := res.records()
 
 	for _, ip := range rs.As[dom] {
@@ -604,7 +604,7 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 		dom += "."
 	}
 
-	mapS := make([]map[string]string, 0)
+	var mapS []map[string]string
 	rs := res.records()
 
 	for _, srv := range rs.SRVs[dom] {
