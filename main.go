@@ -46,12 +46,12 @@ func main() {
 	var newLeader <-chan struct{}
 
 	// launch DNS server
-	if config.DnsOn {
+	if config.DNSOn {
 		dnsErr = resolver.LaunchDNS()
 	}
 
 	// launch HTTP server
-	if config.HttpOn {
+	if config.HTTPOn {
 		httpErr = resolver.LaunchHTTP()
 	}
 

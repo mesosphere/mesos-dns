@@ -59,12 +59,13 @@ type Config struct {
 	// ListenAddr is the server listener address
 	Listener string
 
-	// Http port
-	HttpPort int
+	// NOTE(tsenart): HTTPPort, DNSOn and HTTPOn have defined JSON keys for
+	// backwards compatibility with external API clients.
+	HTTPPort int `json:"HttpPort"`
 
 	// Enable serving DSN and HTTP requests
-	DnsOn  bool
-	HttpOn bool
+	DNSOn  bool `json:"DnsOn"`
+	HTTPOn bool `json:"HttpOn"`
 
 	// Enable replies for external requests
 	ExternalOn bool
@@ -89,9 +90,9 @@ func SetConfig(cjson string) (c Config) {
 		SOAMinttl:      60,
 		Resolvers:      []string{"8.8.8.8"},
 		Listener:       "0.0.0.0",
-		HttpPort:       8123,
-		DnsOn:          true,
-		HttpOn:         true,
+		HTTPPort:       8123,
+		DNSOn:          true,
+		HTTPOn:         true,
 		ExternalOn:     true,
 		RecurseOn:      true,
 	}
@@ -118,7 +119,7 @@ func SetConfig(cjson string) (c Config) {
 	}
 
 	// validate and complete configuration file
-	if !(c.DnsOn || c.HttpOn) {
+	if !(c.DNSOn || c.HTTPOn) {
 		logging.Error.Fatalf("Either DNS or HTTP server should be on")
 	}
 	if len(c.Masters) == 0 && c.Zk == "" {
@@ -161,7 +162,7 @@ func SetConfig(cjson string) (c Config) {
 	logging.Verbose.Println("   - Domain: " + c.Domain)
 	logging.Verbose.Println("   - Listener: " + c.Listener)
 	logging.Verbose.Println("   - Port: ", c.Port)
-	logging.Verbose.Println("   - DnsOn: ", c.DnsOn)
+	logging.Verbose.Println("   - DnsOn: ", c.DNSOn)
 	logging.Verbose.Println("   - TTL: ", c.TTL)
 	logging.Verbose.Println("   - Timeout: ", c.Timeout)
 	logging.Verbose.Println("   - Resolvers: " + strings.Join(c.Resolvers, ", "))
@@ -174,8 +175,8 @@ func SetConfig(cjson string) (c Config) {
 	logging.Verbose.Println("   - SOAExpire: ", c.SOAExpire)
 	logging.Verbose.Println("   - SOAExpire: ", c.SOAMinttl)
 	logging.Verbose.Println("   - RecurseOn: ", c.RecurseOn)
-	logging.Verbose.Println("   - HttpPort: ", c.HttpPort)
-	logging.Verbose.Println("   - HttpOn: ", c.HttpOn)
+	logging.Verbose.Println("   - HttpPort: ", c.HTTPPort)
+	logging.Verbose.Println("   - HttpOn: ", c.HTTPOn)
 	logging.Verbose.Println("   - ConfigFile: ", c.File)
 	logging.Verbose.Println("   - EnforceRFC952: ", c.EnforceRFC952)
 

@@ -501,7 +501,7 @@ func (res *Resolver) LaunchHTTP() <-chan error {
 	defer util.HandleCrash()
 
 	res.configureHTTP()
-	portString := ":" + strconv.Itoa(res.config.HttpPort)
+	portString := ":" + strconv.Itoa(res.config.HTTPPort)
 
 	errCh := make(chan error, 1)
 	go func() {
