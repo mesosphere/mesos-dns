@@ -117,16 +117,14 @@ func (rg *RecordGenerator) findMaster(leader string, masters []string) (StateJSO
 		}
 
 		sj, _ = rg.loadWrap(ip, port)
-		if sj.Leader == "" {
-			logging.Verbose.Println("Warning: Zookeeper is wrong about leader")
-			if len(masters) == 0 {
-				return sj, errors.New("no master")
-			} else {
-				logging.Verbose.Println("Warning: falling back to Masters config field: ", masters)
-			}
-		} else {
+		if sj.Leader != "" {
 			return sj, nil
 		}
+		logging.Verbose.Println("Warning: Zookeeper is wrong about leader")
+		if len(masters) == 0 {
+			return sj, errors.New("no master")
+		}
+		logging.Verbose.Println("Warning: falling back to Masters config field: ", masters)
 	}
 
 	// try each listed mesos master before dying
