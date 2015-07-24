@@ -51,10 +51,10 @@ type Status struct {
 
 // Tasks holds mesos task information read in from state.json
 type Task struct {
-	FrameworkId string   `json:"framework_id"`
-	Id          string   `json:"id"`
+	FrameworkID string   `json:"framework_id"`
+	ID          string   `json:"id"`
 	Name        string   `json:"name"`
-	SlaveId     string   `json:"slave_id"`
+	SlaveID     string   `json:"slave_id"`
 	State       string   `json:"state"`
 	Statuses    []Status `json:"statuses"`
 	Resources   `json:"resources"`
@@ -68,7 +68,7 @@ type Frameworks []struct {
 
 // Slaves is a mapping of id to hostname read in from state.json
 type slave struct {
-	Id       string `json:"id"`
+	ID       string `json:"id"`
 	Hostname string `json:"hostname"`
 }
 type Slaves []slave
@@ -274,7 +274,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	// creates a map with slave IP addresses (IPv4)
 	rg.SlaveIPs = make(map[string]string)
 	for _, slave := range sj.Slaves {
-		rg.SlaveIPs[slave.Id] = sanitizedSlaveAddress(slave.Hostname, spec)
+		rg.SlaveIPs[slave.ID] = sanitizedSlaveAddress(slave.Hostname, spec)
 	}
 
 	rg.SRVs = make(rrs)
@@ -284,15 +284,15 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	for _, f := range sj.Frameworks {
 		fname := labels.AsDomainFrag(f.Name, spec)
 		for _, task := range f.Tasks {
-			hostIP, ok := rg.SlaveIPs[task.SlaveId]
+			hostIP, ok := rg.SlaveIPs[task.SlaveID]
 			// skip not running or not discoverable tasks
 			if !ok || (task.State != "TASK_RUNNING") {
 				continue
 			}
 
 			tname := spec.Mangle(task.Name)
-			sid := slaveIdTail(task.SlaveId)
-			tag := hashString(task.Id)
+			sid := slaveIDTail(task.SlaveID)
+			tag := hashString(task.ID)
 			tail := fname + "." + domain + "."
 
 			// A records for task and task-sid
@@ -547,7 +547,7 @@ func leaderIP(leader string) string {
 }
 
 // return the slave number from a Mesos slave id
-func slaveIdTail(slaveID string) string {
+func slaveIDTail(slaveID string) string {
 	fields := strings.Split(slaveID, "-")
 	return strings.ToLower(fields[len(fields)-1])
 }
