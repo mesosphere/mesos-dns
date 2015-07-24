@@ -206,15 +206,15 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 	return sj, err
 }
 
-// hash two long strings into a short one
+// BUG: The probability of hashing collisions is too high with only 17 bits.
+// NOTE: Using a numerical base as high as valid characters in DNS names would
+// reduce the resulting length without risking more collisions.
 func hashString(s string) string {
-	var upper, lower, sum uint16
 	h := fnv.New32a()
-	h.Write([]byte(s))
-	lower = uint16(h.Sum32())
-	upper = uint16(h.Sum32() >> 16)
-	sum = uint16(lower + upper)
-	return strconv.Itoa(int(sum))
+	_, _ = h.Write([]byte(s))
+	sum := h.Sum32()
+	lower, upper := uint16(sum), uint16(sum>>16)
+	return strconv.FormatUint(uint64(lower+upper), 10)
 }
 
 // attempt to translate the hostname into an IPv4 address. logs an error if IP

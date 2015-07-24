@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"testing"
+	"testing/quick"
 
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
@@ -345,5 +346,13 @@ func TestNTasks(t *testing.T) {
 
 	if len(k) != 2 {
 		t.Error("should only have 2 A records")
+	}
+}
+
+func TestHashString(t *testing.T) {
+	t.Skip("TODO: Increase entropy, fix the bug!")
+	fn := func(a, b string) bool { return hashString(a) != hashString(b) }
+	if err := quick.Check(fn, &quick.Config{MaxCount: 1e9}); err != nil {
+		t.Fatal(err)
 	}
 }
