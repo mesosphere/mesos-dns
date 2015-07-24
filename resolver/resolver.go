@@ -698,7 +698,6 @@ func startDefaultZKdetector(zkurl string, leaderChanged func(string)) error {
 func cleanWild(dom string) string {
 	if strings.Contains(dom, ".*") {
 		return strings.Replace(dom, ".*", "", -1)
-	} else {
-		return dom
 	}
+	return dom
 }
