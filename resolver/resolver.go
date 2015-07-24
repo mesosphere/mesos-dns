@@ -568,8 +568,11 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 	}
 	io.WriteString(resp, string(output))
 
-	// stats
 	mesosrq := strings.HasSuffix(dom, res.config.Domain+".")
+	stats(mesosrq, empty)
+}
+
+func stats(mesosrq, empty bool) {
 	if mesosrq {
 		logging.CurLog.MesosRequests.Inc()
 		if empty {
@@ -581,7 +584,6 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 		logging.CurLog.NonMesosRequests.Inc()
 		logging.CurLog.NonMesosFailed.Inc()
 	}
-
 }
 
 // Reports Mesos-DNS version through http interface
@@ -630,20 +632,8 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 	}
 	io.WriteString(resp, string(output))
 
-	// stats
 	mesosrq := strings.HasSuffix(dom, res.config.Domain+".")
-	if mesosrq {
-		logging.CurLog.MesosRequests.Inc()
-		if empty {
-			logging.CurLog.MesosNXDomain.Inc()
-		} else {
-			logging.CurLog.MesosSuccess.Inc()
-		}
-	} else {
-		logging.CurLog.NonMesosRequests.Inc()
-		logging.CurLog.NonMesosFailed.Inc()
-	}
-
+	stats(mesosrq, empty)
 }
 
 // panicRecover catches any panics from the resolvers and sets an error
