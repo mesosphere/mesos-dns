@@ -309,7 +309,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 			if task.Resources.Ports != "" {
 				ports := yankPorts(task.Resources.Ports)
 				for _, port := range ports {
-					var srvhost string = trec + ":" + port
+					srvhost := trec + ":" + port
 					tcp := "_" + tname + "._tcp." + tail
 					udp := "_" + tname + "._udp." + tail
 					rg.insertRR(tcp, srvhost, "SRV")
