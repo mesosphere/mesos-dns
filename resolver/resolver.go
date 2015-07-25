@@ -4,10 +4,8 @@ package resolver
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"net/http"
@@ -501,7 +499,7 @@ func (res *Resolver) LaunchHTTP() <-chan error {
 	defer util.HandleCrash()
 
 	res.configureHTTP()
-	portString := ":" + strconv.Itoa(res.config.HttpPort)
+	portString := ":" + strconv.Itoa(res.config.HTTPPort)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -519,131 +517,114 @@ func (res *Resolver) LaunchHTTP() <-chan error {
 
 // Reports configuration through REST interface
 func (res *Resolver) RestConfig(req *restful.Request, resp *restful.Response) {
-	output, err := json.Marshal(res.config)
-	if err != nil {
+	if err := resp.WriteAsJson(res.config); err != nil {
 		logging.Error.Println(err)
 	}
-
-	io.WriteString(resp, string(output))
 }
 
 // Reports Mesos-DNS version through REST interface
 func (res *Resolver) RestVersion(req *restful.Request, resp *restful.Response) {
-	mapV := map[string]string{"Service": "Mesos-DNS",
+	err := resp.WriteAsJson(map[string]string{
+		"Service": "Mesos-DNS",
 		"Version": res.version,
-		"URL":     "https://github.com/mesosphere/mesos-dns"}
-	output, err := json.Marshal(mapV)
+		"URL":     "https://github.com/mesosphere/mesos-dns",
+	})
 	if err != nil {
 		logging.Error.Println(err)
 	}
-	io.WriteString(resp, string(output))
 }
 
 // Reports Mesos-DNS version through http interface
 func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
-
 	host := req.PathParameter("host")
 	// clean up host name
 	dom := strings.ToLower(cleanWild(host))
 	if dom[len(dom)-1] != '.' {
 		dom += "."
 	}
-
-	mapH := make([]map[string]string, 0)
 	rs := res.records()
 
-	for _, ip := range rs.As[dom] {
-		t := map[string]string{"host": dom, "ip": ip}
-		mapH = append(mapH, t)
-	}
-	empty := (len(rs.As[dom]) == 0)
-	if empty {
-		t := map[string]string{"host": "", "ip": ""}
-		mapH = append(mapH, t)
+	type record struct {
+		Host string `json:"host"`
+		IP   string `json:"ip"`
 	}
 
-	output, err := json.Marshal(mapH)
-	if err != nil {
+	aRRs := rs.As[dom]
+	records := make([]record, 0, len(aRRs))
+	for _, ip := range aRRs {
+		records = append(records, record{dom, ip})
+	}
+
+	if len(records) == 0 {
+		records = append(records, record{})
+	}
+
+	if err := resp.WriteAsJson(records); err != nil {
 		logging.Error.Println(err)
 	}
-	io.WriteString(resp, string(output))
 
-	// stats
-	mesosrq := strings.HasSuffix(dom, res.config.Domain+".")
-	if mesosrq {
+	stats(dom, res.config.Domain+".", len(aRRs) > 0)
+}
+
+func stats(domain, zone string, success bool) {
+	if strings.HasSuffix(domain, zone) {
 		logging.CurLog.MesosRequests.Inc()
-		if empty {
-			logging.CurLog.MesosNXDomain.Inc()
-		} else {
+		if success {
 			logging.CurLog.MesosSuccess.Inc()
+		} else {
+			logging.CurLog.MesosNXDomain.Inc()
 		}
 	} else {
 		logging.CurLog.NonMesosRequests.Inc()
 		logging.CurLog.NonMesosFailed.Inc()
 	}
-
 }
 
 // Reports Mesos-DNS version through http interface
 func (res *Resolver) RestPorts(req *restful.Request, resp *restful.Response) {
-	io.WriteString(resp, "To be implemented...")
+	err := resp.WriteErrorString(http.StatusNotImplemented, "To be implemented...")
+	if err != nil {
+		logging.Error.Println(err)
+	}
 }
 
 // Reports Mesos-DNS version through http interface
 func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
-
-	var ip string
-
 	service := req.PathParameter("service")
-
 	// clean up service name
 	dom := strings.ToLower(cleanWild(service))
 	if dom[len(dom)-1] != '.' {
 		dom += "."
 	}
-
-	mapS := make([]map[string]string, 0)
 	rs := res.records()
 
-	for _, srv := range rs.SRVs[dom] {
-		h, port, _ := net.SplitHostPort(srv)
-		p, _ := strconv.Atoi(port)
-		if len(rs.As[h]) != 0 {
-			ip = rs.As[h][0]
-		} else {
-			ip = ""
+	type record struct {
+		Service string `json:"service"`
+		Host    string `json:"host"`
+		IP      string `json:"ip"`
+		Port    string `json:"port"`
+	}
+
+	srvRRs := rs.SRVs[dom]
+	records := make([]record, 0, len(srvRRs))
+	for _, s := range srvRRs {
+		host, port, _ := net.SplitHostPort(s)
+		var ip string
+		if r := rs.As[host]; len(r) != 0 {
+			ip = r[0]
 		}
-
-		t := map[string]string{"service": service, "host": h, "ip": ip, "port": strconv.Itoa(p)}
-		mapS = append(mapS, t)
+		records = append(records, record{service, host, ip, port})
 	}
 
-	empty := (len(rs.SRVs[dom]) == 0)
-	if empty {
-		t := map[string]string{"service": "", "host": "", "ip": "", "port": ""}
-		mapS = append(mapS, t)
+	if len(records) == 0 {
+		records = append(records, record{})
 	}
 
-	output, err := json.Marshal(mapS)
-	if err != nil {
+	if err := resp.WriteAsJson(records); err != nil {
 		logging.Error.Println(err)
 	}
-	io.WriteString(resp, string(output))
 
-	// stats
-	mesosrq := strings.HasSuffix(dom, res.config.Domain+".")
-	if mesosrq {
-		logging.CurLog.MesosRequests.Inc()
-		if empty {
-			logging.CurLog.MesosNXDomain.Inc()
-		} else {
-			logging.CurLog.MesosSuccess.Inc()
-		}
-	} else {
-		logging.CurLog.NonMesosRequests.Inc()
-		logging.CurLog.NonMesosFailed.Inc()
-	}
-
+	stats(dom, res.config.Domain+".", len(srvRRs) > 0)
 }
 
 // panicRecover catches any panics from the resolvers and sets an error
@@ -708,7 +689,6 @@ func startDefaultZKdetector(zkurl string, leaderChanged func(string)) error {
 func cleanWild(dom string) string {
 	if strings.Contains(dom, ".*") {
 		return strings.Replace(dom, ".*", "", -1)
-	} else {
-		return dom
 	}
+	return dom
 }

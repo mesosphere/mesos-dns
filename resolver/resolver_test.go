@@ -78,7 +78,7 @@ func fakeDNS(port int) (*Resolver, error) {
 		Listener:   "127.0.0.1",
 		SOARname:   "root.ns1.mesos.",
 		SOAMname:   "ns1.mesos.",
-		HttpPort:   8123,
+		HTTPPort:   8123,
 		ExternalOn: true,
 	})
 
@@ -360,7 +360,7 @@ func TestHTTP(t *testing.T) {
 	correct1 := map[string]interface{}{"Service": "Mesos-DNS", "Version": "0.1.1", "URL": "https://github.com/mesosphere/mesos-dns"}
 	eq1 := reflect.DeepEqual(got1, correct1)
 	if !eq1 {
-		t.Error("Http version API failure")
+		t.Error("HTTP version API failure")
 	}
 
 	// test /v1/config
@@ -376,7 +376,7 @@ func TestHTTP(t *testing.T) {
 	err = json.Unmarshal(g2, &got2)
 	eq2 := reflect.DeepEqual(got2, res.config)
 	if !eq2 {
-		t.Error("Http config API failure")
+		t.Error("HTTP config API failure")
 	}
 
 	// test /v1/services -- existing record
@@ -393,7 +393,7 @@ func TestHTTP(t *testing.T) {
 	correct3 := []map[string]interface{}{{"host": "leader.mesos.", "port": "5050", "service": "_leader._tcp.mesos.", "ip": "1.2.3.4"}}
 	eq3 := reflect.DeepEqual(got3, correct3)
 	if !eq3 {
-		t.Error("Http services API failure")
+		t.Error("HTTP services API failure")
 	}
 
 	// test /v1/services -- non existing record
@@ -410,7 +410,7 @@ func TestHTTP(t *testing.T) {
 	correct4 := []map[string]interface{}{{"host": "", "port": "", "service": "", "ip": ""}}
 	eq4 := reflect.DeepEqual(got4, correct4)
 	if !eq4 {
-		t.Error("Http services API failure")
+		t.Error("HTTP services API failure")
 	}
 
 	// test /v1/host -- existing record
@@ -427,7 +427,7 @@ func TestHTTP(t *testing.T) {
 	correct5 := []map[string]interface{}{{"host": "leader.mesos.", "ip": "1.2.3.4"}}
 	eq5 := reflect.DeepEqual(got5, correct5)
 	if !eq5 {
-		t.Error("Http hosts API failure")
+		t.Error("HTTP hosts API failure")
 	}
 
 }

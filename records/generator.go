@@ -51,10 +51,10 @@ type Status struct {
 
 // Tasks holds mesos task information read in from state.json
 type Task struct {
-	FrameworkId string   `json:"framework_id"`
-	Id          string   `json:"id"`
+	FrameworkID string   `json:"framework_id"`
+	ID          string   `json:"id"`
 	Name        string   `json:"name"`
-	SlaveId     string   `json:"slave_id"`
+	SlaveID     string   `json:"slave_id"`
 	State       string   `json:"state"`
 	Statuses    []Status `json:"statuses"`
 	Resources   `json:"resources"`
@@ -68,7 +68,7 @@ type Frameworks []struct {
 
 // Slaves is a mapping of id to hostname read in from state.json
 type slave struct {
-	Id       string `json:"id"`
+	ID       string `json:"id"`
 	Hostname string `json:"hostname"`
 }
 type Slaves []slave
@@ -100,9 +100,7 @@ func (rg *RecordGenerator) ParseState(leader string, c Config) error {
 		hostSpec = labels.ForRFC952()
 	}
 
-	// insert state
-	rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, c.Masters, hostSpec)
-	return nil
+	return rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, c.Masters, hostSpec)
 }
 
 // Tries each master and looks for the leader
@@ -119,16 +117,14 @@ func (rg *RecordGenerator) findMaster(leader string, masters []string) (StateJSO
 		}
 
 		sj, _ = rg.loadWrap(ip, port)
-		if sj.Leader == "" {
-			logging.Verbose.Println("Warning: Zookeeper is wrong about leader")
-			if len(masters) == 0 {
-				return sj, errors.New("no master")
-			} else {
-				logging.Verbose.Println("Warning: falling back to Masters config field: ", masters)
-			}
-		} else {
+		if sj.Leader != "" {
 			return sj, nil
 		}
+		logging.Verbose.Println("Warning: Zookeeper is wrong about leader")
+		if len(masters) == 0 {
+			return sj, errors.New("no master")
+		}
+		logging.Verbose.Println("Warning: falling back to Masters config field: ", masters)
 	}
 
 	// try each listed mesos master before dying
@@ -208,15 +204,15 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
 	return sj, err
 }
 
-// hash two long strings into a short one
+// BUG: The probability of hashing collisions is too high with only 17 bits.
+// NOTE: Using a numerical base as high as valid characters in DNS names would
+// reduce the resulting length without risking more collisions.
 func hashString(s string) string {
-	var upper, lower, sum uint16
 	h := fnv.New32a()
-	h.Write([]byte(s))
-	lower = uint16(h.Sum32())
-	upper = uint16(h.Sum32() >> 16)
-	sum = uint16(lower + upper)
-	return strconv.Itoa(int(sum))
+	_, _ = h.Write([]byte(s))
+	sum := h.Sum32()
+	lower, upper := uint16(sum), uint16(sum>>16)
+	return strconv.FormatUint(uint64(lower+upper), 10)
 }
 
 // attempt to translate the hostname into an IPv4 address. logs an error if IP
@@ -276,7 +272,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	// creates a map with slave IP addresses (IPv4)
 	rg.SlaveIPs = make(map[string]string)
 	for _, slave := range sj.Slaves {
-		rg.SlaveIPs[slave.Id] = sanitizedSlaveAddress(slave.Hostname, spec)
+		rg.SlaveIPs[slave.ID] = sanitizedSlaveAddress(slave.Hostname, spec)
 	}
 
 	rg.SRVs = make(rrs)
@@ -286,15 +282,15 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	for _, f := range sj.Frameworks {
 		fname := labels.AsDomainFrag(f.Name, spec)
 		for _, task := range f.Tasks {
-			hostIP, ok := rg.SlaveIPs[task.SlaveId]
+			hostIP, ok := rg.SlaveIPs[task.SlaveID]
 			// skip not running or not discoverable tasks
 			if !ok || (task.State != "TASK_RUNNING") {
 				continue
 			}
 
 			tname := spec.Mangle(task.Name)
-			sid := slaveIdTail(task.SlaveId)
-			tag := hashString(task.Id)
+			sid := slaveIDTail(task.SlaveID)
+			tag := hashString(task.ID)
 			tail := fname + "." + domain + "."
 
 			// A records for task and task-sid
@@ -313,7 +309,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 			if task.Resources.Ports != "" {
 				ports := yankPorts(task.Resources.Ports)
 				for _, port := range ports {
-					var srvhost string = trec + ":" + port
+					srvhost := trec + ":" + port
 					tcp := "_" + tname + "._tcp." + tail
 					udp := "_" + tname + "._udp." + tail
 					rg.insertRR(tcp, srvhost, "SRV")
@@ -549,7 +545,7 @@ func leaderIP(leader string) string {
 }
 
 // return the slave number from a Mesos slave id
-func slaveIdTail(slaveID string) string {
+func slaveIDTail(slaveID string) string {
 	fields := strings.Split(slaveID, "-")
 	return strings.ToLower(fields[len(fields)-1])
 }
