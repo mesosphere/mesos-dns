@@ -569,10 +569,10 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 func stats(domain, zone string, success bool) {
 	if strings.HasSuffix(domain, zone) {
 		logging.CurLog.MesosRequests.Inc()
-		if !success {
-			logging.CurLog.MesosNXDomain.Inc()
-		} else {
+		if success {
 			logging.CurLog.MesosSuccess.Inc()
+		} else {
+			logging.CurLog.MesosNXDomain.Inc()
 		}
 	} else {
 		logging.CurLog.NonMesosRequests.Inc()
