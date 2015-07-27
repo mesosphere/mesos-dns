@@ -259,8 +259,8 @@ func TestHandler(t *testing.T) {
 		t.Error(err)
 	}
 
-	if m.Rcode != 3 {
-		t.Error("not setting NXDOMAIN")
+	if got, want := m.Rcode, dns.RcodeNameError; got != want {
+		t.Errorf("not setting NXDOMAIN, got Rcode: %v, want: %v", got, want)
 	}
 
 	// test tcp
@@ -280,7 +280,7 @@ func TestHandler(t *testing.T) {
 	}
 
 	if m.Rcode != 0 || len(m.Answer) > 0 {
-		t.Error("not setting NODATA for AAAA requests")
+		t.Errorf("not setting NODATA for AAAA requests: Rcode: %d, Answer: %+v", m.Rcode, m.Answer)
 	}
 
 	// test AAAA --> NXDOMAIN
@@ -289,8 +289,8 @@ func TestHandler(t *testing.T) {
 		t.Error(err)
 	}
 
-	if m.Rcode != 3 {
-		t.Error("not setting NXDOMAIN for AAAA requests")
+	if got, want := m.Rcode, dns.RcodeNameError; got != want {
+		t.Errorf("not setting NXDOMAIN for AAAA requests: got Rcode: %v, want: %v", got, want)
 	}
 }
 

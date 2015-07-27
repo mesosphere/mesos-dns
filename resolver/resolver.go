@@ -356,111 +356,132 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 // question with resource answer(s)
 // it can handle {A, SRV, ANY}
 func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
-	var err error
-
-	dom := strings.ToLower(cleanWild(r.Question[0].Name))
-	qType := r.Question[0].Qtype
-
-	m := new(dns.Msg)
-	m.Authoritative = true
-	m.RecursionAvailable = res.config.RecurseOn
-	m.SetReply(r)
-
-	rs := res.records()
-
-	// SRV requests
-	if (qType == dns.TypeSRV) || (qType == dns.TypeANY) {
-		for _, srv := range rs.SRVs[dom] {
-			rr, err := res.formatSRV(r.Question[0].Name, srv)
-			if err != nil {
-				logging.Error.Println(err)
-			} else {
-				m.Answer = append(m.Answer, rr)
-				// return one corresponding A record add additional info
-				host := strings.Split(srv, ":")[0]
-				if len(rs.As[host]) != 0 {
-					rr, err := res.formatA(host, rs.As[host][0])
-					if err != nil {
-						logging.Error.Println(err)
-					} else {
-						m.Extra = append(m.Extra, rr)
-					}
-				}
-
-			}
-		}
-	}
-
-	// A requests
-	if (qType == dns.TypeA) || (qType == dns.TypeANY) {
-		for _, a := range rs.As[dom] {
-			rr, err := res.formatA(dom, a)
-			if err != nil {
-				logging.Error.Println(err)
-			} else {
-				m.Answer = append(m.Answer, rr)
-			}
-
-		}
-	}
-
-	// SOA requests
-	if (qType == dns.TypeSOA) || (qType == dns.TypeANY) {
-		rr, err := res.formatSOA(r.Question[0].Name)
-		if err != nil {
-			logging.Error.Println(err)
-		} else {
-			m.Ns = append(m.Ns, rr)
-		}
-	}
-
-	// NS requests
-	if (qType == dns.TypeNS) || (qType == dns.TypeANY) {
-		rr, err := res.formatNS(r.Question[0].Name)
-		logging.VeryVerbose.Println("NS request")
-		if err != nil {
-			logging.Error.Println(err)
-		} else {
-			m.Ns = append(m.Ns, rr)
-		}
-	}
-
-	// shuffle answers
-	m.Answer = shuffleAnswers(m.Answer)
-	// tracing info
 	logging.CurLog.MesosRequests.Inc()
 
-	if err != nil {
-		logging.CurLog.MesosFailed.Inc()
-	} else if (qType == dns.TypeAAAA) && (len(rs.SRVs[dom]) > 0 || len(rs.As[dom]) > 0) {
-		// correct handling of AAAA if there are A or SRV records
-		m.Authoritative = true
-		// set NOERROR
-		m.SetRcode(r, 0)
-		// leave answer empty (NOERROR --> NODATA)
+	m := &dns.Msg{MsgHdr: dns.MsgHdr{
+		Authoritative:      true,
+		RecursionAvailable: res.config.RecurseOn,
+	}}
+	m.SetReply(r)
 
+	var errs multiError
+	rs := res.records()
+	name := strings.ToLower(cleanWild(r.Question[0].Name))
+	switch r.Question[0].Qtype {
+	case dns.TypeSRV:
+		errs = append(errs, res.handleSRV(rs, name, m, r))
+	case dns.TypeA:
+		errs = append(errs, res.handleA(rs, name, m))
+	case dns.TypeSOA:
+		errs = append(errs, res.handleSOA(m, r))
+	case dns.TypeNS:
+		errs = append(errs, res.handleNS(m, r))
+	case dns.TypeANY:
+		errs = append(errs,
+			res.handleSRV(rs, name, m, r),
+			res.handleA(rs, name, m),
+			res.handleSOA(m, r),
+			res.handleNS(m, r),
+		)
+	}
+
+	if len(m.Answer) == 0 {
+		errs = append(errs, res.handleEmpty(rs, name, m, r))
 	} else {
-		// no answers but not a {SOA,SRV} request
-		if len(m.Answer) == 0 && (qType != dns.TypeSOA) && (qType != dns.TypeNS) && (qType != dns.TypeSRV) {
-			// set NXDOMAIN
-			m.SetRcode(r, 3)
+		shuffleAnswers(m.Answer)
+		logging.CurLog.MesosSuccess.Inc()
+	}
 
-			rr, err := res.formatSOA(r.Question[0].Name)
-			if err != nil {
-				logging.Error.Println(err)
-			} else {
-				m.Ns = append(m.Ns, rr)
-			}
-
-			logging.CurLog.MesosNXDomain.Inc()
-			logging.VeryVerbose.Println("total A rrs:\t" + strconv.Itoa(len(rs.As)))
-			logging.VeryVerbose.Println("failed looking for " + r.Question[0].String())
-		} else {
-			logging.CurLog.MesosSuccess.Inc()
-		}
+	if !errs.Nil() {
+		logging.Error.Println(errs)
+		logging.CurLog.MesosFailed.Inc()
 	}
 
 	reply(w, m)
+}
+
+func (res *Resolver) handleSRV(rs *records.RecordGenerator, name string, m, r *dns.Msg) error {
+	var errs multiError
+	for _, srv := range rs.SRVs[name] {
+		srvRR, err := res.formatSRV(r.Question[0].Name, srv)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		m.Answer = append(m.Answer, srvRR)
+		host := strings.Split(srv, ":")[0]
+		if len(rs.As[host]) == 0 {
+			continue
+		}
+
+		aRR, err := res.formatA(host, rs.As[host][0])
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		m.Extra = append(m.Extra, aRR)
+	}
+	return errs
+}
+
+func (res *Resolver) handleA(rs *records.RecordGenerator, name string, m *dns.Msg) error {
+	var errs multiError
+	for _, a := range rs.As[name] {
+		rr, err := res.formatA(name, a)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		m.Answer = append(m.Answer, rr)
+	}
+	return errs
+}
+
+func (res *Resolver) handleSOA(m, r *dns.Msg) error {
+	rr, err := res.formatSOA(r.Question[0].Name)
+	if err != nil {
+		return err
+	}
+	m.Ns = append(m.Ns, rr)
+	return nil
+}
+
+func (res *Resolver) handleNS(m, r *dns.Msg) error {
+	rr, err := res.formatNS(r.Question[0].Name)
+	logging.Error.Println("NS request")
+	if err != nil {
+		return err
+	}
+	m.Ns = append(m.Ns, rr)
+	return nil
+}
+
+func (res *Resolver) handleEmpty(rs *records.RecordGenerator, name string, m, r *dns.Msg) error {
+	qType := r.Question[0].Qtype
+	switch qType {
+	case dns.TypeSOA, dns.TypeNS, dns.TypeSRV:
+		logging.CurLog.MesosSuccess.Inc()
+		return nil
+	}
+
+	m.Rcode = dns.RcodeNameError
+	if qType == dns.TypeAAAA && len(rs.SRVs[name])+len(rs.As[name]) > 0 {
+		m.Rcode = dns.RcodeSuccess
+	}
+
+	logging.CurLog.MesosNXDomain.Inc()
+	logging.VeryVerbose.Println("total A rrs:\t" + strconv.Itoa(len(rs.As)))
+	logging.VeryVerbose.Println("failed looking for " + r.Question[0].String())
+
+	rr, err := res.formatSOA(r.Question[0].Name)
+	if err != nil {
+		return err
+	}
+
+	m.Ns = append(m.Ns, rr)
+	return nil
 }
 
 // reply writes the given dns.Msg out to the given dns.ResponseWriter,
@@ -689,9 +710,30 @@ func startDefaultZKdetector(zkurl string, leaderChanged func(string)) error {
 
 // cleanWild strips any wildcards out thus mapping cleanly to the
 // original serviceName
-func cleanWild(dom string) string {
-	if strings.Contains(dom, ".*") {
-		return strings.Replace(dom, ".*", "", -1)
+func cleanWild(name string) string {
+	if strings.Contains(name, ".*") {
+		return strings.Replace(name, ".*", "", -1)
 	}
-	return dom
+	return name
+}
+
+type multiError []error
+
+func (e multiError) Error() string {
+	errs := make([]string, len(e))
+	for i := range errs {
+		if e[i] != nil {
+			errs[i] = e[i].Error()
+		}
+	}
+	return strings.Join(errs, "; ")
+}
+
+func (e multiError) Nil() bool {
+	for _, err := range e {
+		if err != nil {
+			return false
+		}
+	}
+	return true
 }
