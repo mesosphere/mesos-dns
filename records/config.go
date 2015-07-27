@@ -183,8 +183,8 @@ func SetConfig(cjson string) (c Config) {
 	return c
 }
 
-// Returns the first nameserver in /etc/resolv.conf
-// used for non-Mesos  queries
+// GetLocalDNS returns the first nameserver in /etc/resolv.conf
+// Used for non-Mesos queries.
 func GetLocalDNS() []string {
 	conf, err := dns.ClientConfigFromFile("/etc/resolv.conf")
 	if err != nil {

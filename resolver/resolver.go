@@ -1,5 +1,4 @@
-// package resolver contains functions to handle resolving .mesos
-// domains
+// Package resolver contains functions to handle resolving .mesos domains
 package resolver
 
 import (
@@ -16,7 +15,7 @@ import (
 
 	"github.com/emicklei/go-restful"
 	"github.com/mesos/mesos-go/detector"
-	_ "github.com/mesos/mesos-go/detector/zoo"
+	_ "github.com/mesos/mesos-go/detector/zoo" // Registers the ZK detector
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
@@ -28,7 +27,7 @@ var (
 	recurseCnt = 3
 )
 
-// holds configuration state and the resource records
+// Resolver holds configuration state and the resource records
 type Resolver struct {
 	version    string
 	config     records.Config
@@ -43,6 +42,7 @@ type Resolver struct {
 	startZKdetection func(zkurl string, leaderChanged func(string)) error
 }
 
+// New returns a Resolver with the given version and configuration.
 func New(version string, config records.Config) *Resolver {
 	r := &Resolver{
 		version: version,
@@ -62,7 +62,8 @@ func (res *Resolver) records() *records.RecordGenerator {
 	return res.rs
 }
 
-// launches DNS server for a resolver, returns immediately
+// LaunchDNS starts a (TCP and UDP) DNS server for the Resolver,
+// returning a error channel to which errors are asynchronously sent.
 func (res *Resolver) LaunchDNS() <-chan error {
 	// Handers for Mesos requests
 	dns.HandleFunc(res.config.Domain+".", panicRecover(res.HandleMesos))
@@ -77,7 +78,7 @@ func (res *Resolver) LaunchDNS() <-chan error {
 	return errCh
 }
 
-// starts a DNS server for net protocol (tcp/udp), returns immediately.
+// Serve starts a DNS server for net protocol (tcp/udp), returns immediately.
 // the returned signal chan is closed upon the server successfully entering the listening phase.
 // if the server aborts then an error is sent on the error chan.
 func (res *Resolver) Serve(proto string) (<-chan struct{}, <-chan error) {
@@ -104,7 +105,7 @@ func (res *Resolver) Serve(proto string) (<-chan struct{}, <-chan error) {
 	return ch, errCh
 }
 
-// launches Zookeeper detector, returns immediately two chans: the first fires an empty
+// LaunchZK launches a Zookeeper detector, returns immediately two chans: the first fires an empty
 // struct whenever there's a new (non-nil) mesos leader, the second if there's an unrecoverable
 // error in the master detector.
 func (res *Resolver) LaunchZK(initialDetectionTimeout time.Duration) (<-chan struct{}, <-chan error) {
@@ -144,7 +145,7 @@ func (res *Resolver) LaunchZK(initialDetectionTimeout time.Duration) (<-chan str
 	return leaderCh, errCh
 }
 
-// triggers a new refresh from mesos master
+// Reload triggers a new state load from the configured Mesos master.
 func (res *Resolver) Reload() {
 	t := records.RecordGenerator{}
 	// Being very conservative
@@ -299,7 +300,8 @@ func shuffleAnswers(answers []dns.RR) []dns.RR {
 	return answers
 }
 
-// makes non-mesos queries to external nameserver
+// HandleNonMesos handles non-mesos queries by recursing to a configured
+// external resolver.
 func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 	var err error
 	var m *dns.Msg
@@ -494,7 +496,8 @@ func (res *Resolver) configureHTTP() {
 	restful.Add(ws)
 }
 
-// starts an http server for mesos-dns queries, returns immediately
+// LaunchHTTP starts an HTTP server for the Resolver, returning a error channel
+// to which errors are asynchronously sent.
 func (res *Resolver) LaunchHTTP() <-chan error {
 	defer util.HandleCrash()
 
@@ -515,14 +518,14 @@ func (res *Resolver) LaunchHTTP() <-chan error {
 	return errCh
 }
 
-// Reports configuration through REST interface
+// RestConfig handles HTTP requests of Resolver configuration.
 func (res *Resolver) RestConfig(req *restful.Request, resp *restful.Response) {
 	if err := resp.WriteAsJson(res.config); err != nil {
 		logging.Error.Println(err)
 	}
 }
 
-// Reports Mesos-DNS version through REST interface
+// RestVersion handles HTTP requests of Mesos-DNS version.
 func (res *Resolver) RestVersion(req *restful.Request, resp *restful.Response) {
 	err := resp.WriteAsJson(map[string]string{
 		"Service": "Mesos-DNS",
@@ -534,7 +537,7 @@ func (res *Resolver) RestVersion(req *restful.Request, resp *restful.Response) {
 	}
 }
 
-// Reports Mesos-DNS version through http interface
+// RestHost handles HTTP requests of DNS A records of the given host.
 func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 	host := req.PathParameter("host")
 	// clean up host name
@@ -580,7 +583,7 @@ func stats(domain, zone string, success bool) {
 	}
 }
 
-// Reports Mesos-DNS version through http interface
+// RestPorts is an HTTP handler which is currently not implemented.
 func (res *Resolver) RestPorts(req *restful.Request, resp *restful.Response) {
 	err := resp.WriteErrorString(http.StatusNotImplemented, "To be implemented...")
 	if err != nil {
@@ -588,7 +591,7 @@ func (res *Resolver) RestPorts(req *restful.Request, resp *restful.Response) {
 	}
 }
 
-// Reports Mesos-DNS version through http interface
+// RestService handles HTTP requests of DNS SRV records for the given name.
 func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 	service := req.PathParameter("service")
 	// clean up service name

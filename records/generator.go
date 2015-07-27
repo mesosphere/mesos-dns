@@ -1,4 +1,4 @@
-// package records contains functions to generate resource records from
+// Package records contains functions to generate resource records from
 // mesos master states to serve through a dns server
 package records
 
@@ -22,34 +22,33 @@ import (
 // Will likely become map[string][]discoveryinfo
 type rrs map[string][]string
 
-// Mesos-DNS state
-// Refactor when discovery id is available
+// RecordGenerator contains DNS records and methods to access and manipulate
+// them. TODO(kozyraki): Refactor when discovery id is available.
 type RecordGenerator struct {
 	As       rrs
 	SRVs     rrs
 	SlaveIPs map[string]string
 }
 
-// The following types help parse state.json
-// Resources holds our SRV ports
+// Resources holds resources as defined in the /state.json Mesos HTTP endpoint.
 type Resources struct {
 	Ports string `json:"ports"`
 }
 
-// Label holds a key/value pair
+// Label holds a label as defined in the /state.json Mesos HTTP endpoint.
 type Label struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
 
-// Status holds a task status
+// Status holds a task status as defined in the /state.json Mesos HTTP endpoint.
 type Status struct {
 	Timestamp float64 `json:"timestamp"`
 	State     string  `json:"state"`
 	Labels    []Label `json:"labels,omitempty"`
 }
 
-// Tasks holds mesos task information read in from state.json
+// Task holds a task as defined in the /state.json Mesos HTTP endpoint.
 type Task struct {
 	FrameworkID string   `json:"framework_id"`
 	ID          string   `json:"id"`
@@ -60,27 +59,27 @@ type Task struct {
 	Resources   `json:"resources"`
 }
 
-// Frameworks holds mesos frameworks information read in from state.json
-type Frameworks []struct {
+// Framework holds a framework as defined in the /state.json Mesos HTTP endpoint.
+type Framework struct {
 	Tasks []Task `json:"tasks"`
 	Name  string `json:"name"`
 }
 
-// Slaves is a mapping of id to hostname read in from state.json
-type slave struct {
+// Framework holds a framework as defined in the /state.json Mesos HTTP endpoint.
+type Slave struct {
 	ID       string `json:"id"`
 	Hostname string `json:"hostname"`
 }
-type Slaves []slave
 
-// StateJSON is a representation of mesos master state.json
+// StateJSON holds the state defined in the /state.json Mesos HTTP endpoint.
 type StateJSON struct {
-	Frameworks `json:"frameworks"`
-	Slaves     `json:"slaves"`
-	Leader     string `json:"leader"`
+	Frameworks []Framework `json:"frameworks"`
+	Slaves     []Slave     `json:"slaves"`
+	Leader     string      `json:"leader"`
 }
 
-// Finds the master and inserts DNS state
+// ParseState retrieves and parses the Mesos master /state.json and converts it
+// into DNS records.
 func (rg *RecordGenerator) ParseState(leader string, c Config) error {
 
 	// find master -- return if error
@@ -274,7 +273,6 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 		}
 		rg.SlaveIPs[slave.ID] = address
 	}
-
 
 	// complete crap - refactor me
 	for _, f := range sj.Frameworks {

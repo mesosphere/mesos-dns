@@ -1,6 +1,6 @@
 package labels
 
-// mangles the given name in order to produce a valid domain fragment.
+// AsDomainFrag mangles the given name in order to produce a valid domain fragment.
 // a valid domain fragment will consist of one or more host name labels
 // concatenated by a separatorChar char.
 func AsDomainFrag(name string, spec HostNameSpec) string {

@@ -129,12 +129,12 @@ func fakeQuery(dom string, rrHeader uint16, proto string, serverPort int) ([]dns
 	return in.Answer, nil
 }
 
-func identicalResults(msg_a []dns.RR, msg_b []dns.RR) bool {
-	if len(msg_a) != len(msg_b) {
+func identicalResults(a []dns.RR, b []dns.RR) bool {
+	if len(a) != len(b) {
 		return false
 	}
-	for i := range msg_a {
-		if msg_a[i].String() != msg_b[i].String() {
+	for i := range a {
+		if a[i].String() != b[i].String() {
 			return false
 		}
 	}
@@ -213,14 +213,14 @@ func TestHandler(t *testing.T) {
 	}
 
 	// Test case sensitivity -- this test depends on one above
-	msg_a := msg
+	dup := msg
 	msg, err = fakeQuery("cHrOnOs.MARATHON.mesoS.", dns.TypeA, "udp", port)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if !identicalResults(msg, msg_a) {
-		t.Errorf("Case sensitivity failure:\n%s\n!=\n%s", msg, msg_a)
+	if !identicalResults(msg, dup) {
+		t.Errorf("Case sensitivity failure:\n%s\n!=\n%s", msg, dup)
 	}
 
 	// test SRV record
