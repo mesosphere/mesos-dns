@@ -108,9 +108,9 @@ func (rg *RecordGenerator) ParseState(leader string, c Config) error {
 		return err
 	}
 
-	hostSpec := labels.ForRFC1123()
+	hostSpec := labels.RFC1123
 	if c.EnforceRFC952 {
-		hostSpec = labels.ForRFC952()
+		hostSpec = labels.RFC952
 	}
 
 	return rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, c.Masters, hostSpec)
@@ -270,7 +270,7 @@ func (t *Task) containerIP() string {
 
 // InsertState transforms a StateJSON into RecordGenerator RRs
 func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
-	listener string, masters []string, spec labels.HostNameSpec) error {
+	listener string, masters []string, spec labels.Func) error {
 
 	// creates a map with slave IP addresses (IPv4)
 	rg.SlaveIPs = make(map[string]string)
@@ -286,14 +286,14 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 			rg.insertRR("_slave._tcp."+domain+".", srv, "SRV")
 		} else {
 			logging.VeryVerbose.Printf("string '%q' for slave with id %q is not a valid IP address", address, slave.ID)
-			address = labels.AsDomainFrag(address, spec)
+			address = labels.DomainFrag(address, labels.Sep, spec)
 		}
 		rg.SlaveIPs[slave.ID] = address
 	}
 
 	// complete crap - refactor me
 	for _, f := range sj.Frameworks {
-		fname := labels.AsDomainFrag(f.Name, spec)
+		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
 		if address, ok := hostToIP4(f.PID.Host); ok {
 			a := fname + "." + domain + "."
 			rg.insertRR(a, address, "A")
@@ -308,7 +308,7 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 				continue
 			}
 
-			tname := spec.Mangle(task.Name)
+			tname := spec(task.Name)
 			sid := slaveIDTail(task.SlaveID)
 			tag := hashString(task.ID)
 			tail := fname + "." + domain + "."

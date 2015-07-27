@@ -221,7 +221,7 @@ func TestInsertState(t *testing.T) {
 
 	sj.Leader = "master@144.76.157.37:5050"
 	masters := []string{"144.76.157.37:5050"}
-	spec := labels.ForRFC952()
+	spec := labels.RFC952
 
 	var rg RecordGenerator
 	if err := rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters, spec); err != nil {
