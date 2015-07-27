@@ -5,10 +5,7 @@ import (
 )
 
 func TestValidateMasters(t *testing.T) {
-	table := []struct {
-		ms    []string
-		valid bool
-	}{
+	for i, tc := range []validationTest{
 		{nil, true},
 		{[]string{}, true},
 		{[]string{""}, false},
@@ -27,24 +24,13 @@ func TestValidateMasters(t *testing.T) {
 		{[]string{"[2001:0db8:3c4d:0015:0000:0000:1a2f:1a2b]:1"}, true},
 		{[]string{"[2001:db8:3c4d:15::1a2f:1a2b]:1"}, true},
 		{[]string{"[2001:0db8:3c4d:0015:0000:0000:1a2f:1a2b]:1", "[2001:db8:3c4d:15::1a2f:1a2b]:1"}, false},
-	}
-	for i, tc := range table {
-		err := validateMasters(tc.ms)
-		if (err == nil && tc.valid) || (err != nil && !tc.valid) {
-			continue
-		} else if tc.valid {
-			t.Fatalf("test %d failed, unexpected error validating masters %v: %v", i+1, tc.ms, err)
-		} else {
-			t.Fatalf("test %d failed, expected validation error for masters(%d) %v", i+1, len(tc.ms), tc.ms)
-		}
+	} {
+		validate(t, i+1, tc, validateMasters)
 	}
 }
 
 func TestValidateResolvers(t *testing.T) {
-	table := []struct {
-		rs    []string
-		valid bool
-	}{
+	for i, tc := range []validationTest{
 		{nil, true},
 		{[]string{}, true},
 		{[]string{""}, false},
@@ -58,15 +44,22 @@ func TestValidateResolvers(t *testing.T) {
 		{[]string{"2001:0db8:3c4d:0015:0000:0000:1a2f:1a2b"}, true},
 		{[]string{"2001:db8:3c4d:15::1a2f:1a2b"}, true},
 		{[]string{"2001:0db8:3c4d:0015:0000:0000:1a2f:1a2b", "2001:db8:3c4d:15::1a2f:1a2b"}, false},
+	} {
+		validate(t, i+1, tc, validateResolvers)
 	}
-	for i, tc := range table {
-		err := validateResolvers(tc.rs)
-		if (err == nil && tc.valid) || (err != nil && !tc.valid) {
-			continue
-		} else if tc.valid {
-			t.Fatalf("test %d failed, unexpected error validating resolvers %v: %v", i+1, tc.rs, err)
-		} else {
-			t.Fatalf("test %d failed, expected validation error for resolvers(%d) %v", i+1, len(tc.rs), tc.rs)
-		}
+}
+
+type validationTest struct {
+	in    []string
+	valid bool
+}
+
+func validate(t *testing.T, i int, tc validationTest, f func([]string) error) {
+	if err := f(tc.in); (err == nil && tc.valid) || (err != nil && !tc.valid) {
+		return // valid
+	} else if tc.valid {
+		t.Fatalf("test %d failed, unexpected error validating resolvers %v: %v", i, tc.in, err)
+	} else {
+		t.Fatalf("test %d failed, expected validation error for resolvers(%d) %v", i, len(tc.in), tc.in)
 	}
 }
