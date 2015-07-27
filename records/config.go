@@ -2,6 +2,7 @@ package records
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os/user"
@@ -75,51 +76,13 @@ type Config struct {
 }
 
 // SetConfig instantiates a Config struct read in from config.json
-func SetConfig(cjson string) (c Config) {
-	c = Config{
-		RefreshSeconds: 60,
-		TTL:            60,
-		Domain:         "mesos",
-		Port:           53,
-		Timeout:        5,
-		SOARname:       "root.ns1.mesos",
-		SOAMname:       "ns1.mesos",
-		SOARefresh:     60,
-		SOARetry:       600,
-		SOAExpire:      86400,
-		SOAMinttl:      60,
-		Resolvers:      []string{"8.8.8.8"},
-		Listener:       "0.0.0.0",
-		HTTPPort:       8123,
-		DNSOn:          true,
-		HTTPOn:         true,
-		ExternalOn:     true,
-		RecurseOn:      true,
-	}
-
-	// read configuration file
-	usr, _ := user.Current()
-	dir := usr.HomeDir + "/"
-	cjson = strings.Replace(cjson, "~/", dir, 1)
-
-	path, err := filepath.Abs(cjson)
+func SetConfig(cjson string) Config {
+	c, err := readConfig(cjson)
 	if err != nil {
-		logging.Error.Fatalf("cannot find configuration file")
+		logging.Error.Fatal(err)
 	}
-
-	b, err := ioutil.ReadFile(path)
-	if err != nil {
-		logging.Error.Fatalf("missing configuration file")
-	}
-	c.File = path
-
-	err = json.Unmarshal(b, &c)
-	if err != nil {
-		logging.Error.Println(err)
-	}
-
 	// validate and complete configuration file
-	if !(c.DNSOn || c.HTTPOn) {
+	if !c.DNSOn && !c.HTTPOn {
 		logging.Error.Fatalf("Either DNS or HTTP server should be on")
 	}
 	if len(c.Masters) == 0 && c.Zk == "" {
@@ -141,23 +104,14 @@ func SetConfig(cjson string) (c Config) {
 	c.Domain = strings.ToLower(c.Domain)
 
 	// SOA record fields
-	c.SOARname = strings.Replace(c.SOARname, "@", ".", -1)
-	if c.SOARname[len(c.SOARname)-1:] != "." {
-		c.SOARname = c.SOARname + "."
-	}
-	if c.SOAMname[len(c.SOAMname)-1:] != "." {
-		c.SOAMname = c.SOAMname + "."
-	}
+	c.SOARname = strings.TrimRight(strings.Replace(c.SOARname, "@", ".", -1), ".") + "."
+	c.SOAMname = strings.TrimRight(c.SOAMname, ".") + "."
 	c.SOASerial = uint32(time.Now().Unix())
 
 	// print configuration file
 	logging.Verbose.Println("Mesos-DNS configuration:")
-	if len(c.Masters) != 0 {
-		logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
-	}
-	if c.Zk != "" {
-		logging.Verbose.Println("   - Zookeeper: ", c.Zk)
-	}
+	logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
+	logging.Verbose.Println("   - Zookeeper: ", c.Zk)
 	logging.Verbose.Println("   - RefreshSeconds: ", c.RefreshSeconds)
 	logging.Verbose.Println("   - Domain: " + c.Domain)
 	logging.Verbose.Println("   - Listener: " + c.Listener)
@@ -180,7 +134,46 @@ func SetConfig(cjson string) (c Config) {
 	logging.Verbose.Println("   - ConfigFile: ", c.File)
 	logging.Verbose.Println("   - EnforceRFC952: ", c.EnforceRFC952)
 
-	return c
+	return *c
+}
+
+func readConfig(file string) (*Config, error) {
+	c := Config{
+		RefreshSeconds: 60,
+		TTL:            60,
+		Domain:         "mesos",
+		Port:           53,
+		Timeout:        5,
+		SOARname:       "root.ns1.mesos",
+		SOAMname:       "ns1.mesos",
+		SOARefresh:     60,
+		SOARetry:       600,
+		SOAExpire:      86400,
+		SOAMinttl:      60,
+		Resolvers:      []string{"8.8.8.8"},
+		Listener:       "0.0.0.0",
+		HTTPPort:       8123,
+		DNSOn:          true,
+		HTTPOn:         true,
+		ExternalOn:     true,
+		RecurseOn:      true,
+	}
+
+	usr, err := user.Current()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't retrieve current user: %v", err)
+	}
+
+	c.File, err = filepath.Abs(strings.Replace(file, "~/", usr.HomeDir+"/", 1))
+	if err != nil {
+		return nil, fmt.Errorf("cannot find configuration file")
+	} else if bs, err := ioutil.ReadFile(c.File); err != nil {
+		return nil, fmt.Errorf("missing configuration file: %q", c.File)
+	} else if err = json.Unmarshal(bs, &c); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config file: %q", c.File)
+	}
+
+	return &c, nil
 }
 
 // GetLocalDNS returns the first nameserver in /etc/resolv.conf
