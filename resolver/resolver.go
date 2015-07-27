@@ -168,40 +168,28 @@ func (res *Resolver) Reload() {
 
 // defaultExtResolver queries other nameserver, potentially recurses; callers should probably be invoking extResolver
 // instead since that's the pluggable entrypoint into external resolution.
-func (res *Resolver) defaultExtResolver(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
-	var in *dns.Msg
-	var err error
+func (res *Resolver) defaultExtResolver(r *dns.Msg, nameserver string, proto string, cnt int) (in *dns.Msg, err error) {
+	defer logging.CurLog.NonMesosRecursed.Inc()
 
-	c := new(dns.Client)
-	c.Net = proto
-
-	var t time.Duration = 5 * 1e9
+	timeout := 5 * time.Second
 	if res.config.Timeout != 0 {
-		t = time.Duration(int64(res.config.Timeout * 1e9))
+		timeout = time.Duration(res.config.Timeout) * time.Second
 	}
 
-	c.DialTimeout = t
-	c.ReadTimeout = t
-	c.WriteTimeout = t
-
-	in, _, err = c.Exchange(r, nameserver)
-	if err != nil {
-		return in, err
+	c := dns.Client{
+		Net:          proto,
+		DialTimeout:  timeout,
+		ReadTimeout:  timeout,
+		WriteTimeout: timeout,
 	}
 
-	// recurse
-	if (in != nil) && (len(in.Answer) == 0) && (!in.MsgHdr.Authoritative) && (len(in.Ns) > 0) && (err != nil) {
-
-		if cnt == recurseCnt {
-			logging.CurLog.NonMesosRecursed.Inc()
+	for i := 0; i < cnt; i++ {
+		in, _, err = c.Exchange(r, nameserver)
+		if err != nil || len(in.Ns) == 0 || (in.Authoritative && len(in.Answer) > 0) {
+			break
+		} else if soa, ok := in.Ns[0].(*dns.SOA); ok {
+			nameserver = soa.Ns
 		}
-
-		if cnt > 0 {
-			if soa, ok := (in.Ns[0]).(*dns.SOA); ok {
-				return res.defaultExtResolver(r, net.JoinHostPort(soa.Ns, "53"), proto, cnt-1)
-			}
-		}
-
 	}
 
 	return in, err
