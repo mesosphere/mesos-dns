@@ -146,29 +146,6 @@ func TestMasterRecord(t *testing.T) {
 	}
 }
 
-func TestSanitizedSlaveAddress(t *testing.T) {
-	spec := labels.ForRFC952()
-	x := sanitizedSlaveAddress("1.2.3.4", spec)
-	if x != "1.2.3.4" {
-		t.Fatalf("unexpected slave address %q", x)
-	}
-
-	x = sanitizedSlaveAddress("localhost", spec)
-	if x != "127.0.0.1" {
-		t.Fatalf("unexpected slave address %q", x)
-	}
-
-	x = sanitizedSlaveAddress("unbelievable.domain.acme", spec)
-	if x != "unbelievable.domain.acme" {
-		t.Fatalf("unexpected slave address %q", x)
-	}
-
-	x = sanitizedSlaveAddress("unbelievable<>.domain!@#...acme", spec)
-	if x != "unbelievable.domain.acme" {
-		t.Fatalf("unexpected slave address %q", x)
-	}
-}
-
 func TestYankPorts(t *testing.T) {
 	p := "[31328-31328]"
 
