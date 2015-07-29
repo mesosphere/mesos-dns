@@ -271,12 +271,15 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 
 	// creates a map with slave IP addresses (IPv4)
 	rg.SlaveIPs = make(map[string]string)
-	for _, slave := range sj.Slaves {
-		rg.SlaveIPs[slave.ID] = sanitizedSlaveAddress(slave.Hostname, spec)
-	}
-
 	rg.SRVs = make(rrs)
 	rg.As = make(rrs)
+
+	for _, slave := range sj.Slaves {
+		ssa := sanitizedSlaveAddress(slave.Hostname, spec)
+		rg.SlaveIPs[slave.ID] = ssa
+		rg.insertRR("slave."+domain+".", ssa, "A")
+	}
+
 
 	// complete crap - refactor me
 	for _, f := range sj.Frameworks {

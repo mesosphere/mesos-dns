@@ -287,6 +287,14 @@ func TestInsertState(t *testing.T) {
 		t.Error("should find a running master - A record")
 	}
 
+	rrs, ok = rg.As["slave.mesos."]
+	if !ok {
+		t.Error("should find a running slave - A record")
+	}
+	if got, want := rrs, []string{"1.2.3.10", "1.2.3.11", "1.2.3.12"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("should return the slave ips %v for the slave record, but got %v", want, got)
+	}
+
 	_, ok = rg.As["master0.mesos."]
 	if !ok {
 		t.Error("should find a running master0 - A record")
@@ -308,7 +316,7 @@ func TestInsertState(t *testing.T) {
 	}
 
 	// test for 5 A names
-	if got, want := len(rg.As), 16; got != want {
+	if got, want := len(rg.As), 17; got != want {
 		t.Errorf("not enough As, got %d, expected %d", got, want)
 	}
 
