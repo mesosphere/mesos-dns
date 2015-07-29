@@ -277,7 +277,12 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	for _, slave := range sj.Slaves {
 		ssa := sanitizedSlaveAddress(slave.Hostname, spec)
 		rg.SlaveIPs[slave.ID] = ssa
-		rg.insertRR("slave."+domain+".", ssa, "A")
+
+		if(net.ParseIP(ssa) != nil) {
+			rg.insertRR("slave."+domain+".", ssa, "A")
+		} else {
+			logging.VeryVerbose.Printf("string '%q' for slave with id %q is not a valid IP address", ssa, slave.ID)
+		}
 	}
 
 
