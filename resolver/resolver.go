@@ -415,7 +415,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	// NS requests
 	if (qType == dns.TypeNS) || (qType == dns.TypeANY) {
 		rr, err := res.formatNS(r.Question[0].Name)
-		logging.Error.Println("NS request")
+		logging.VeryVerbose.Println("NS request")
 		if err != nil {
 			logging.Error.Println(err)
 		} else {
