@@ -231,16 +231,6 @@ func hostToIP4(hostname string) (string, bool) {
 	return ip.String(), true
 }
 
-// attempt to convert the slave hostname to an IP4 address. if that fails, then
-// sanitize the hostname for DNS compat.
-func sanitizedSlaveAddress(hostname string, spec labels.HostNameSpec) (string, bool) {
-	address, ok := hostToIP4(hostname)
-	if !ok {
-		address = labels.AsDomainFrag(address, spec)
-	}
-	return address, ok
-}
-
 func (t *Task) containerIP() string {
 	const containerIPTaskStatusLabel = "Docker.NetworkSettings.IPAddress"
 
@@ -275,14 +265,14 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	rg.As = make(rrs)
 
 	for _, slave := range sj.Slaves {
-		ssa, ok := sanitizedSlaveAddress(slave.Hostname, spec)
-		rg.SlaveIPs[slave.ID] = ssa
-
+		address, ok := hostToIP4(slave.Hostname)
 		if ok {
-			rg.insertRR("slave."+domain+".", ssa, "A")
+			rg.insertRR("slave."+domain+".", address, "A")
 		} else {
-			logging.VeryVerbose.Printf("string '%q' for slave with id %q is not a valid IP address", ssa, slave.ID)
+			logging.VeryVerbose.Printf("string '%q' for slave with id %q is not a valid IP address", address, slave.ID)
+			address = labels.AsDomainFrag(address, spec)
 		}
+		rg.SlaveIPs[slave.ID] = address
 	}
 
 
