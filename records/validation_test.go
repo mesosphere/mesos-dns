@@ -55,11 +55,12 @@ type validationTest struct {
 }
 
 func validate(t *testing.T, i int, tc validationTest, f func([]string) error) {
-	if err := f(tc.in); (err == nil && tc.valid) || (err != nil && !tc.valid) {
+	switch err := f(tc.in); {
+	case (err == nil && tc.valid) || (err != nil && !tc.valid):
 		return // valid
-	} else if tc.valid {
+	case tc.valid:
 		t.Fatalf("test %d failed, unexpected error validating resolvers %v: %v", i, tc.in, err)
-	} else {
+	default:
 		t.Fatalf("test %d failed, expected validation error for resolvers(%d) %v", i, len(tc.in), tc.in)
 	}
 }
