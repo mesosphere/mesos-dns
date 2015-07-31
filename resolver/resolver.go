@@ -166,12 +166,15 @@ func (res *Resolver) Reload() {
 	}
 }
 
+// extQueryTimeout is the default external resolver query timeout.
+const extQueryTimeout = 5 * time.Second
+
 // defaultExtResolver queries other nameserver, potentially recurses; callers should probably be invoking extResolver
 // instead since that's the pluggable entrypoint into external resolution.
-func (res *Resolver) defaultExtResolver(r *dns.Msg, nameserver string, proto string, cnt int) (in *dns.Msg, err error) {
+func (res *Resolver) defaultExtResolver(r *dns.Msg, nameserver, proto string, cnt int) (in *dns.Msg, err error) {
 	defer logging.CurLog.NonMesosRecursed.Inc()
 
-	timeout := 5 * time.Second
+	timeout := extQueryTimeout
 	if res.config.Timeout != 0 {
 		timeout = time.Duration(res.config.Timeout) * time.Second
 	}
