@@ -65,6 +65,7 @@ type Task struct {
 // Framework holds a framework as defined in the /state.json Mesos HTTP endpoint.
 type Framework struct {
 	Tasks []Task `json:"tasks"`
+	PID   PID    `json:"pid"`
 	Name  string `json:"name"`
 }
 
@@ -293,6 +294,13 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	// complete crap - refactor me
 	for _, f := range sj.Frameworks {
 		fname := labels.AsDomainFrag(f.Name, spec)
+		if address, ok := hostToIP4(f.PID.Host); ok {
+			a := fname + "." + domain + "."
+			rg.insertRR(a, address, "A")
+			srv := net.JoinHostPort(a, f.PID.Port)
+			rg.insertRR("_framework._tcp."+a, srv, "SRV")
+		}
+
 		for _, task := range f.Tasks {
 			hostIP, ok := rg.SlaveIPs[task.SlaveID]
 			// skip not running or not discoverable tasks

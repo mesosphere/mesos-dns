@@ -242,6 +242,7 @@ func TestInsertState(t *testing.T) {
 		{rg.As, "A", "leader.mesos.", []string{"144.76.157.37"}},
 		{rg.As, "A", "slave.mesos.", []string{"1.2.3.10", "1.2.3.11", "1.2.3.12"}},
 		{rg.As, "A", "some-box.chronoswithaspaceandmixe.mesos.", []string{"1.2.3.11"}}, // ensure we translate the framework name as well
+		{rg.As, "A", "marathon.mesos.", []string{"1.2.3.11"}},
 		{rg.SRVs, "SRV", "_poseidon._tcp.marathon.mesos.", nil},
 		{rg.SRVs, "SRV", "_leader._tcp.mesos.", []string{"leader.mesos.:5050"}},
 		{rg.SRVs, "SRV", "_liquor-store._tcp.marathon.mesos.", []string{
@@ -251,6 +252,7 @@ func TestInsertState(t *testing.T) {
 		}},
 		{rg.SRVs, "SRV", "_liquor-store.marathon.mesos.", nil},
 		{rg.SRVs, "SRV", "_slave._tcp.mesos.", []string{"slave.mesos.:5051"}},
+		{rg.SRVs, "SRV", "_framework._tcp.marathon.mesos.", []string{"marathon.mesos.:25501"}},
 	} {
 		if got := tt.rrs[tt.name]; !reflect.DeepEqual(got, tt.want) {
 			t.Errorf("test #%d: %s record for %q: got: %q, want: %q", i, tt.kind, tt.name, got, tt.want)
