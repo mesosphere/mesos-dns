@@ -19,7 +19,10 @@ func (r *logRing) run() {
 		select {
 		case r.output <- x:
 		default:
-			<-r.output // drop item
+			select {
+			case <-r.output: // drop the oldest item
+			default: // someone already took everything?!
+			}
 			r.output <- x
 		}
 	}
