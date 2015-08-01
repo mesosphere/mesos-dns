@@ -3,6 +3,7 @@
 package records
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,8 @@ import (
 
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
+
+	"github.com/mesos/mesos-go/upid"
 )
 
 // Map host/service name to DNS answer
@@ -69,6 +72,16 @@ type Framework struct {
 type Slave struct {
 	ID       string `json:"id"`
 	Hostname string `json:"hostname"`
+	PID      PID    `json:"pid"`
+}
+
+// PID holds a Mesos PID and implements the json.Unmarshaler interface.
+type PID struct{ *upid.UPID }
+
+// UnmarshalJSON implements the json.Unmarshaler interface for PIDs.
+func (p *PID) UnmarshalJSON(data []byte) (err error) {
+	p.UPID, err = upid.Parse(string(bytes.Trim(data, `" `)))
+	return err
 }
 
 // StateJSON holds the state defined in the /state.json Mesos HTTP endpoint.
@@ -264,9 +277,12 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	rg.As = make(rrs)
 
 	for _, slave := range sj.Slaves {
-		address, ok := hostToIP4(slave.Hostname)
+		address, ok := hostToIP4(slave.PID.Host)
 		if ok {
-			rg.insertRR("slave."+domain+".", address, "A")
+			a := "slave." + domain + "."
+			rg.insertRR(a, address, "A")
+			srv := net.JoinHostPort(a, slave.PID.Port)
+			rg.insertRR("_slave._tcp."+domain+".", srv, "SRV")
 		} else {
 			logging.VeryVerbose.Printf("string '%q' for slave with id %q is not a valid IP address", address, slave.ID)
 			address = labels.AsDomainFrag(address, spec)
