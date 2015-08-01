@@ -332,7 +332,7 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 	if m == nil {
 		m = new(dns.Msg)
 		m.SetRcode(r, 2)
-		err = errors.New("nil msg")
+		err = fmt.Errorf("failed external DNS lookup of %q: %v", r.Question[0].Name, err)
 	}
 	if err != nil {
 		logging.Error.Println(r.Question[0].Name)
