@@ -27,6 +27,7 @@ vet:
 build:
 	@echo "--> Building mesos-dns"
 	@godep go build -o mesos-dns
+	@godep go build -o dnstap ./tools/dnstap
 
 test_banner:
 	@echo "--> Testing mesos-dns"

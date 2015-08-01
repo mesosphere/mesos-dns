@@ -9,6 +9,7 @@ import (
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/resolver"
+	"github.com/mesosphere/mesos-dns/resolver/tap"
 	"github.com/mesosphere/mesos-dns/util"
 )
 
@@ -45,7 +46,12 @@ func main() {
 
 	// launch DNS server
 	if config.DNSOn {
-		go func() { errch <- <-resolver.LaunchDNS() }()
+		tapServer, errCh := tap.LocalListenAndServe()
+		go func() { errch <- <-errCh }
+
+		//TODO(jdef) should check config to see if tap is enabled
+		tap := tap.NewTap(tapServer.NewSink())
+		go func() { errch <- <-resolver.LaunchDNS(tap) }()
 	}
 
 	// launch HTTP server
