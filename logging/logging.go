@@ -11,29 +11,40 @@ import (
 )
 
 var (
-	VerboseFlag     bool
+	// VerboseFlag enables verbose logging if set to true.
+	VerboseFlag bool
+	// VeryVerboseFlag enables very verbose logging if set to true.
 	VeryVerboseFlag bool
-	Verbose         *log.Logger
-	VeryVerbose     *log.Logger
-	Error           *log.Logger
+	// Verbose is this package's verbose Logger.
+	Verbose *log.Logger
+	// VeryVerbose is this package's very verbose Logger.
+	VeryVerbose *log.Logger
+	// Error is this package's error Logger.
+	Error *log.Logger
 )
 
+// Counter defines an interface for a monotonically incrementing value.
 type Counter interface {
 	Inc()
 }
 
+// LogCounter implements the Counter interface with a uint64 register.
+// It's safe for concurrent use.
 type LogCounter struct {
 	value uint64
 }
 
+// Inc increments the counter by one.
 func (lc *LogCounter) Inc() {
 	atomic.AddUint64(&lc.value, 1)
 }
 
+// String returns a string represention of the counter.
 func (lc *LogCounter) String() string {
 	return strconv.FormatUint(atomic.LoadUint64(&lc.value), 10)
 }
 
+// LogOut holds metrics captured in an instrumented runtime.
 type LogOut struct {
 	MesosRequests    Counter
 	MesosSuccess     Counter
@@ -46,6 +57,7 @@ type LogOut struct {
 	NonMesosRecursed Counter
 }
 
+// CurLog is the default package level LogOut.
 var CurLog = LogOut{
 	MesosRequests:    &LogCounter{},
 	MesosSuccess:     &LogCounter{},
