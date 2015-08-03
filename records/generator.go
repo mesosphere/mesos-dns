@@ -69,7 +69,7 @@ type Framework struct {
 	Name  string `json:"name"`
 }
 
-// Framework holds a framework as defined in the /state.json Mesos HTTP endpoint.
+// Slave holds a slave as defined in the /state.json Mesos HTTP endpoint.
 type Slave struct {
 	ID       string `json:"id"`
 	Hostname string `json:"hostname"`
