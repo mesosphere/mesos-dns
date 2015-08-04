@@ -35,6 +35,7 @@ type Resolver struct {
 	rsLock     sync.RWMutex
 	leader     string
 	leaderLock sync.RWMutex
+	rng        *rand.Rand
 
 	// pluggable external DNS resolution, mainly for unit testing
 	extResolver func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error)
@@ -48,6 +49,7 @@ func New(version string, config records.Config) *Resolver {
 		version: version,
 		config:  config,
 		rs:      &records.RecordGenerator{},
+		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	r.extResolver = r.defaultExtResolver
 	r.startZKdetection = startDefaultZKdetector
@@ -279,12 +281,10 @@ func (res *Resolver) formatNS(dom string) (*dns.NS, error) {
 }
 
 // reorders answers for very basic load balancing
-func shuffleAnswers(answers []dns.RR) []dns.RR {
-	rand.Seed(time.Now().UTC().UnixNano())
-
+func shuffleAnswers(rng *rand.Rand, answers []dns.RR) []dns.RR {
 	n := len(answers)
 	for i := 0; i < n; i++ {
-		r := i + rand.Intn(n-i)
+		r := i + rng.Intn(n-i)
 		answers[r], answers[i] = answers[i], answers[r]
 	}
 
@@ -379,7 +379,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	if len(m.Answer) == 0 {
 		errs = append(errs, res.handleEmpty(rs, name, m, r))
 	} else {
-		shuffleAnswers(m.Answer)
+		shuffleAnswers(res.rng, m.Answer)
 		logging.CurLog.MesosSuccess.Inc()
 	}
 
