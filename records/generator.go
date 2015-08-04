@@ -176,12 +176,12 @@ func (rg *RecordGenerator) loadFromMaster(ip string, port string) (sj StateJSON)
 	if err != nil {
 		logging.Error.Println(err)
 	}
-	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		logging.Error.Println(err)
 	}
+	_ = resp.Body.Close()
 
 	err = json.Unmarshal(body, &sj)
 	if err != nil {
