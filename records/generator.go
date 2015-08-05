@@ -272,11 +272,87 @@ func (t *Task) containerIP() string {
 func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 	listener string, masters []string, spec labels.Func) error {
 
-	// creates a map with slave IP addresses (IPv4)
 	rg.SlaveIPs = make(map[string]string)
 	rg.SRVs = make(rrs)
 	rg.As = make(rrs)
 
+	rg.frameworkRecords(sj, domain, spec)
+	rg.slaveRecords(sj, domain, spec)
+	rg.listenerRecord(listener, ns)
+	rg.masterRecord(domain, masters, sj.Leader)
+
+	// complete crap - refactor me
+	for _, f := range sj.Frameworks {
+		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
+
+		// insert taks records
+		tail := fname + "." + domain + "."
+		for _, task := range f.Tasks {
+			hostIP, ok := rg.SlaveIPs[task.SlaveID]
+
+			// skip not running or not discoverable tasks
+			if !ok || (task.State != "TASK_RUNNING") {
+				continue
+			}
+
+			// context used to build domain names
+			context := struct{
+				TaskName string
+				TaskID string
+				SlaveID string
+			}{
+				SlaveID:  slaveIDTail(task.SlaveID),
+				TaskID:   hashString(task.ID),
+				TaskName: spec(task.Name),
+			}
+
+			// insert canonical A records
+			trec := context.TaskName + "-" + context.TaskID + "-" + context.SlaveID + "." + tail
+			arec := context.TaskName + "." + tail
+			containerIP := task.containerIP()
+			rg.insertRR(arec, hostIP, "A")
+			rg.insertRR(trec, hostIP, "A")
+			if containerIP != "" {
+				rg.insertRR("_container."+arec, containerIP, "A")
+				rg.insertRR("_container."+trec, containerIP, "A")
+			}
+
+			// Add RFC 2782 SRV records
+			task.forEachPort(func (port string) {
+				srvHost := trec + ":" + port
+				tcp := "_" + context.TaskName + "._tcp." + tail
+				udp := "_" + context.TaskName + "._udp." + tail
+				rg.insertRR(tcp, srvHost, "SRV")
+				rg.insertRR(udp, srvHost, "SRV")
+			})
+		}
+	}
+
+	return nil
+}
+
+// frameworkRecords injects A and SRV records into the generator store:
+//     frameworkname.domain.                 // resolves to IPs of each framework
+//     _framework._tcp.frameworkname.domain. // resolves to the driver port and IP of each framework
+func (rg *RecordGenerator) frameworkRecords(sj StateJSON, domain string, spec labels.Func) {
+	for _, f := range sj.Frameworks {
+		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
+
+		// insert framework records (IPv4)
+		if address, ok := hostToIP4(f.PID.Host); ok {
+			a := fname + "." + domain + "."
+			rg.insertRR(a, address, "A")
+			srv := net.JoinHostPort(a, f.PID.Port)
+			rg.insertRR("_framework._tcp."+a, srv, "SRV")
+		}
+	}
+}
+
+
+// slaveRecords injects A and SRV records into the generator store:
+//     slave.domain.      // resolves to IPs of all slaves
+//     _slave._tc.domain. // resolves to the driver port and IP of all slaves
+func (rg *RecordGenerator) slaveRecords(sj StateJSON, domain string, spec labels.Func) {
 	for _, slave := range sj.Slaves {
 		address, ok := hostToIP4(slave.PID.Host)
 		if ok {
@@ -290,58 +366,6 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 		}
 		rg.SlaveIPs[slave.ID] = address
 	}
-
-	// complete crap - refactor me
-	for _, f := range sj.Frameworks {
-		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
-		if address, ok := hostToIP4(f.PID.Host); ok {
-			a := fname + "." + domain + "."
-			rg.insertRR(a, address, "A")
-			srv := net.JoinHostPort(a, f.PID.Port)
-			rg.insertRR("_framework._tcp."+a, srv, "SRV")
-		}
-
-		for _, task := range f.Tasks {
-			hostIP, ok := rg.SlaveIPs[task.SlaveID]
-			// skip not running or not discoverable tasks
-			if !ok || (task.State != "TASK_RUNNING") {
-				continue
-			}
-
-			tname := spec(task.Name)
-			sid := slaveIDTail(task.SlaveID)
-			tag := hashString(task.ID)
-			tail := fname + "." + domain + "."
-
-			// A records for task and task-sid
-			arec := tname + "." + tail
-			rg.insertRR(arec, hostIP, "A")
-			trec := tname + "-" + tag + "-" + sid + "." + tail
-			rg.insertRR(trec, hostIP, "A")
-
-			// A records with container IP
-			if containerIP := task.containerIP(); containerIP != "" {
-				rg.insertRR("_container."+arec, containerIP, "A")
-				rg.insertRR("_container."+trec, containerIP, "A")
-			}
-
-			// SRV records
-			if task.Resources.Ports != "" {
-				ports := yankPorts(task.Resources.Ports)
-				for _, port := range ports {
-					srvhost := trec + ":" + port
-					tcp := "_" + tname + "._tcp." + tail
-					udp := "_" + tname + "._udp." + tail
-					rg.insertRR(tcp, srvhost, "SRV")
-					rg.insertRR(udp, srvhost, "SRV")
-				}
-			}
-		}
-	}
-
-	rg.listenerRecord(listener, ns)
-	rg.masterRecord(domain, masters, sj.Leader)
-	return nil
 }
 
 // masterRecord injects A and SRV records into the generator store:
@@ -581,4 +605,13 @@ func getProto(pair string) (string, string, error) {
 		return "", "", fmt.Errorf("unable to parse proto from %q", pair)
 	}
 	return h[0], h[1], nil
+}
+
+func (t *Task) forEachPort(f func(port string)) {
+	if t.Resources.Ports != "" {
+		ports := yankPorts(t.Resources.Ports)
+		for _, port := range ports {
+			f(port)
+		}
+	}
 }
