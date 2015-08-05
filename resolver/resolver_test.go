@@ -17,6 +17,7 @@ import (
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/records/labels"
+	"github.com/mesosphere/mesos-dns/records/state"
 	"github.com/miekg/dns"
 )
 
@@ -419,7 +420,7 @@ func fakeDNS(t *testing.T) *Resolver {
 		t.Fatal(err)
 	}
 
-	var sj records.StateJSON
+	var sj state.State
 	err = json.Unmarshal(b, &sj)
 	if err != nil {
 		t.Fatal(err)
