@@ -10,8 +10,6 @@ import (
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
 	"github.com/mesosphere/mesos-dns/records/state"
-
-	"github.com/mesos/mesos-go/upid"
 )
 
 func init() {
@@ -207,29 +205,6 @@ func TestInsertState(t *testing.T) {
 	} {
 		if got := tt.rrs[tt.name]; !reflect.DeepEqual(got, tt.want) {
 			t.Errorf("test #%d: %s record for %q: got: %q, want: %q", i, tt.kind, tt.name, got, tt.want)
-		}
-	}
-}
-
-func TestPID_UnmarshalJSON(t *testing.T) {
-	makePID := func(id, host, port string) state.PID {
-		return state.PID{UPID: &upid.UPID{ID: id, Host: host, Port: port}}
-	}
-	for i, tt := range []struct {
-		data string
-		want state.PID
-		err  error
-	}{
-		{`"slave(1)@127.0.0.1:5051"`, makePID("slave(1)", "127.0.0.1", "5051"), nil},
-		{`  "slave(1)@127.0.0.1:5051"  `, makePID("slave(1)", "127.0.0.1", "5051"), nil},
-		{`"  slave(1)@127.0.0.1:5051  "`, makePID("slave(1)", "127.0.0.1", "5051"), nil},
-	} {
-		var pid state.PID
-		if err := json.Unmarshal([]byte(tt.data), &pid); !reflect.DeepEqual(err, tt.err) {
-			t.Errorf("test #%d: got err: %v, want: %v", i, err, tt.want)
-		}
-		if got := pid; !reflect.DeepEqual(got, tt.want) {
-			t.Errorf("test #%d: got: %v, want: %v", i, got, tt.want)
 		}
 	}
 }
