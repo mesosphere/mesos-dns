@@ -3,6 +3,8 @@ package resolver
 import (
 	"encoding/json"
 	"io/ioutil"
+	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -11,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kylelemons/godebug/pretty"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/records/labels"
@@ -52,7 +55,8 @@ func TestShuffleAnswers(t *testing.T) {
 	copy(c, m.Answer)
 	n.Answer = c
 
-	_ = shuffleAnswers(m.Answer)
+	rng := rand.New(rand.NewSource(0))
+	_ = shuffleAnswers(rng, m.Answer)
 
 	sflag := false
 	// 10! chance of failing here
@@ -68,239 +72,9 @@ func TestShuffleAnswers(t *testing.T) {
 	}
 }
 
-func fakeDNS(port int) (*Resolver, error) {
-	res := New("", records.Config{
-		Masters:    []string{"144.76.157.37:5050"},
-		TTL:        60,
-		Port:       port,
-		Domain:     "mesos",
-		Resolvers:  records.GetLocalDNS(),
-		Listener:   "127.0.0.1",
-		SOARname:   "root.ns1.mesos.",
-		SOAMname:   "ns1.mesos.",
-		HTTPPort:   8123,
-		ExternalOn: true,
-	})
-
-	b, err := ioutil.ReadFile("../factories/fake.json")
-	if err != nil {
-		return res, err
-	}
-
-	var sj records.StateJSON
-	err = json.Unmarshal(b, &sj)
-	if err != nil {
-		return res, err
-	}
-
-	masters := []string{"144.76.157.37:5050"}
-	spec := labels.RFC952
-	res.rs = &records.RecordGenerator{}
-	res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters, spec)
-
-	return res, nil
-}
-
-func fakeMsg(dom string, rrHeader uint16, proto string, serverPort int) (*dns.Msg, error) {
-	qc := uint16(dns.ClassINET)
-
-	c := new(dns.Client)
-	c.Net = proto
-
-	m := new(dns.Msg)
-	m.Question = make([]dns.Question, 1)
-	m.Question[0] = dns.Question{
-		Name:   dns.Fqdn(dom),
-		Qtype:  rrHeader,
-		Qclass: qc,
-	}
-	m.RecursionDesired = true
-	in, _, err := c.Exchange(m, "127.0.0.1:"+strconv.Itoa(serverPort))
-	return in, err
-
-}
-
-func fakeQuery(dom string, rrHeader uint16, proto string, serverPort int) ([]dns.RR, error) {
-	in, err := fakeMsg(dom, rrHeader, proto, serverPort)
-	if err != nil {
-		return nil, err
-	}
-
-	return in.Answer, nil
-}
-
-func identicalResults(a []dns.RR, b []dns.RR) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i].String() != b[i].String() {
-			return false
-		}
-	}
-	return true
-}
-
-func onError(abort <-chan struct{}, errCh <-chan error, f func(error)) <-chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		select {
-		case <-abort:
-		case e := <-errCh:
-			if e != nil {
-				defer close(ch)
-				f(e)
-			}
-		}
-	}()
-	return ch
-}
-
-func onSignal(abort <-chan struct{}, s <-chan struct{}, f func()) {
-	go func() {
-		select {
-		case <-abort:
-		case <-s:
-			f()
-		}
-	}()
-}
-
-// start TCP and UDP DNS servers and block, waiting for the server listeners to come up before returning
-func safeStartDNSResolver(t *testing.T, res *Resolver) {
-	var abortOnce sync.Once
-	abort := make(chan struct{})
-	doAbort := func() {
-		abortOnce.Do(func() { close(abort) })
-	}
-
-	s1, e := res.Serve("udp")
-	f1 := onError(abort, e, func(err error) { t.Fatalf("udp server failed: %v", err) })
-	s2, e := res.Serve("tcp")
-	f2 := onError(abort, e, func(err error) { t.Fatalf("tcp server failed: %v", err) })
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	onSignal(abort, s1, wg.Done)
-	onSignal(abort, s2, wg.Done)
-	onSignal(abort, f1, doAbort)
-	onSignal(abort, f2, doAbort)
-
-	wg.Wait()
-}
-
-func TestHandler(t *testing.T) {
-	var msg []dns.RR
-
-	const port = 8053
-	res, err := fakeDNS(port)
-	if err != nil {
-		t.Error(err)
-	}
-
-	dns.HandleFunc("mesos.", res.HandleMesos)
-	safeStartDNSResolver(t, res)
-
-	// test A records
-	msg, err = fakeQuery("chronos.marathon.mesos.", dns.TypeA, "udp", port)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(msg) != 1 {
-		t.Error("not serving up A records")
-	}
-
-	// Test case sensitivity -- this test depends on one above
-	dup := msg
-	msg, err = fakeQuery("cHrOnOs.MARATHON.mesoS.", dns.TypeA, "udp", port)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if !identicalResults(msg, dup) {
-		t.Errorf("Case sensitivity failure:\n%s\n!=\n%s", msg, dup)
-	}
-
-	// test SRV record
-	msg, err = fakeQuery("_liquor-store._udp.marathon.mesos.", dns.TypeSRV, "udp", port)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(msg) != 3 {
-		t.Error("not serving up SRV records")
-	}
-
-	// test SOA
-	m, err := fakeMsg("non-existing.mesos.", dns.TypeSOA, "udp", port)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if m.Ns == nil {
-		t.Error("not serving up SOA")
-	}
-
-	// test NS
-	m, err = fakeMsg("non-existing2.mesos.", dns.TypeNS, "udp", port)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if m.Ns == nil {
-		t.Error("not serving up NS")
-	}
-
-	// test non-existing host
-	m, err = fakeMsg("missing.mesos.", dns.TypeA, "udp", port)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if got, want := m.Rcode, dns.RcodeNameError; got != want {
-		t.Errorf("not setting NXDOMAIN, got Rcode: %v, want: %v", got, want)
-	}
-
-	// test tcp
-	msg, err = fakeQuery("chronos.marathon.mesos.", dns.TypeA, "tcp", port)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(msg) != 1 {
-		t.Error("not serving up A records")
-	}
-
-	// test AAAA --> NODATA
-	m, err = fakeMsg("chronos.marathon.mesos.", dns.TypeAAAA, "udp", port)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if m.Rcode != 0 || len(m.Answer) > 0 {
-		t.Errorf("not setting NODATA for AAAA requests: Rcode: %d, Answer: %+v", m.Rcode, m.Answer)
-	}
-
-	// test AAAA --> NXDOMAIN
-	m, err = fakeMsg("missing.mesos.", dns.TypeAAAA, "udp", port)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if got, want := m.Rcode, dns.RcodeNameError; got != want {
-		t.Errorf("not setting NXDOMAIN for AAAA requests: got Rcode: %v, want: %v", got, want)
-	}
-}
-
-func TestNonMesosHandler(t *testing.T) {
-	var msg []dns.RR
-
-	const port = 8054
-	res, err := fakeDNS(port)
+func TestHandlers(t *testing.T) {
+	res := fakeDNS(t)
 	res.extResolver = func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
-		t.Logf("ext-resolver: r=%v, nameserver=%s, proto=%s, cnt=%d", r, nameserver, proto, cnt)
 		rr1, err := res.formatA("google.com.", "1.1.1.1")
 		if err != nil {
 			return nil, err
@@ -309,127 +83,173 @@ func TestNonMesosHandler(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		msg := &dns.Msg{
-			Answer: []dns.RR{rr1, rr2},
-		}
+		msg := &dns.Msg{Answer: []dns.RR{rr1, rr2}}
 		msg.SetReply(r)
 		return msg, nil
 	}
-	if err != nil {
-		t.Error(err)
-	}
 
-	dns.HandleFunc(".", res.HandleNonMesos)
-	safeStartDNSResolver(t, res)
-
-	// test A records
-	msg, err = fakeQuery("google.com", dns.TypeA, "udp", port)
-	if err != nil {
-		t.Error(err)
-	}
-
-	if len(msg) < 1 {
-		t.Errorf("not serving up A records, expected 2 records instead of %d: %+v", len(msg), msg)
+	for i, tt := range []struct {
+		dns.HandlerFunc
+		*dns.Msg
+	}{
+		{
+			res.HandleMesos,
+			message(
+				question("chronos.marathon.mesos.", dns.TypeA),
+				header(true, dns.RcodeSuccess),
+				answers(
+					a(rrheader("chronos.marathon.mesos.", dns.TypeA, 60),
+						net.ParseIP("1.2.3.11")))),
+		},
+		{ // case insensitive
+			res.HandleMesos,
+			message(
+				question("cHrOnOs.MARATHON.mesoS.", dns.TypeA),
+				header(true, dns.RcodeSuccess),
+				answers(
+					a(rrheader("chronos.marathon.mesos.", dns.TypeA, 60),
+						net.ParseIP("1.2.3.11")))),
+		},
+		{
+			res.HandleMesos,
+			message(
+				question("_liquor-store._udp.marathon.mesos.", dns.TypeSRV),
+				header(true, dns.RcodeSuccess),
+				answers(
+					srv(rrheader("_liquor-store._udp.marathon.mesos.", dns.TypeSRV, 60),
+						"liquor-store-17700-0.marathon.mesos.", 31355, 0, 0),
+					srv(rrheader("_liquor-store._udp.marathon.mesos.", dns.TypeSRV, 60),
+						"liquor-store-17700-0.marathon.mesos.", 31354, 0, 0),
+					srv(rrheader("_liquor-store._udp.marathon.mesos.", dns.TypeSRV, 60),
+						"liquor-store-7581-1.marathon.mesos.", 31737, 0, 0)),
+				extras(
+					a(rrheader("liquor-store-17700-0.marathon.mesos.", dns.TypeA, 60),
+						net.ParseIP("1.2.3.11")),
+					a(rrheader("liquor-store-17700-0.marathon.mesos.", dns.TypeA, 60),
+						net.ParseIP("1.2.3.11")),
+					a(rrheader("liquor-store-7581-1.marathon.mesos.", dns.TypeA, 60),
+						net.ParseIP("1.2.3.12")))),
+		},
+		{
+			res.HandleMesos,
+			message(
+				question("non-existing.mesos.", dns.TypeSOA),
+				header(true, dns.RcodeSuccess),
+				nss(
+					soa(rrheader("non-existing.mesos.", dns.TypeSOA, 60),
+						"root.ns1.mesos.", "ns1.mesos.", 60))),
+		},
+		{
+			res.HandleMesos,
+			message(
+				question("non-existing.mesos.", dns.TypeNS),
+				header(true, dns.RcodeSuccess),
+				nss(
+					ns(rrheader("non-existing.mesos.", dns.TypeNS, 60), "ns1.mesos."))),
+		},
+		{
+			res.HandleMesos,
+			message(
+				question("missing.mesos.", dns.TypeA),
+				header(true, dns.RcodeNameError),
+				nss(
+					soa(rrheader("missing.mesos.", dns.TypeSOA, 60),
+						"root.ns1.mesos.", "ns1.mesos.", 60))),
+		},
+		{
+			res.HandleMesos,
+			message(
+				question("chronos.marathon.mesos.", dns.TypeAAAA),
+				header(true, dns.RcodeSuccess),
+				nss(
+					soa(rrheader("chronos.marathon.mesos.", dns.TypeSOA, 60),
+						"root.ns1.mesos.", "ns1.mesos.", 60))),
+		},
+		{
+			res.HandleMesos,
+			message(
+				question("missing.mesos.", dns.TypeAAAA),
+				header(true, dns.RcodeNameError),
+				nss(
+					soa(rrheader("missing.mesos.", dns.TypeSOA, 60),
+						"root.ns1.mesos.", "ns1.mesos.", 60))),
+		},
+		{
+			res.HandleNonMesos,
+			message(
+				question("google.com.", dns.TypeA),
+				header(false, dns.RcodeSuccess),
+				answers(
+					a(rrheader("google.com.", dns.TypeA, 60), net.ParseIP("1.1.1.1")),
+					a(rrheader("google.com.", dns.TypeA, 60), net.ParseIP("2.2.2.2")))),
+		},
+	} {
+		var rw responseRecorder
+		tt.HandlerFunc(&rw, tt.Msg)
+		if got, want := rw.msg, tt.Msg; !reflect.DeepEqual(got, want) {
+			t.Logf("Test #%d\n%v\n", i, pretty.Sprint(tt.Msg.Question))
+			t.Error(pretty.Compare(got, want))
+		}
 	}
 }
 
 func TestHTTP(t *testing.T) {
-
 	// setup DNS server (just http)
-	res, err := fakeDNS(8053)
-	if err != nil {
-		t.Error(err)
-	}
+	res := fakeDNS(t)
 	res.version = "0.1.1"
 
 	res.configureHTTP()
-	ts := httptest.NewServer(http.DefaultServeMux)
-	defer ts.Close()
+	srv := httptest.NewServer(http.DefaultServeMux)
+	defer srv.Close()
 
-	// test /v1/version
-	r1, err := http.Get(ts.URL + "/v1/version")
-	if err != nil {
-		t.Error(err)
+	for _, tt := range []struct {
+		path      string
+		code      int
+		got, want interface{}
+	}{
+		{"/v1/version", http.StatusOK, map[string]interface{}{},
+			map[string]interface{}{
+				"Service": "Mesos-DNS",
+				"URL":     "https://github.com/mesosphere/mesos-dns",
+				"Version": "0.1.1",
+			},
+		},
+		{"/v1/config", http.StatusOK, &records.Config{}, &res.config},
+		{"/v1/services/_leader._tcp.mesos.", http.StatusOK, []interface{}{},
+			[]interface{}{map[string]interface{}{
+				"service": "_leader._tcp.mesos.",
+				"host":    "leader.mesos.",
+				"ip":      "1.2.3.4",
+				"port":    "5050",
+			}},
+		},
+		{"/v1/services/_myservice._tcp.mesos.", http.StatusOK, []interface{}{},
+			[]interface{}{map[string]interface{}{
+				"service": "",
+				"host":    "",
+				"ip":      "",
+				"port":    "",
+			}},
+		},
+		{"/v1/hosts/leader.mesos", http.StatusOK, []interface{}{},
+			[]interface{}{map[string]interface{}{
+				"host": "leader.mesos.",
+				"ip":   "1.2.3.4",
+			}},
+		},
+	} {
+		if resp, err := http.Get(srv.URL + tt.path); err != nil {
+			t.Error(err)
+		} else if got, want := resp.StatusCode, tt.code; got != want {
+			t.Errorf("GET %s: StatusCode: got %d, want %d", tt.path, got, want)
+		} else if err := json.NewDecoder(resp.Body).Decode(&tt.got); err != nil {
+			t.Error(err)
+		} else if got, want := tt.got, tt.want; !reflect.DeepEqual(got, want) {
+			t.Errorf("GET %s: Body:\ngot:  %#v\nwant: %#v", tt.path, got, want)
+		} else {
+			_ = resp.Body.Close()
+		}
 	}
-	g1, err := ioutil.ReadAll(r1.Body)
-	if err != nil {
-		t.Error(err)
-	}
-	var got1 map[string]interface{}
-	err = json.Unmarshal(g1, &got1)
-	correct1 := map[string]interface{}{"Service": "Mesos-DNS", "Version": "0.1.1", "URL": "https://github.com/mesosphere/mesos-dns"}
-	eq1 := reflect.DeepEqual(got1, correct1)
-	if !eq1 {
-		t.Error("HTTP version API failure")
-	}
-
-	// test /v1/config
-	r2, err := http.Get(ts.URL + "/v1/config")
-	if err != nil {
-		t.Error(err)
-	}
-	g2, err := ioutil.ReadAll(r2.Body)
-	if err != nil {
-		t.Error(err)
-	}
-	var got2 records.Config
-	err = json.Unmarshal(g2, &got2)
-	eq2 := reflect.DeepEqual(got2, res.config)
-	if !eq2 {
-		t.Error("HTTP config API failure")
-	}
-
-	// test /v1/services -- existing record
-	r3, err := http.Get(ts.URL + "/v1/services/_leader._tcp.mesos.")
-	if err != nil {
-		t.Error(err)
-	}
-	g3, err := ioutil.ReadAll(r3.Body)
-	if err != nil {
-		t.Error(err)
-	}
-	var got3 []map[string]interface{}
-	err = json.Unmarshal(g3, &got3)
-	correct3 := []map[string]interface{}{{"host": "leader.mesos.", "port": "5050", "service": "_leader._tcp.mesos.", "ip": "1.2.3.4"}}
-	eq3 := reflect.DeepEqual(got3, correct3)
-	if !eq3 {
-		t.Error("HTTP services API failure")
-	}
-
-	// test /v1/services -- non existing record
-	r4, err := http.Get(ts.URL + "/v1/services/_myservice._tcp.mesos.")
-	if err != nil {
-		t.Error(err)
-	}
-	g4, err := ioutil.ReadAll(r4.Body)
-	if err != nil {
-		t.Error(err)
-	}
-	var got4 []map[string]interface{}
-	err = json.Unmarshal(g4, &got4)
-	correct4 := []map[string]interface{}{{"host": "", "port": "", "service": "", "ip": ""}}
-	eq4 := reflect.DeepEqual(got4, correct4)
-	if !eq4 {
-		t.Error("HTTP services API failure")
-	}
-
-	// test /v1/host -- existing record
-	r5, err := http.Get(ts.URL + "/v1/hosts/leader.mesos")
-	if err != nil {
-		t.Error(err)
-	}
-	g5, err := ioutil.ReadAll(r5.Body)
-	if err != nil {
-		t.Error(err)
-	}
-	var got5 []map[string]interface{}
-	err = json.Unmarshal(g5, &got5)
-	correct5 := []map[string]interface{}{{"host": "leader.mesos.", "ip": "1.2.3.4"}}
-	eq5 := reflect.DeepEqual(got5, correct5)
-	if !eq5 {
-		t.Error("HTTP hosts API failure")
-	}
-
 }
 
 func TestLaunchZK(t *testing.T) {
@@ -480,4 +300,151 @@ func TestLaunchZK(t *testing.T) {
 	case <-time.After(200 * time.Millisecond):
 		// expected
 	}
+}
+
+func message(opts ...func(*dns.Msg)) *dns.Msg {
+	var m dns.Msg
+	for _, opt := range opts {
+		opt(&m)
+	}
+	return &m
+}
+
+func header(auth bool, rcode int) func(*dns.Msg) {
+	return func(m *dns.Msg) {
+		m.Authoritative = auth
+		m.Response = true
+		m.Rcode = rcode
+		m.Compress = true
+	}
+}
+
+func question(name string, qtype uint16) func(*dns.Msg) {
+	return func(m *dns.Msg) { m.SetQuestion(name, qtype) }
+}
+
+func answers(rrs ...dns.RR) func(*dns.Msg) {
+	return func(m *dns.Msg) { m.Answer = append(m.Answer, rrs...) }
+}
+
+func nss(rrs ...dns.RR) func(*dns.Msg) {
+	return func(m *dns.Msg) { m.Ns = append(m.Ns, rrs...) }
+}
+
+func extras(rrs ...dns.RR) func(*dns.Msg) {
+	return func(m *dns.Msg) { m.Extra = append(m.Extra, rrs...) }
+}
+
+func rrheader(name string, rrtype uint16, ttl uint32) dns.RR_Header {
+	return dns.RR_Header{
+		Name:   name,
+		Rrtype: rrtype,
+		Class:  dns.ClassINET,
+		Ttl:    ttl,
+	}
+}
+
+func a(hdr dns.RR_Header, ip net.IP) dns.RR {
+	return &dns.A{
+		Hdr: hdr,
+		A:   ip.To4(),
+	}
+}
+
+func srv(hdr dns.RR_Header, target string, port, priority, weight uint16) dns.RR {
+	return &dns.SRV{
+		Hdr:      hdr,
+		Target:   target,
+		Port:     port,
+		Priority: priority,
+		Weight:   weight,
+	}
+}
+
+func ns(hdr dns.RR_Header, s string) dns.RR {
+	return &dns.NS{
+		Hdr: hdr,
+		Ns:  s,
+	}
+}
+
+func soa(hdr dns.RR_Header, ns, mbox string, minttl uint32) dns.RR {
+	return &dns.SOA{
+		Hdr:    hdr,
+		Ns:     ns,
+		Mbox:   mbox,
+		Minttl: minttl,
+	}
+}
+
+// responseRecorder implements the dns.ResponseWriter interface. It's used in
+// tests only.
+type responseRecorder struct {
+	localAddr  net.IPAddr
+	remoteAddr net.IPAddr
+	msg        *dns.Msg
+}
+
+func (r responseRecorder) LocalAddr() net.Addr  { return &r.localAddr }
+func (r responseRecorder) RemoteAddr() net.Addr { return &r.remoteAddr }
+func (r *responseRecorder) WriteMsg(m *dns.Msg) error {
+	r.msg = m
+	return nil
+}
+
+func (r *responseRecorder) Write([]byte) (int, error) { return 0, nil }
+func (r *responseRecorder) Close() error              { return nil }
+func (r responseRecorder) TsigStatus() error          { return nil }
+func (r responseRecorder) TsigTimersOnly(bool)        {}
+func (r *responseRecorder) Hijack()                   {}
+
+func fakeDNS(t *testing.T) *Resolver {
+	res := New("", records.Config{
+		Masters:       []string{"144.76.157.37:5050"},
+		TTL:           60,
+		Port:          53,
+		Domain:        "mesos",
+		Resolvers:     records.GetLocalDNS(),
+		Listener:      "127.0.0.1",
+		SOARname:      "root.ns1.mesos.",
+		SOAMname:      "ns1.mesos.",
+		HTTPPort:      8123,
+		ExternalOn:    true,
+		EnforceRFC952: true,
+	})
+	res.rng.Seed(0) // for deterministic tests
+
+	b, err := ioutil.ReadFile("../factories/fake.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var sj records.StateJSON
+	err = json.Unmarshal(b, &sj)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res.config.Masters = []string{"144.76.157.37:5050"}
+	spec := labels.RFC952
+	err = res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", res.config.Masters, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func onError(abort <-chan struct{}, errCh <-chan error, f func(error)) <-chan struct{} {
+	ch := make(chan struct{})
+	go func() {
+		select {
+		case <-abort:
+		case e := <-errCh:
+			if e != nil {
+				defer close(ch)
+				f(e)
+			}
+		}
+	}()
+	return ch
 }

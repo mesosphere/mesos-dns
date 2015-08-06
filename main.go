@@ -41,37 +41,29 @@ func main() {
 	// initialize resolver
 	config := records.SetConfig(*cjson)
 	resolver := resolver.New(version, config)
-
-	var dnsErr, httpErr, zkErr <-chan error
-	var newLeader <-chan struct{}
+	errch := make(chan error)
 
 	// launch DNS server
 	if config.DNSOn {
-		dnsErr = resolver.LaunchDNS()
+		go func() { errch <- <-resolver.LaunchDNS() }()
 	}
 
 	// launch HTTP server
 	if config.HTTPOn {
-		httpErr = resolver.LaunchHTTP()
+		go func() { errch <- <-resolver.LaunchHTTP() }()
 	}
 
+	var newLeader <-chan struct{}
+	var zkErr <-chan error
 	// launch Zookeeper listener
 	if config.Zk != "" {
 		newLeader, zkErr = resolver.LaunchZK(zkInitialDetectionTimeout)
+		go func() { errch <- <-zkErr }()
 	} else {
 		// uniform behavior when new leader from masters field
 		leader := make(chan struct{}, 1)
 		leader <- struct{}{}
 		newLeader = leader
-	}
-
-	// print error and terminate
-	handleServerErr := func(name string, err error) {
-		if err != nil {
-			logging.Error.Fatalf("%s failed: %v", name, err)
-		} else {
-			logging.Error.Fatalf("%s stopped unexpectedly", name)
-		}
 	}
 
 	// generate reload signal; up to 1 reload pending at any time
@@ -101,12 +93,8 @@ func main() {
 		select {
 		case <-newLeader:
 			tryReload()
-		case err := <-dnsErr:
-			handleServerErr("DNS server", err)
-		case err := <-httpErr:
-			handleServerErr("HTTP server", err)
-		case err := <-zkErr:
-			handleServerErr("ZK watcher", err)
+		case err := <-errch:
+			logging.Error.Fatal(err)
 		}
 	}
 }
