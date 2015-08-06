@@ -425,7 +425,6 @@ func fakeDNS(t *testing.T) *Resolver {
 		t.Fatal(err)
 	}
 
-	res.config.Masters = []string{"144.76.157.37:5050"}
 	spec := labels.RFC952
 	err = res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", res.config.Masters, spec)
 	if err != nil {
