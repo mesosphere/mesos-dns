@@ -205,13 +205,14 @@ func (rg *RecordGenerator) InsertState(sj state.State, domain string,
 func (rg *RecordGenerator) frameworkRecords(sj state.State, domain string, spec labels.Func) {
 	for _, f := range sj.Frameworks {
 		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
-
-		// insert framework records (IPv4)
-		if address, ok := hostToIP4(f.PID.Host); ok {
+		host, port := f.HostPort()
+		if address, ok := hostToIP4(host); ok {
 			a := fname + "." + domain + "."
 			rg.insertRR(a, address, "A")
-			srv := net.JoinHostPort(a, f.PID.Port)
-			rg.insertRR("_framework._tcp."+a, srv, "SRV")
+			if port != "" {
+				srv := net.JoinHostPort(a, port)
+				rg.insertRR("_framework._tcp."+a, srv, "SRV")
+			}
 		}
 	}
 }
