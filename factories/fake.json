@@ -130,6 +130,27 @@
         },
         {
             "active": true,
+            "checkpoint": false,
+            "completed_tasks": [],
+            "failover_timeout": 1200,
+            "hostname": "localhost",
+            "id": "20140703-014514-3041283216-5050-5348-0002",
+            "name": "no pid",
+            "offers": [],
+            "registered_time": 1414913537.10742,
+            "reregistered_time": 1414913537.10744,
+            "resources": {
+                "cpus": 0,
+                 "disk": 0,
+                 "mem": 0
+             },
+             "role": "*",
+             "tasks": [],
+             "unregistered_time": 0,
+             "user": "root"
+        },
+        {
+            "active": true,
             "checkpoint": true,
             "completed_tasks": [
                 {

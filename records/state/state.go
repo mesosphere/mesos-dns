@@ -87,9 +87,19 @@ func (t *Task) ContainerIP() string {
 
 // Framework holds a framework as defined in the /state.json Mesos HTTP endpoint.
 type Framework struct {
-	Tasks []Task `json:"tasks"`
-	PID   PID    `json:"pid"`
-	Name  string `json:"name"`
+	Tasks    []Task `json:"tasks"`
+	PID      PID    `json:"pid"`
+	Name     string `json:"name"`
+	Hostname string `json:"hostname"`
+}
+
+// HostPort returns the hostname and port where a framework's scheduler is
+// listening on.
+func (f Framework) HostPort() (string, string) {
+	if f.PID.UPID != nil {
+		return f.PID.Host, f.PID.Port
+	}
+	return f.Hostname, ""
 }
 
 // Slave holds a slave as defined in the /state.json Mesos HTTP endpoint.
