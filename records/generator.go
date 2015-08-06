@@ -233,13 +233,13 @@ func (rg *RecordGenerator) InsertState(sj state.State, domain string,
 			}
 
 			// Add RFC 2782 SRV records
-			task.ForEachPort(func(port string) {
+			for _, port := range task.Ports() {
 				srvHost := trec + ":" + port
 				tcp := "_" + context.TaskName + "._tcp." + tail
 				udp := "_" + context.TaskName + "._udp." + tail
 				rg.insertRR(tcp, srvHost, "SRV")
 				rg.insertRR(udp, srvHost, "SRV")
-			})
+			}
 		}
 	}
 

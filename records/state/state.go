@@ -2,13 +2,36 @@ package state
 
 import (
 	"bytes"
+	"strconv"
+	"strings"
 
 	"github.com/mesos/mesos-go/upid"
 )
 
 // Resources holds resources as defined in the /state.json Mesos HTTP endpoint.
 type Resources struct {
-	Ports string `json:"ports"`
+	PortRanges string `json:"ports"`
+}
+
+// Ports returns a slice of individual ports expanded from PortRanges.
+func (r Resources) Ports() []string {
+	rhs := strings.Split(r.PortRanges, "[")[1]
+	lhs := strings.Split(rhs, "]")[0]
+
+	yports := []string{}
+
+	mports := strings.Split(lhs, ",")
+	for _, port := range mports {
+		tmp := strings.TrimSpace(port)
+		pz := strings.Split(tmp, "-")
+		lo, _ := strconv.Atoi(pz[0])
+		hi, _ := strconv.Atoi(pz[1])
+
+		for t := lo; t <= hi; t++ {
+			yports = append(yports, strconv.Itoa(t))
+		}
+	}
+	return yports
 }
 
 // Label holds a label as defined in the /state.json Mesos HTTP endpoint.
@@ -34,6 +57,32 @@ type Task struct {
 	Statuses    []Status `json:"statuses"`
 	Resources   `json:"resources"`
 	Discovery   *DiscoveryInfo `json:"discovery"`
+}
+
+// ContainerIP extracts a container ip from a Mesos state.json task. If not
+// container ip is provided, an empty string is returned.
+func (t *Task) ContainerIP() string {
+	const containerIPTaskStatusLabel = "Docker.NetworkSettings.IPAddress"
+
+	// find TASK_RUNNING statuses
+	var latestContainerIP string
+	var latestTimestamp float64
+	for _, status := range t.Statuses {
+		if status.State != "TASK_RUNNING" {
+			continue
+		}
+
+		// find the latest docker-inspect label
+		for _, label := range status.Labels {
+			if label.Key == containerIPTaskStatusLabel && status.Timestamp > latestTimestamp {
+				latestContainerIP = label.Value
+				latestTimestamp = status.Timestamp
+				break
+			}
+		}
+	}
+
+	return latestContainerIP
 }
 
 // Framework holds a framework as defined in the /state.json Mesos HTTP endpoint.
