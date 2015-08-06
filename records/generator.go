@@ -3,7 +3,6 @@
 package records
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,8 +15,7 @@ import (
 
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
-
-	"github.com/mesos/mesos-go/upid"
+	"github.com/mesosphere/mesos-dns/records/state"
 )
 
 // Map host/service name to DNS answer
@@ -31,65 +29,6 @@ type RecordGenerator struct {
 	As       rrs
 	SRVs     rrs
 	SlaveIPs map[string]string
-}
-
-// Resources holds resources as defined in the /state.json Mesos HTTP endpoint.
-type Resources struct {
-	Ports string `json:"ports"`
-}
-
-// Label holds a label as defined in the /state.json Mesos HTTP endpoint.
-type Label struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
-// Status holds a task status as defined in the /state.json Mesos HTTP endpoint.
-type Status struct {
-	Timestamp float64 `json:"timestamp"`
-	State     string  `json:"state"`
-	Labels    []Label `json:"labels,omitempty"`
-}
-
-// Task holds a task as defined in the /state.json Mesos HTTP endpoint.
-type Task struct {
-	FrameworkID string   `json:"framework_id"`
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	SlaveID     string   `json:"slave_id"`
-	State       string   `json:"state"`
-	Statuses    []Status `json:"statuses"`
-	Resources   `json:"resources"`
-}
-
-// Framework holds a framework as defined in the /state.json Mesos HTTP endpoint.
-type Framework struct {
-	Tasks []Task `json:"tasks"`
-	PID   PID    `json:"pid"`
-	Name  string `json:"name"`
-}
-
-// Slave holds a slave as defined in the /state.json Mesos HTTP endpoint.
-type Slave struct {
-	ID       string `json:"id"`
-	Hostname string `json:"hostname"`
-	PID      PID    `json:"pid"`
-}
-
-// PID holds a Mesos PID and implements the json.Unmarshaler interface.
-type PID struct{ *upid.UPID }
-
-// UnmarshalJSON implements the json.Unmarshaler interface for PIDs.
-func (p *PID) UnmarshalJSON(data []byte) (err error) {
-	p.UPID, err = upid.Parse(string(bytes.Trim(data, `" `)))
-	return err
-}
-
-// StateJSON holds the state defined in the /state.json Mesos HTTP endpoint.
-type StateJSON struct {
-	Frameworks []Framework `json:"frameworks"`
-	Slaves     []Slave     `json:"slaves"`
-	Leader     string      `json:"leader"`
 }
 
 // ParseState retrieves and parses the Mesos master /state.json and converts it
@@ -118,8 +57,8 @@ func (rg *RecordGenerator) ParseState(leader string, c Config) error {
 
 // Tries each master and looks for the leader
 // if no leader responds it errors
-func (rg *RecordGenerator) findMaster(leader string, masters []string) (StateJSON, error) {
-	var sj StateJSON
+func (rg *RecordGenerator) findMaster(leader string, masters []string) (state.State, error) {
+	var sj state.State
 
 	// Check if ZK master is correct
 	if leader != "" {
@@ -164,7 +103,7 @@ func (rg *RecordGenerator) findMaster(leader string, masters []string) (StateJSO
 }
 
 // Loads state.json from mesos master
-func (rg *RecordGenerator) loadFromMaster(ip string, port string) (sj StateJSON) {
+func (rg *RecordGenerator) loadFromMaster(ip string, port string) (sj state.State) {
 	// REFACTOR: state.json security
 	url := "http://" + ip + ":" + port + "/master/state.json"
 
@@ -195,9 +134,9 @@ func (rg *RecordGenerator) loadFromMaster(ip string, port string) (sj StateJSON)
 // attempts can fail from down server or mesos master secondary
 // it also reloads from a different master if the master it attempted to
 // load from was not the leader
-func (rg *RecordGenerator) loadWrap(ip string, port string) (StateJSON, error) {
+func (rg *RecordGenerator) loadWrap(ip string, port string) (state.State, error) {
 	var err error
-	var sj StateJSON
+	var sj state.State
 
 	defer func() {
 		if rec := recover(); rec != nil {
@@ -244,39 +183,43 @@ func hostToIP4(hostname string) (string, bool) {
 	return ip.String(), true
 }
 
-func (t *Task) containerIP() string {
-	const containerIPTaskStatusLabel = "Docker.NetworkSettings.IPAddress"
+// InsertState transforms a StateJSON into RecordGenerator RRs
+func (rg *RecordGenerator) InsertState(sj state.State, domain string,
+	ns string, listener string, masters []string, spec labels.Func) error {
 
-	// find TASK_RUNNING statuses
-	var latestContainerIP string
-	var latestTimestamp float64
-	for _, status := range t.Statuses {
-		if status.State != "TASK_RUNNING" {
-			continue
-		}
+	rg.SlaveIPs = map[string]string{}
+	rg.SRVs = rrs{}
+	rg.As = rrs{}
+	rg.frameworkRecords(sj, domain, spec)
+	rg.slaveRecords(sj, domain, spec)
+	rg.listenerRecord(listener, ns)
+	rg.masterRecord(domain, masters, sj.Leader)
+	rg.taskRecords(sj, domain, spec)
 
-		// find the latest docker-inspect label
-		for _, label := range status.Labels {
-			if label.Key == containerIPTaskStatusLabel && status.Timestamp > latestTimestamp {
-				latestContainerIP = label.Value
-				latestTimestamp = status.Timestamp
-				break
-			}
-		}
-	}
-
-	return latestContainerIP
+	return nil
 }
 
-// InsertState transforms a StateJSON into RecordGenerator RRs
-func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
-	listener string, masters []string, spec labels.Func) error {
+// frameworkRecords injects A and SRV records into the generator store:
+//     frameworkname.domain.                 // resolves to IPs of each framework
+//     _framework._tcp.frameworkname.domain. // resolves to the driver port and IP of each framework
+func (rg *RecordGenerator) frameworkRecords(sj state.State, domain string, spec labels.Func) {
+	for _, f := range sj.Frameworks {
+		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
 
-	// creates a map with slave IP addresses (IPv4)
-	rg.SlaveIPs = make(map[string]string)
-	rg.SRVs = make(rrs)
-	rg.As = make(rrs)
+		// insert framework records (IPv4)
+		if address, ok := hostToIP4(f.PID.Host); ok {
+			a := fname + "." + domain + "."
+			rg.insertRR(a, address, "A")
+			srv := net.JoinHostPort(a, f.PID.Port)
+			rg.insertRR("_framework._tcp."+a, srv, "SRV")
+		}
+	}
+}
 
+// slaveRecords injects A and SRV records into the generator store:
+//     slave.domain.      // resolves to IPs of all slaves
+//     _slave._tc.domain. // resolves to the driver port and IP of all slaves
+func (rg *RecordGenerator) slaveRecords(sj state.State, domain string, spec labels.Func) {
 	for _, slave := range sj.Slaves {
 		address, ok := hostToIP4(slave.PID.Host)
 		if ok {
@@ -290,58 +233,6 @@ func (rg *RecordGenerator) InsertState(sj StateJSON, domain string, ns string,
 		}
 		rg.SlaveIPs[slave.ID] = address
 	}
-
-	// complete crap - refactor me
-	for _, f := range sj.Frameworks {
-		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
-		if address, ok := hostToIP4(f.PID.Host); ok {
-			a := fname + "." + domain + "."
-			rg.insertRR(a, address, "A")
-			srv := net.JoinHostPort(a, f.PID.Port)
-			rg.insertRR("_framework._tcp."+a, srv, "SRV")
-		}
-
-		for _, task := range f.Tasks {
-			hostIP, ok := rg.SlaveIPs[task.SlaveID]
-			// skip not running or not discoverable tasks
-			if !ok || (task.State != "TASK_RUNNING") {
-				continue
-			}
-
-			tname := spec(task.Name)
-			sid := slaveIDTail(task.SlaveID)
-			tag := hashString(task.ID)
-			tail := fname + "." + domain + "."
-
-			// A records for task and task-sid
-			arec := tname + "." + tail
-			rg.insertRR(arec, hostIP, "A")
-			trec := tname + "-" + tag + "-" + sid + "." + tail
-			rg.insertRR(trec, hostIP, "A")
-
-			// A records with container IP
-			if containerIP := task.containerIP(); containerIP != "" {
-				rg.insertRR("_container."+arec, containerIP, "A")
-				rg.insertRR("_container."+trec, containerIP, "A")
-			}
-
-			// SRV records
-			if task.Resources.Ports != "" {
-				ports := yankPorts(task.Resources.Ports)
-				for _, port := range ports {
-					srvhost := trec + ":" + port
-					tcp := "_" + tname + "._tcp." + tail
-					udp := "_" + tname + "._udp." + tail
-					rg.insertRR(tcp, srvhost, "SRV")
-					rg.insertRR(udp, srvhost, "SRV")
-				}
-			}
-		}
-	}
-
-	rg.listenerRecord(listener, ns)
-	rg.masterRecord(domain, masters, sj.Leader)
-	return nil
 }
 
 // masterRecord injects A and SRV records into the generator store:
@@ -452,6 +343,47 @@ func (rg *RecordGenerator) listenerRecord(listener string, ns string) {
 	}
 }
 
+func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec labels.Func) {
+	for _, f := range sj.Frameworks {
+		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
+
+		// insert taks records
+		tail := fname + "." + domain + "."
+		for _, task := range f.Tasks {
+			hostIP, ok := rg.SlaveIPs[task.SlaveID]
+
+			// skip not running or not discoverable tasks
+			if !ok || (task.State != "TASK_RUNNING") {
+				continue
+			}
+
+			ctx := struct{ TaskName, TaskID, SlaveID string }{
+				spec(task.Name), hashString(task.ID), slaveIDTail(task.SlaveID),
+			}
+
+			// insert canonical A records
+			trec := ctx.TaskName + "-" + ctx.TaskID + "-" + ctx.SlaveID + "." + tail
+			arec := ctx.TaskName + "." + tail
+			containerIP := task.ContainerIP()
+			rg.insertRR(arec, hostIP, "A")
+			rg.insertRR(trec, hostIP, "A")
+			if containerIP != "" {
+				rg.insertRR("_container."+arec, containerIP, "A")
+				rg.insertRR("_container."+trec, containerIP, "A")
+			}
+
+			// Add RFC 2782 SRV records
+			for _, port := range task.Ports() {
+				srvHost := trec + ":" + port
+				tcp := "_" + ctx.TaskName + "._tcp." + tail
+				udp := "_" + ctx.TaskName + "._udp." + tail
+				rg.insertRR(tcp, srvHost, "SRV")
+				rg.insertRR(udp, srvHost, "SRV")
+			}
+		}
+	}
+}
+
 // A records for each local interface
 // If this causes problems you should explicitly set the
 // listener address in config.json
@@ -534,27 +466,6 @@ func (rg *RecordGenerator) insertRR(name, host, rtype string) bool {
 		rg.SRVs[name] = append(val, host)
 	}
 	return true
-}
-
-// returns an array of ports from a range
-func yankPorts(ports string) []string {
-	rhs := strings.Split(ports, "[")[1]
-	lhs := strings.Split(rhs, "]")[0]
-
-	yports := []string{}
-
-	mports := strings.Split(lhs, ",")
-	for _, port := range mports {
-		tmp := strings.TrimSpace(port)
-		pz := strings.Split(tmp, "-")
-		lo, _ := strconv.Atoi(pz[0])
-		hi, _ := strconv.Atoi(pz[1])
-
-		for t := lo; t <= hi; t++ {
-			yports = append(yports, strconv.Itoa(t))
-		}
-	}
-	return yports
 }
 
 // leaderIP returns the ip for the mesos master

@@ -17,6 +17,7 @@ import (
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/records/labels"
+	"github.com/mesosphere/mesos-dns/records/state"
 	"github.com/miekg/dns"
 )
 
@@ -419,13 +420,12 @@ func fakeDNS(t *testing.T) *Resolver {
 		t.Fatal(err)
 	}
 
-	var sj records.StateJSON
+	var sj state.State
 	err = json.Unmarshal(b, &sj)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	res.config.Masters = []string{"144.76.157.37:5050"}
 	spec := labels.RFC952
 	err = res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", res.config.Masters, spec)
 	if err != nil {

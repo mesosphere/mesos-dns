@@ -7,9 +7,9 @@ import (
 	"testing"
 	"testing/quick"
 
-	"github.com/mesos/mesos-go/upid"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
+	"github.com/mesosphere/mesos-dns/records/state"
 )
 
 func init() {
@@ -147,57 +147,6 @@ func TestMasterRecord(t *testing.T) {
 	}
 }
 
-func TestYankPorts(t *testing.T) {
-	p := "[31328-31328]"
-
-	ports := yankPorts(p)
-
-	if ports[0] != "31328" {
-		t.Error("not parsing port")
-	}
-}
-
-func TestMultipleYankPorts(t *testing.T) {
-	p := "[31111-31111, 31113-31113]"
-
-	ports := yankPorts(p)
-
-	if len(ports) != 2 {
-		t.Error("not parsing ports")
-	}
-
-	if ports[0] != "31111" {
-		t.Error("not parsing port")
-	}
-
-	if ports[1] != "31113" {
-		t.Error("not parsing port")
-	}
-}
-
-func TestRangePorts(t *testing.T) {
-	p := "[31115-31117]"
-
-	ports := yankPorts(p)
-
-	if len(ports) != 3 {
-		t.Error("not parsing ports")
-	}
-
-	if ports[0] != "31115" {
-		t.Error("not parsing port")
-	}
-
-	if ports[1] != "31116" {
-		t.Error("not parsing port")
-	}
-
-	if ports[2] != "31117" {
-		t.Error("not parsing port")
-	}
-
-}
-
 func TestLeaderIP(t *testing.T) {
 	l := "master@144.76.157.37:5050"
 
@@ -210,7 +159,7 @@ func TestLeaderIP(t *testing.T) {
 
 // ensure we are parsing what we think we are
 func TestInsertState(t *testing.T) {
-	var sj StateJSON
+	var sj state.State
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
 	if err != nil {
@@ -256,29 +205,6 @@ func TestInsertState(t *testing.T) {
 	} {
 		if got := tt.rrs[tt.name]; !reflect.DeepEqual(got, tt.want) {
 			t.Errorf("test #%d: %s record for %q: got: %q, want: %q", i, tt.kind, tt.name, got, tt.want)
-		}
-	}
-}
-
-func TestPID_UnmarshalJSON(t *testing.T) {
-	makePID := func(id, host, port string) PID {
-		return PID{&upid.UPID{ID: id, Host: host, Port: port}}
-	}
-	for i, tt := range []struct {
-		data string
-		want PID
-		err  error
-	}{
-		{`"slave(1)@127.0.0.1:5051"`, makePID("slave(1)", "127.0.0.1", "5051"), nil},
-		{`  "slave(1)@127.0.0.1:5051"  `, makePID("slave(1)", "127.0.0.1", "5051"), nil},
-		{`"  slave(1)@127.0.0.1:5051  "`, makePID("slave(1)", "127.0.0.1", "5051"), nil},
-	} {
-		var pid PID
-		if err := json.Unmarshal([]byte(tt.data), &pid); !reflect.DeepEqual(err, tt.err) {
-			t.Errorf("test #%d: got err: %v, want: %v", i, err, tt.want)
-		}
-		if got := pid; !reflect.DeepEqual(got, tt.want) {
-			t.Errorf("test #%d: got: %v, want: %v", i, got, tt.want)
 		}
 	}
 }
