@@ -187,61 +187,14 @@ func hostToIP4(hostname string) (string, bool) {
 func (rg *RecordGenerator) InsertState(sj state.State, domain string,
 	ns string, listener string, masters []string, spec labels.Func) error {
 
-	rg.SlaveIPs = make(map[string]string)
-	rg.SRVs = make(rrs)
-	rg.As = make(rrs)
-
+	rg.SlaveIPs = map[string]string{}
+	rg.SRVs = rrs{}
+	rg.As = rrs{}
 	rg.frameworkRecords(sj, domain, spec)
 	rg.slaveRecords(sj, domain, spec)
 	rg.listenerRecord(listener, ns)
 	rg.masterRecord(domain, masters, sj.Leader)
-
-	// complete crap - refactor me
-	for _, f := range sj.Frameworks {
-		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
-
-		// insert taks records
-		tail := fname + "." + domain + "."
-		for _, task := range f.Tasks {
-			hostIP, ok := rg.SlaveIPs[task.SlaveID]
-
-			// skip not running or not discoverable tasks
-			if !ok || (task.State != "TASK_RUNNING") {
-				continue
-			}
-
-			// context used to build domain names
-			context := struct {
-				TaskName string
-				TaskID   string
-				SlaveID  string
-			}{
-				SlaveID:  slaveIDTail(task.SlaveID),
-				TaskID:   hashString(task.ID),
-				TaskName: spec(task.Name),
-			}
-
-			// insert canonical A records
-			trec := context.TaskName + "-" + context.TaskID + "-" + context.SlaveID + "." + tail
-			arec := context.TaskName + "." + tail
-			containerIP := task.ContainerIP()
-			rg.insertRR(arec, hostIP, "A")
-			rg.insertRR(trec, hostIP, "A")
-			if containerIP != "" {
-				rg.insertRR("_container."+arec, containerIP, "A")
-				rg.insertRR("_container."+trec, containerIP, "A")
-			}
-
-			// Add RFC 2782 SRV records
-			for _, port := range task.Ports() {
-				srvHost := trec + ":" + port
-				tcp := "_" + context.TaskName + "._tcp." + tail
-				udp := "_" + context.TaskName + "._udp." + tail
-				rg.insertRR(tcp, srvHost, "SRV")
-				rg.insertRR(udp, srvHost, "SRV")
-			}
-		}
-	}
+	rg.taskRecords(sj, domain, spec)
 
 	return nil
 }
@@ -387,6 +340,47 @@ func (rg *RecordGenerator) listenerRecord(listener string, ns string) {
 		rg.insertRR(ns, "127.0.0.1", "A")
 	} else {
 		rg.insertRR(ns, listener, "A")
+	}
+}
+
+func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec labels.Func) {
+	for _, f := range sj.Frameworks {
+		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
+
+		// insert taks records
+		tail := fname + "." + domain + "."
+		for _, task := range f.Tasks {
+			hostIP, ok := rg.SlaveIPs[task.SlaveID]
+
+			// skip not running or not discoverable tasks
+			if !ok || (task.State != "TASK_RUNNING") {
+				continue
+			}
+
+			ctx := struct{ TaskName, TaskID, SlaveID string }{
+				spec(task.Name), hashString(task.ID), slaveIDTail(task.SlaveID),
+			}
+
+			// insert canonical A records
+			trec := ctx.TaskName + "-" + ctx.TaskID + "-" + ctx.SlaveID + "." + tail
+			arec := ctx.TaskName + "." + tail
+			containerIP := task.ContainerIP()
+			rg.insertRR(arec, hostIP, "A")
+			rg.insertRR(trec, hostIP, "A")
+			if containerIP != "" {
+				rg.insertRR("_container."+arec, containerIP, "A")
+				rg.insertRR("_container."+trec, containerIP, "A")
+			}
+
+			// Add RFC 2782 SRV records
+			for _, port := range task.Ports() {
+				srvHost := trec + ":" + port
+				tcp := "_" + ctx.TaskName + "._tcp." + tail
+				udp := "_" + ctx.TaskName + "._udp." + tail
+				rg.insertRR(tcp, srvHost, "SRV")
+				rg.insertRR(udp, srvHost, "SRV")
+			}
+		}
 	}
 }
 
