@@ -66,7 +66,10 @@ type Task struct {
 // ContainerIP extracts a container ip from a Mesos state.json task. If not
 // container ip is provided, an empty string is returned.
 func (t *Task) ContainerIP() string {
-	const containerIPTaskStatusLabel = "Docker.NetworkSettings.IPAddress"
+	const (
+		dockerLabel = "Docker.NetworkSettings.IPAddress"
+		mesosLabel  = "MesosContainerizer.NetworkSettings.IPAddress"
+	)
 
 	// find TASK_RUNNING statuses
 	var latestContainerIP string
@@ -78,7 +81,7 @@ func (t *Task) ContainerIP() string {
 
 		// find the latest docker-inspect label
 		for _, label := range status.Labels {
-			if label.Key == containerIPTaskStatusLabel && status.Timestamp > latestTimestamp {
+			if (label.Key == dockerLabel || label.Key == mesosLabel) && status.Timestamp > latestTimestamp {
 				latestContainerIP = label.Value
 				latestTimestamp = status.Timestamp
 				break
