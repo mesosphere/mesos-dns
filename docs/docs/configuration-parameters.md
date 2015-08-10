@@ -28,7 +28,8 @@ The configuration file should include the following fields:
   "SOARefresh": 60,
   "SOARetry":   600,
   "SOAExpire":  86400,
-  "SOAMinttl": 60
+  "SOAMinttl": 60,
+  "IPSources": ["mesos", "host"]
 }
 ```
 

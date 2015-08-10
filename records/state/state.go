@@ -15,6 +15,10 @@ type Resources struct {
 
 // Ports returns a slice of individual ports expanded from PortRanges.
 func (r Resources) Ports() []string {
+	if r.PortRanges == "" || r.PortRanges == "[]" {
+		return []string{}
+	}
+
 	rhs := strings.Split(r.PortRanges, "[")[1]
 	lhs := strings.Split(rhs, "]")[0]
 
@@ -49,32 +53,59 @@ type Status struct {
 
 // Task holds a task as defined in the /state.json Mesos HTTP endpoint.
 type Task struct {
-	FrameworkID string   `json:"framework_id"`
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	SlaveID     string   `json:"slave_id"`
-	State       string   `json:"state"`
-	Statuses    []Status `json:"statuses"`
-	Resources   `json:"resources"`
-	Discovery   *DiscoveryInfo `json:"discovery"`
+	FrameworkID   string   `json:"framework_id"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	SlaveID       string   `json:"slave_id"`
+	State         string   `json:"state"`
+	Statuses      []Status `json:"statuses"`
+	Resources     `json:"resources"`
+	DiscoveryInfo DiscoveryInfo `json:"discovery"`
+
+	SlaveIP string `json:"-"`
 }
 
-// ContainerIP extracts a container ip from a Mesos state.json task. If not
+var ipLabels = map[string]string{
+	"docker": "Docker.NetworkSettings.IPAddress",
+	"mesos":  "MesosContainerizer.NetworkSettings.IPAddress",
+}
+
+// IP extracts the IP from a task given the prioritized list of IP sources
+func (t *Task) IP(srcs ...string) string {
+	for _, src := range srcs {
+		switch src {
+		case "host":
+			return t.SlaveIP
+		case "docker", "mesos":
+			if ip := t.containerIP(src); ip != "" {
+				return ip
+			}
+		}
+	}
+	return ""
+}
+
+// HasDiscoveryInfo return whether the DiscoveryInfo was provided in the state.json
+func (t *Task) HasDiscoveryInfo() bool {
+	return t.DiscoveryInfo.Name != ""
+}
+
+// containerIP extracts a container ip from a Mesos state.json task. If no
 // container ip is provided, an empty string is returned.
-func (t *Task) ContainerIP() string {
-	const containerIPTaskStatusLabel = "Docker.NetworkSettings.IPAddress"
+func (t *Task) containerIP(src string) string {
+	ipLabel := ipLabels[src]
 
 	// find TASK_RUNNING statuses
 	var latestContainerIP string
 	var latestTimestamp float64
 	for _, status := range t.Statuses {
-		if status.State != "TASK_RUNNING" {
+		if status.State != "TASK_RUNNING" || status.Timestamp <= latestTimestamp {
 			continue
 		}
 
 		// find the latest docker-inspect label
 		for _, label := range status.Labels {
-			if label.Key == containerIPTaskStatusLabel && status.Timestamp > latestTimestamp {
+			if label.Key == ipLabel {
 				latestContainerIP = label.Value
 				latestTimestamp = status.Timestamp
 				break
@@ -127,11 +158,11 @@ type State struct {
 
 // DiscoveryInfo holds the discovery meta data for a task defined in the /state.json Mesos HTTP endpoint.
 type DiscoveryInfo struct {
-	Visibilty   string  `json:"visibility"`
-	Version     *string `json:"version,omitempty"`
-	Name        *string `json:"name,omitempty"`
-	Location    *string `json:"location,omitempty"`
-	Environment *string `json:"environment,omitempty"`
+	Visibilty   string `json:"visibility"`
+	Version     string `json:"version,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Location    string `json:"location,omitempty"`
+	Environment string `json:"environment,omitempty"`
 	Labels      struct {
 		Labels `json:"labels"`
 	} `json:"labels"`

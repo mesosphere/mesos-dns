@@ -73,6 +73,34 @@ type Config struct {
 
 	// EnforceRFC952 will enforce an older, more strict set of rules for DNS labels
 	EnforceRFC952 bool
+
+	// IPSources is the prioritized list of task IP sources
+	IPSources []string // e.g. ["host", "docker", "mesos", "rkt"]
+}
+
+// NewConfig return the default config of the resolver
+func NewConfig() Config {
+	return Config{
+		RefreshSeconds: 60,
+		TTL:            60,
+		Domain:         "mesos",
+		Port:           53,
+		Timeout:        5,
+		SOARname:       "root.ns1.mesos",
+		SOAMname:       "ns1.mesos",
+		SOARefresh:     60,
+		SOARetry:       600,
+		SOAExpire:      86400,
+		SOAMinttl:      60,
+		Resolvers:      []string{"8.8.8.8"},
+		Listener:       "0.0.0.0",
+		HTTPPort:       8123,
+		DNSOn:          true,
+		HTTPOn:         true,
+		ExternalOn:     true,
+		RecurseOn:      true,
+		IPSources:      []string{"mesos", "host"},
+	}
 }
 
 // SetConfig instantiates a Config struct read in from config.json
@@ -97,8 +125,12 @@ func SetConfig(cjson string) Config {
 			c.Resolvers = GetLocalDNS()
 		}
 		if err = validateResolvers(c.Resolvers); err != nil {
-			logging.Error.Fatalf("Resovlers validation failed: %v", err)
+			logging.Error.Fatalf("Resolvers validation failed: %v", err)
 		}
+	}
+
+	if err = validateIPSources(c.IPSources); err != nil {
+		logging.Error.Fatalf("IPSources validation failed: %v", err)
 	}
 
 	c.Domain = strings.ToLower(c.Domain)
@@ -133,31 +165,13 @@ func SetConfig(cjson string) Config {
 	logging.Verbose.Println("   - HttpOn: ", c.HTTPOn)
 	logging.Verbose.Println("   - ConfigFile: ", c.File)
 	logging.Verbose.Println("   - EnforceRFC952: ", c.EnforceRFC952)
+	logging.Verbose.Println("   - IPSources: ", c.IPSources)
 
 	return *c
 }
 
 func readConfig(file string) (*Config, error) {
-	c := Config{
-		RefreshSeconds: 60,
-		TTL:            60,
-		Domain:         "mesos",
-		Port:           53,
-		Timeout:        5,
-		SOARname:       "root.ns1.mesos",
-		SOAMname:       "ns1.mesos",
-		SOARefresh:     60,
-		SOARetry:       600,
-		SOAExpire:      86400,
-		SOAMinttl:      60,
-		Resolvers:      []string{"8.8.8.8"},
-		Listener:       "0.0.0.0",
-		HTTPPort:       8123,
-		DNSOn:          true,
-		HTTPOn:         true,
-		ExternalOn:     true,
-		RecurseOn:      true,
-	}
+	c := NewConfig()
 
 	usr, err := user.Current()
 	if err != nil {
@@ -170,10 +184,22 @@ func readConfig(file string) (*Config, error) {
 	} else if bs, err := ioutil.ReadFile(c.File); err != nil {
 		return nil, fmt.Errorf("missing configuration file: %q", c.File)
 	} else if err = json.Unmarshal(bs, &c); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config file: %q", c.File)
+		return nil, fmt.Errorf("failed to unmarshal config file %q: %v", c.File, err)
 	}
 
 	return &c, nil
+}
+
+func unique(ss []string) []string {
+	set := make(map[string]struct{}, len(ss))
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if _, ok := set[s]; !ok {
+			set[s] = struct{}{}
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // GetLocalDNS returns the first nameserver in /etc/resolv.conf

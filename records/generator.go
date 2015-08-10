@@ -52,7 +52,7 @@ func (rg *RecordGenerator) ParseState(leader string, c Config) error {
 		hostSpec = labels.RFC952
 	}
 
-	return rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, c.Masters, hostSpec)
+	return rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, c.Masters, c.IPSources, hostSpec)
 }
 
 // Tries each master and looks for the leader
@@ -184,8 +184,7 @@ func hostToIP4(hostname string) (string, bool) {
 }
 
 // InsertState transforms a StateJSON into RecordGenerator RRs
-func (rg *RecordGenerator) InsertState(sj state.State, domain string,
-	ns string, listener string, masters []string, spec labels.Func) error {
+func (rg *RecordGenerator) InsertState(sj state.State, domain, ns, listener string, masters, ipSources []string, spec labels.Func) error {
 
 	rg.SlaveIPs = map[string]string{}
 	rg.SRVs = rrs{}
@@ -194,7 +193,7 @@ func (rg *RecordGenerator) InsertState(sj state.State, domain string,
 	rg.slaveRecords(sj, domain, spec)
 	rg.listenerRecord(listener, ns)
 	rg.masterRecord(domain, masters, sj.Leader)
-	rg.taskRecords(sj, domain, spec)
+	rg.taskRecords(sj, domain, spec, ipSources)
 
 	return nil
 }
@@ -344,42 +343,77 @@ func (rg *RecordGenerator) listenerRecord(listener string, ns string) {
 	}
 }
 
-func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec labels.Func) {
+func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec labels.Func, ipSources []string) {
 	for _, f := range sj.Frameworks {
 		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
 
 		// insert taks records
-		tail := fname + "." + domain + "."
+		tail := "." + domain + "."
 		for _, task := range f.Tasks {
-			hostIP, ok := rg.SlaveIPs[task.SlaveID]
+			var ok bool
+			task.SlaveIP, ok = rg.SlaveIPs[task.SlaveID]
 
 			// skip not running or not discoverable tasks
 			if !ok || (task.State != "TASK_RUNNING") {
 				continue
 			}
 
-			ctx := struct{ TaskName, TaskID, SlaveID string }{
-				spec(task.Name), hashString(task.ID), slaveIDTail(task.SlaveID),
+			// define context
+			ctx := struct{ taskName, taskID, slaveID, taskIP, slaveIP string }{
+				spec(task.Name),
+				hashString(task.ID),
+				slaveIDTail(task.SlaveID),
+				task.IP(ipSources...),
+				task.SlaveIP,
+			}
+
+			// use DiscoveryInfo name if defined instead of task name
+			if task.HasDiscoveryInfo() {
+				ctx.taskName = task.DiscoveryInfo.Name
 			}
 
 			// insert canonical A records
-			trec := ctx.TaskName + "-" + ctx.TaskID + "-" + ctx.SlaveID + "." + tail
-			arec := ctx.TaskName + "." + tail
-			containerIP := task.ContainerIP()
-			rg.insertRR(arec, hostIP, "A")
-			rg.insertRR(trec, hostIP, "A")
-			if containerIP != "" {
-				rg.insertRR("_container."+arec, containerIP, "A")
-				rg.insertRR("_container."+trec, containerIP, "A")
-			}
+			canonical := ctx.taskName + "-" + ctx.taskID + "-" + ctx.slaveID + "." + fname
+			arec := ctx.taskName + "." + fname
+
+			rg.insertRR(arec+tail, ctx.taskIP, "A")
+			rg.insertRR(canonical+tail, ctx.taskIP, "A")
+
+			rg.insertRR(arec+".slave"+tail, ctx.slaveIP, "A")
+			rg.insertRR(canonical+".slave"+tail, ctx.slaveIP, "A")
 
 			// Add RFC 2782 SRV records
+			slaveHost := canonical + ".slave" + tail
+			tcpName := "_" + ctx.taskName + "._tcp." + fname
+			udpName := "_" + ctx.taskName + "._udp." + fname
 			for _, port := range task.Ports() {
-				srvHost := trec + ":" + port
-				tcp := "_" + ctx.TaskName + "._tcp." + tail
-				udp := "_" + ctx.TaskName + "._udp." + tail
-				rg.insertRR(tcp, srvHost, "SRV")
-				rg.insertRR(udp, srvHost, "SRV")
+				slaveTarget := slaveHost + ":" + port
+
+				if !task.HasDiscoveryInfo() {
+					rg.insertRR(tcpName+tail, slaveTarget, "SRV")
+					rg.insertRR(udpName+tail, slaveTarget, "SRV")
+				}
+
+				rg.insertRR(tcpName+".slave"+tail, slaveTarget, "SRV")
+				rg.insertRR(udpName+".slave"+tail, slaveTarget, "SRV")
+			}
+
+			if !task.HasDiscoveryInfo() {
+				continue
+			}
+
+			for _, port := range task.DiscoveryInfo.Ports.DiscoveryPorts {
+				target := canonical + tail + ":" + strconv.Itoa(port.Number)
+
+				// use protocol if defined, fallback to tcp+udp
+				proto := spec(port.Protocol)
+				if proto != "" {
+					name := "_" + ctx.taskName + "._" + proto + "." + fname
+					rg.insertRR(name+tail, target, "SRV")
+				} else {
+					rg.insertRR(tcpName+tail, target, "SRV")
+					rg.insertRR(udpName+tail, target, "SRV")
+				}
 			}
 		}
 	}
@@ -454,11 +488,12 @@ func (rg *RecordGenerator) exists(name, host, rtype string) bool {
 // but only if the pair is unique. returns true if added, false otherwise.
 // TODO(???): REFACTOR when storage is updated
 func (rg *RecordGenerator) insertRR(name, host, rtype string) bool {
-	logging.VeryVerbose.Println("[" + rtype + "]\t" + name + ": " + host)
-
-	if rg.exists(name, host, rtype) {
+	if host == "" || rg.exists(name, host, rtype) {
 		return false
 	}
+
+	logging.VeryVerbose.Println("[" + rtype + "]\t" + name + ": " + host)
+
 	if rtype == "A" {
 		val := rg.As[name]
 		rg.As[name] = append(val, host)
