@@ -349,7 +349,7 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
 
 		// insert taks records
-		tail := fname + "." + domain + "."
+		tail := "." + domain + "."
 		for _, task := range f.Tasks {
 			hostIP, ok := rg.SlaveIPs[task.SlaveID]
 
@@ -363,21 +363,21 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 			}
 
 			// insert canonical A records
-			trec := ctx.TaskName + "-" + ctx.TaskID + "-" + ctx.SlaveID + "." + tail
-			arec := ctx.TaskName + "." + tail
+			trec := ctx.TaskName + "-" + ctx.TaskID + "-" + ctx.SlaveID + "." + fname
+			arec := ctx.TaskName + "." + fname
 			containerIP := task.ContainerIP()
-			rg.insertRR(arec, hostIP, "A")
-			rg.insertRR(trec, hostIP, "A")
+			rg.insertRR(arec + tail, hostIP, "A")
+			rg.insertRR(trec + tail, hostIP, "A")
 			if containerIP != "" {
-				rg.insertRR("_container."+arec, containerIP, "A")
-				rg.insertRR("_container."+trec, containerIP, "A")
+				rg.insertRR(arec + ".slave" + tail, containerIP, "A")
+				rg.insertRR(trec + ".slave" + tail, containerIP, "A")
 			}
 
 			// Add RFC 2782 SRV records
 			for _, port := range task.Ports() {
-				srvHost := trec + ":" + port
-				tcp := "_" + ctx.TaskName + "._tcp." + tail
-				udp := "_" + ctx.TaskName + "._udp." + tail
+				srvHost := trec + tail + ":" + port
+				tcp := "_" + ctx.TaskName + "._tcp." + fname + tail
+				udp := "_" + ctx.TaskName + "._udp." + fname + tail
 				rg.insertRR(tcp, srvHost, "SRV")
 				rg.insertRR(udp, srvHost, "SRV")
 			}

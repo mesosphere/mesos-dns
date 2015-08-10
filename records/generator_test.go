@@ -183,9 +183,9 @@ func TestInsertState(t *testing.T) {
 		want       []string
 	}{
 		{rg.As, "A", "liquor-store.marathon.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
-		{rg.As, "A", "_container.liquor-store.marathon.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
+		{rg.As, "A", "liquor-store.marathon.slave.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
 		{rg.As, "A", "poseidon.marathon.mesos.", nil},
-		{rg.As, "A", "_container.poseidon.marathon.mesos.", nil},
+		{rg.As, "A", "poseidon.marathon.slave.mesos.", nil},
 		{rg.As, "A", "master.mesos.", []string{"144.76.157.37"}},
 		{rg.As, "A", "master0.mesos.", []string{"144.76.157.37"}},
 		{rg.As, "A", "leader.mesos.", []string{"144.76.157.37"}},
