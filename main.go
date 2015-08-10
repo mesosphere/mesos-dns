@@ -47,7 +47,7 @@ func main() {
 	// launch DNS server
 	if config.DNSOn {
 		tapServer, errCh := tap.LocalListenAndServe()
-		go func() { errch <- <-errCh }
+		go func() { errch <- <-errCh }()
 
 		//TODO(jdef) should check config to see if tap is enabled
 		tap := tap.NewTap(tapServer.NewSink())
