@@ -15,6 +15,10 @@ type Resources struct {
 
 // Ports returns a slice of individual ports expanded from PortRanges.
 func (r Resources) Ports() []string {
+	if r.PortRanges == "" || r.PortRanges == "[]" {
+		return []string{}
+	}
+
 	rhs := strings.Split(r.PortRanges, "[")[1]
 	lhs := strings.Split(rhs, "]")[0]
 
