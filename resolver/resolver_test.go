@@ -158,7 +158,7 @@ func TestHandlers(t *testing.T) {
 				header(true, dns.RcodeSuccess),
 				nss(
 					soa(rrheader("non-existing.mesos.", dns.TypeSOA, 60),
-						"root.ns1.mesos.", "ns1.mesos.", 60))),
+						"root.ns1.mesos", "ns1.mesos", 60))),
 		},
 		{
 			res.HandleMesos,
@@ -166,7 +166,7 @@ func TestHandlers(t *testing.T) {
 				question("non-existing.mesos.", dns.TypeNS),
 				header(true, dns.RcodeSuccess),
 				nss(
-					ns(rrheader("non-existing.mesos.", dns.TypeNS, 60), "ns1.mesos."))),
+					ns(rrheader("non-existing.mesos.", dns.TypeNS, 60), "ns1.mesos"))),
 		},
 		{
 			res.HandleMesos,
@@ -175,7 +175,7 @@ func TestHandlers(t *testing.T) {
 				header(true, dns.RcodeNameError),
 				nss(
 					soa(rrheader("missing.mesos.", dns.TypeSOA, 60),
-						"root.ns1.mesos.", "ns1.mesos.", 60))),
+						"root.ns1.mesos", "ns1.mesos", 60))),
 		},
 		{
 			res.HandleMesos,
@@ -184,7 +184,7 @@ func TestHandlers(t *testing.T) {
 				header(true, dns.RcodeSuccess),
 				nss(
 					soa(rrheader("chronos.marathon.mesos.", dns.TypeSOA, 60),
-						"root.ns1.mesos.", "ns1.mesos.", 60))),
+						"root.ns1.mesos", "ns1.mesos", 60))),
 		},
 		{
 			res.HandleMesos,
@@ -193,7 +193,7 @@ func TestHandlers(t *testing.T) {
 				header(true, dns.RcodeNameError),
 				nss(
 					soa(rrheader("missing.mesos.", dns.TypeSOA, 60),
-						"root.ns1.mesos.", "ns1.mesos.", 60))),
+						"root.ns1.mesos", "ns1.mesos", 60))),
 		},
 		{
 			res.HandleNonMesos,
@@ -391,10 +391,13 @@ func ns(hdr dns.RR_Header, s string) dns.RR {
 
 func soa(hdr dns.RR_Header, ns, mbox string, minttl uint32) dns.RR {
 	return &dns.SOA{
-		Hdr:    hdr,
-		Ns:     ns,
-		Mbox:   mbox,
-		Minttl: minttl,
+		Hdr:     hdr,
+		Ns:      ns,
+		Mbox:    mbox,
+		Minttl:  minttl,
+		Refresh: 60,
+		Retry:   600,
+		Expire:  86400,
 	}
 }
 
@@ -420,19 +423,11 @@ func (r responseRecorder) TsigTimersOnly(bool)        {}
 func (r *responseRecorder) Hijack()                   {}
 
 func fakeDNS(t *testing.T) *Resolver {
-	res := New("", records.Config{
-		Masters:       []string{"144.76.157.37:5050"},
-		TTL:           60,
-		Port:          53,
-		Domain:        "mesos",
-		Resolvers:     records.GetLocalDNS(),
-		Listener:      "127.0.0.1",
-		SOARname:      "root.ns1.mesos.",
-		SOAMname:      "ns1.mesos.",
-		HTTPPort:      8123,
-		ExternalOn:    true,
-		EnforceRFC952: true,
-	})
+	config := records.NewConfig()
+	config.Masters = []string{"144.76.157.37:5050"}
+	config.RecurseOn = false
+
+	res := New("", config)
 	res.rng.Seed(0) // for deterministic tests
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
@@ -447,7 +442,7 @@ func fakeDNS(t *testing.T) *Resolver {
 	}
 
 	spec := labels.RFC952
-	err = res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", res.config.Masters, spec)
+	err = res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", res.config.Masters, res.config.IPSources, spec)
 	if err != nil {
 		t.Fatal(err)
 	}

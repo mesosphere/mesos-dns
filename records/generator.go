@@ -52,7 +52,7 @@ func (rg *RecordGenerator) ParseState(leader string, c Config) error {
 		hostSpec = labels.RFC952
 	}
 
-	return rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, c.Masters, hostSpec)
+	return rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, c.Masters, c.IPSources, hostSpec)
 }
 
 // Tries each master and looks for the leader
@@ -184,8 +184,7 @@ func hostToIP4(hostname string) (string, bool) {
 }
 
 // InsertState transforms a StateJSON into RecordGenerator RRs
-func (rg *RecordGenerator) InsertState(sj state.State, domain string,
-	ns string, listener string, masters []string, spec labels.Func) error {
+func (rg *RecordGenerator) InsertState(sj state.State, domain, ns, listener string, masters, ipSources []string, spec labels.Func) error {
 
 	rg.SlaveIPs = map[string]string{}
 	rg.SRVs = rrs{}
@@ -194,7 +193,7 @@ func (rg *RecordGenerator) InsertState(sj state.State, domain string,
 	rg.slaveRecords(sj, domain, spec)
 	rg.listenerRecord(listener, ns)
 	rg.masterRecord(domain, masters, sj.Leader)
-	rg.taskRecords(sj, domain, spec)
+	rg.taskRecords(sj, domain, spec, ipSources)
 
 	return nil
 }
@@ -344,14 +343,15 @@ func (rg *RecordGenerator) listenerRecord(listener string, ns string) {
 	}
 }
 
-func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec labels.Func) {
+func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec labels.Func, ipSources []string) {
 	for _, f := range sj.Frameworks {
 		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
 
 		// insert taks records
 		tail := "." + domain + "."
 		for _, task := range f.Tasks {
-			slaveIP, ok := rg.SlaveIPs[task.SlaveID]
+			var ok bool
+			task.SlaveIP, ok = rg.SlaveIPs[task.SlaveID]
 
 			// skip not running or not discoverable tasks
 			if !ok || (task.State != "TASK_RUNNING") {
@@ -359,24 +359,17 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 			}
 
 			// define context
-			di := task.Discovery
-			ctx := struct{ taskName, taskID, slaveID, taskIP, slaveIP, containerIP string }{
+			ctx := struct{ taskName, taskID, slaveID, taskIP, slaveIP string }{
 				spec(task.Name),
 				hashString(task.ID),
 				slaveIDTail(task.SlaveID),
-				slaveIP,
-				slaveIP,
-				task.ContainerIP(),
+				task.IP(ipSources...),
+				task.SlaveIP,
 			}
 
 			// use DiscoveryInfo name if defined instead of task name
-			if di != nil && di.Name != nil && *di.Name != "" {
-				ctx.taskName = *di.Name
-			}
-
-			// point main records to slave or container
-			if ctx.containerIP != "" {
-				ctx.taskIP = ctx.containerIP
+			if task.HasDiscoveryInfo() {
+				ctx.taskName = task.DiscoveryInfo.Name
 			}
 
 			// insert canonical A records
@@ -396,7 +389,7 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 			for _, port := range task.Ports() {
 				slaveTarget := slaveHost + ":" + port
 
-				if di == nil {
+				if !task.HasDiscoveryInfo() {
 					rg.insertRR(tcpName + tail, slaveTarget, "SRV")
 					rg.insertRR(udpName + tail, slaveTarget, "SRV")
 				}
@@ -404,18 +397,21 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 				rg.insertRR(tcpName + ".slave" + tail, slaveTarget, "SRV")
 				rg.insertRR(udpName + ".slave" + tail, slaveTarget, "SRV")
 			}
-			if di != nil {
-				for _, port := range task.Discovery.Ports.DiscoveryPorts {
-					target := canonical + tail + ":" + strconv.Itoa(port.Number)
 
-					// use protocol if defined, fallback to tcp+udp
-					if port.Protocol != "" {
-						name := "_" + ctx.taskName + "._" + port.Protocol + "." + fname
-						rg.insertRR(name + tail, target, "SRV")
-					} else {
-						rg.insertRR(tcpName + tail, target, "SRV")
-						rg.insertRR(udpName + tail, target, "SRV")
-					}
+			if !task.HasDiscoveryInfo() {
+				continue
+			}
+
+			for _, port := range task.DiscoveryInfo.Ports.DiscoveryPorts {
+				target := canonical + tail + ":" + strconv.Itoa(port.Number)
+
+				// use protocol if defined, fallback to tcp+udp
+				if port.Protocol != "" {
+					name := "_" + ctx.taskName + "._" + port.Protocol + "." + fname
+					rg.insertRR(name + tail, target, "SRV")
+				} else {
+					rg.insertRR(tcpName + tail, target, "SRV")
+					rg.insertRR(udpName + tail, target, "SRV")
 				}
 			}
 		}

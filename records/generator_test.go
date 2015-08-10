@@ -170,7 +170,7 @@ type TestRecord struct {
 	want []string
 }
 
-func testRecords(t *testing.T, spec labels.Func, rs []TestRecord) {
+func testRecords(t *testing.T, spec labels.Func, ipSources []string, rs []TestRecord) {
 	var sj state.State
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
@@ -184,7 +184,7 @@ func testRecords(t *testing.T, spec labels.Func, rs []TestRecord) {
 	masters := []string{"144.76.157.37:5050"}
 
 	var rg RecordGenerator
-	if err := rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters, spec); err != nil {
+	if err := rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters, ipSources, spec); err != nil {
 		t.Fatal(err)
 	}
 
@@ -207,7 +207,7 @@ func testRecords(t *testing.T, spec labels.Func, rs []TestRecord) {
 
 // ensure we are parsing what we think we are
 func TestInsertState(t *testing.T) {
-	testRecords(t, labels.RFC952, []TestRecord{
+	testRecords(t, labels.RFC952, NewConfig().IPSources, []TestRecord{
 		{a, "liquor-store.marathon.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
 		{a, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
 		{a, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
@@ -240,6 +240,29 @@ func TestInsertState(t *testing.T) {
 		}},
 		{srv, "_slave._tcp.mesos.", []string{"slave.mesos.:5051"}},
 		{srv, "_framework._tcp.marathon.mesos.", []string{"marathon.mesos.:25501"}},
+	})
+}
+
+func TestInsertStateWithContainerIPConfig(t *testing.T) {
+	testRecords(t, labels.RFC952, []string{"host"}, []TestRecord{
+		{a, "liquor-store.marathon.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{a, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{a, "nginx.marathon.mesos.", []string{"1.2.3.11"}},
+		{a, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
+	})
+
+	testRecords(t, labels.RFC952, []string{"mesos", "host"}, []TestRecord{
+		{a, "liquor-store.marathon.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{a, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{a, "nginx.marathon.mesos.", []string{"10.3.0.3"}},
+		{a, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
+	})
+
+	testRecords(t, labels.RFC952, []string{"docker", "host"}, []TestRecord{
+		{a, "liquor-store.marathon.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
+		{a, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{a, "nginx.marathon.mesos.", []string{"1.2.3.11"}},
+		{a, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
 	})
 }
 
