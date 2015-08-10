@@ -114,22 +114,42 @@ func TestHandlers(t *testing.T) {
 		{
 			res.HandleMesos,
 			message(
-				question("_liquor-store._udp.marathon.mesos.", dns.TypeSRV),
+				question("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV),
 				header(true, dns.RcodeSuccess),
 				answers(
-					srv(rrheader("_liquor-store._udp.marathon.mesos.", dns.TypeSRV, 60),
-						"liquor-store-17700-0.marathon.mesos.", 31355, 0, 0),
-					srv(rrheader("_liquor-store._udp.marathon.mesos.", dns.TypeSRV, 60),
-						"liquor-store-17700-0.marathon.mesos.", 31354, 0, 0),
-					srv(rrheader("_liquor-store._udp.marathon.mesos.", dns.TypeSRV, 60),
-						"liquor-store-7581-1.marathon.mesos.", 31737, 0, 0)),
+					srv(rrheader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
+						"liquor-store-17700-0.marathon.mesos.", 443, 0, 0),
+					srv(rrheader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
+						"liquor-store-7581-1.marathon.mesos.", 80, 0, 0),
+					srv(rrheader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
+						"liquor-store-7581-1.marathon.mesos.", 443, 0, 0),
+					srv(rrheader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
+						"liquor-store-17700-0.marathon.mesos.", 80, 0, 0)),
 				extras(
 					a(rrheader("liquor-store-17700-0.marathon.mesos.", dns.TypeA, 60),
-						net.ParseIP("1.2.3.11")),
+						net.ParseIP("10.3.0.1")),
 					a(rrheader("liquor-store-17700-0.marathon.mesos.", dns.TypeA, 60),
-						net.ParseIP("1.2.3.11")),
+						net.ParseIP("10.3.0.1")),
 					a(rrheader("liquor-store-7581-1.marathon.mesos.", dns.TypeA, 60),
-						net.ParseIP("1.2.3.12")))),
+						net.ParseIP("10.3.0.2")),
+					a(rrheader("liquor-store-7581-1.marathon.mesos.", dns.TypeA, 60),
+						net.ParseIP("10.3.0.2")))),
+		},
+		{
+			res.HandleMesos,
+			message(
+				question("_car-store._udp.marathon.mesos.", dns.TypeSRV),
+				header(true, dns.RcodeSuccess),
+				answers(
+					srv(rrheader("_car-store._udp.marathon.mesos.", dns.TypeSRV, 60),
+						"car-store-50548-0.marathon.slave.mesos.", 31365, 0, 0),
+					srv(rrheader("_car-store._udp.marathon.mesos.", dns.TypeSRV, 60),
+						"car-store-50548-0.marathon.slave.mesos.", 31364, 0, 0)),
+				extras(
+					a(rrheader("car-store-50548-0.marathon.slave.mesos.", dns.TypeA, 60),
+						net.ParseIP("1.2.3.11")),
+					a(rrheader("car-store-50548-0.marathon.slave.mesos.", dns.TypeA, 60),
+						net.ParseIP("1.2.3.11")))),
 		},
 		{
 			res.HandleMesos,

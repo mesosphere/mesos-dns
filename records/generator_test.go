@@ -157,8 +157,20 @@ func TestLeaderIP(t *testing.T) {
 	}
 }
 
-// ensure we are parsing what we think we are
-func TestInsertState(t *testing.T) {
+type kind int
+
+const (
+	a kind = iota
+	srv
+)
+
+type TestRecord struct {
+	kind kind
+	name string
+	want []string
+}
+
+func testRecords(t *testing.T, spec labels.Func, rs []TestRecord) {
 	var sj state.State
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
@@ -170,45 +182,65 @@ func TestInsertState(t *testing.T) {
 
 	sj.Leader = "master@144.76.157.37:5050"
 	masters := []string{"144.76.157.37:5050"}
-	spec := labels.RFC952
 
 	var rg RecordGenerator
 	if err := rg.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", masters, spec); err != nil {
 		t.Fatal(err)
 	}
 
-	for i, tt := range []struct {
-		rrs
-		kind, name string
-		want       []string
-	}{
-		{rg.As, "A", "liquor-store.marathon.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
-		{rg.As, "A", "liquor-store.marathon.slave.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
-		{rg.As, "A", "poseidon.marathon.mesos.", nil},
-		{rg.As, "A", "poseidon.marathon.slave.mesos.", nil},
-		{rg.As, "A", "master.mesos.", []string{"144.76.157.37"}},
-		{rg.As, "A", "master0.mesos.", []string{"144.76.157.37"}},
-		{rg.As, "A", "leader.mesos.", []string{"144.76.157.37"}},
-		{rg.As, "A", "slave.mesos.", []string{"1.2.3.10", "1.2.3.11", "1.2.3.12"}},
-		{rg.As, "A", "some-box.chronoswithaspaceandmixe.mesos.", []string{"1.2.3.11"}}, // ensure we translate the framework name as well
-		{rg.As, "A", "marathon.mesos.", []string{"1.2.3.11"}},
-		{rg.As, "A", "nopid.mesos.", []string{"127.0.0.1"}},
-		{rg.SRVs, "SRV", "_poseidon._tcp.marathon.mesos.", nil},
-		{rg.SRVs, "SRV", "_leader._tcp.mesos.", []string{"leader.mesos.:5050"}},
-		{rg.SRVs, "SRV", "_liquor-store._tcp.marathon.mesos.", []string{
-			"liquor-store-17700-0.marathon.mesos.:31354",
-			"liquor-store-17700-0.marathon.mesos.:31355",
-			"liquor-store-7581-1.marathon.mesos.:31737",
-		}},
-		{rg.SRVs, "SRV", "_liquor-store.marathon.mesos.", nil},
-		{rg.SRVs, "SRV", "_slave._tcp.mesos.", []string{"slave.mesos.:5051"}},
-		{rg.SRVs, "SRV", "_framework._tcp.marathon.mesos.", []string{"marathon.mesos.:25501"}},
-		{rg.SRVs, "SRV", "_framework._tcp.nopid-framework.mesos.", nil},
-	} {
-		if got := tt.rrs[tt.name]; !reflect.DeepEqual(got, tt.want) {
-			t.Errorf("test #%d: %s record for %q: got: %q, want: %q", i, tt.kind, tt.name, got, tt.want)
+	for i, tt := range rs {
+		var rrs rrs
+		switch tt.kind {
+		case a:
+			rrs = rg.As
+		case srv:
+			rrs = rg.SRVs
+		default:
+			t.Fatalf("invalid test record kind %v", tt.kind)
+		}
+
+		if got := rrs[tt.name]; !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("test #%d: %d record for %q: got: %q, want: %q", i, tt.kind, tt.name, got, tt.want)
 		}
 	}
+}
+
+// ensure we are parsing what we think we are
+func TestInsertState(t *testing.T) {
+	testRecords(t, labels.RFC952, []TestRecord{
+		{a, "liquor-store.marathon.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
+		{a, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{a, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
+		{a, "nginx.marathon.mesos.", []string{"10.3.0.3"}},
+		{a, "poseidon.marathon.mesos.", nil},
+		{a, "poseidon.marathon.slave.mesos.", nil},
+		{a, "master.mesos.", []string{"144.76.157.37"}},
+		{a, "master0.mesos.", []string{"144.76.157.37"}},
+		{a, "leader.mesos.", []string{"144.76.157.37"}},
+		{a, "slave.mesos.", []string{"1.2.3.10", "1.2.3.11", "1.2.3.12"}},
+		{a, "some-box.chronoswithaspaceandmixe.mesos.", []string{"1.2.3.11"}}, // ensure we translate the framework name as well
+		{a, "marathon.mesos.", []string{"1.2.3.11"}},
+		{srv, "_poseidon._tcp.marathon.mesos.", nil},
+		{srv, "_leader._tcp.mesos.", []string{"leader.mesos.:5050"}},
+		{srv, "_liquor-store._tcp.marathon.mesos.", []string{
+			"liquor-store-17700-0.marathon.mesos.:80",
+			"liquor-store-17700-0.marathon.mesos.:443",
+			"liquor-store-7581-1.marathon.mesos.:80",
+			"liquor-store-7581-1.marathon.mesos.:443",
+		}},
+		{srv, "_liquor-store._udp.marathon.mesos.", nil},
+		{srv, "_liquor-store.marathon.mesos.", nil},
+		{srv, "_car-store._tcp.marathon.mesos.", []string{
+			"car-store-50548-0.marathon.slave.mesos.:31364",
+			"car-store-50548-0.marathon.slave.mesos.:31365",
+		}},
+		{srv, "_car-store._udp.marathon.mesos.", []string{
+			"car-store-50548-0.marathon.slave.mesos.:31364",
+			"car-store-50548-0.marathon.slave.mesos.:31365",
+		}},
+		{srv, "_slave._tcp.mesos.", []string{"slave.mesos.:5051"}},
+		{srv, "_framework._tcp.marathon.mesos.", []string{"marathon.mesos.:25501"}},
+	})
 }
 
 // ensure we only generate one A record for each host

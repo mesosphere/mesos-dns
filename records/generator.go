@@ -406,11 +406,11 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 			}
 			if di != nil {
 				for _, port := range task.Discovery.Ports.DiscoveryPorts {
-					target := canonical + tail + ":" + string(port.Number)
+					target := canonical + tail + ":" + strconv.Itoa(port.Number)
 
 					// use protocol if defined, fallback to tcp+udp
 					if port.Protocol != "" {
-						name := "_" + ctx.taskName + "._" + port.Protocol + tail
+						name := "_" + ctx.taskName + "._" + port.Protocol + "." + fname
 						rg.insertRR(name + tail, target, "SRV")
 					} else {
 						rg.insertRR(tcpName + tail, target, "SRV")
