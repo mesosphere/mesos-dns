@@ -99,7 +99,7 @@ func NewConfig() Config {
 		HTTPOn:         true,
 		ExternalOn:     true,
 		RecurseOn:      true,
-		IPSources:      []string{"docker", "mesos", "host"},
+		IPSources:      []string{"mesos", "host"},
 	}
 }
 

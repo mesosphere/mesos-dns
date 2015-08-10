@@ -426,6 +426,7 @@ func fakeDNS(t *testing.T) *Resolver {
 	config := records.NewConfig()
 	config.Masters = []string{"144.76.157.37:5050"}
 	config.RecurseOn = false
+	config.IPSources = []string{"docker", "mesos", "host"}
 
 	res := New("", config)
 	res.rng.Seed(0) // for deterministic tests

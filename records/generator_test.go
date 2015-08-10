@@ -180,7 +180,7 @@ func testRecordGenerator(t *testing.T, spec labels.Func, ipSources []string) Rec
 
 // ensure we are parsing what we think we are
 func TestInsertState(t *testing.T) {
-	rg := testRecordGenerator(t, labels.RFC952, NewConfig().IPSources)
+	rg := testRecordGenerator(t, labels.RFC952, []string{"docker", "mesos", "host"})
 	rgDocker := testRecordGenerator(t, labels.RFC952, []string{"docker", "host"})
 	rgMesos := testRecordGenerator(t, labels.RFC952, []string{"mesos", "host"})
 	rgSlave := testRecordGenerator(t, labels.RFC952, []string{"host"})
