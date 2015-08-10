@@ -159,12 +159,15 @@ func readConfig(file string) (*Config, error) {
 		RecurseOn:      true,
 	}
 
+	workingDir := "."
 	usr, err := user.Current()
 	if err != nil {
-		return nil, fmt.Errorf("couldn't retrieve current user: %v", err)
+		logging.Error.Println("Failed to determine current user, translating ~/ to ./, error was", err)
+	} else {
+		workingDir = usr.HomeDir
 	}
 
-	c.File, err = filepath.Abs(strings.Replace(file, "~/", usr.HomeDir+"/", 1))
+	c.File, err = filepath.Abs(strings.Replace(file, "~/", workingDir+"/", 1))
 	if err != nil {
 		return nil, fmt.Errorf("cannot find configuration file")
 	} else if bs, err := ioutil.ReadFile(c.File); err != nil {
