@@ -129,6 +129,9 @@ func SetConfig(cjson string) Config {
 		}
 	}
 
+	if len(c.IPSources) == 0 {
+		logging.Error.Fatalf("empty ip sources")
+	}
 	c.IPSources = unique(c.IPSources)
 	for _, src := range c.IPSources {
 		switch src {
