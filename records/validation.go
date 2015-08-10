@@ -39,17 +39,14 @@ func validateResolvers(rs []string) error {
 	if len(rs) == 0 {
 		return nil
 	}
-	ips := make(map[string]struct{}, len(rs))
+	if len(rs) != len(unique(rs)) {
+		return fmt.Errorf("duplicate resolver IP specified")
+	}
 	for _, r := range rs {
 		ip := net.ParseIP(r)
 		if ip == nil {
 			return fmt.Errorf("illegal IP specified for resolver %q", r)
 		}
-		ipstr := ip.String()
-		if _, found := ips[ipstr]; found {
-			return fmt.Errorf("duplicate resolver IP specified: %v", r)
-		}
-		ips[ipstr] = struct{}{}
 	}
 	return nil
 }
