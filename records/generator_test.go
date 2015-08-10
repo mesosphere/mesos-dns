@@ -157,20 +157,7 @@ func TestLeaderIP(t *testing.T) {
 	}
 }
 
-type kind int
-
-const (
-	a kind = iota
-	srv
-)
-
-type TestRecord struct {
-	kind kind
-	name string
-	want []string
-}
-
-func testRecords(t *testing.T, spec labels.Func, ipSources []string, rs []TestRecord) {
+func testRecordGenerator(t *testing.T, spec labels.Func, ipSources []string) RecordGenerator {
 	var sj state.State
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
@@ -188,82 +175,73 @@ func testRecords(t *testing.T, spec labels.Func, ipSources []string, rs []TestRe
 		t.Fatal(err)
 	}
 
-	for i, tt := range rs {
-		var rrs rrs
-		switch tt.kind {
-		case a:
-			rrs = rg.As
-		case srv:
-			rrs = rg.SRVs
-		default:
-			t.Fatalf("invalid test record kind %v", tt.kind)
-		}
-
-		if got := rrs[tt.name]; !reflect.DeepEqual(got, tt.want) {
-			t.Errorf("test #%d: %d record for %q: got: %q, want: %q", i, tt.kind, tt.name, got, tt.want)
-		}
-	}
+	return rg
 }
 
 // ensure we are parsing what we think we are
 func TestInsertState(t *testing.T) {
-	testRecords(t, labels.RFC952, NewConfig().IPSources, []TestRecord{
-		{a, "liquor-store.marathon.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
-		{a, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
-		{a, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
-		{a, "nginx.marathon.mesos.", []string{"10.3.0.3"}},
-		{a, "poseidon.marathon.mesos.", nil},
-		{a, "poseidon.marathon.slave.mesos.", nil},
-		{a, "master.mesos.", []string{"144.76.157.37"}},
-		{a, "master0.mesos.", []string{"144.76.157.37"}},
-		{a, "leader.mesos.", []string{"144.76.157.37"}},
-		{a, "slave.mesos.", []string{"1.2.3.10", "1.2.3.11", "1.2.3.12"}},
-		{a, "some-box.chronoswithaspaceandmixe.mesos.", []string{"1.2.3.11"}}, // ensure we translate the framework name as well
-		{a, "marathon.mesos.", []string{"1.2.3.11"}},
-		{srv, "_poseidon._tcp.marathon.mesos.", nil},
-		{srv, "_leader._tcp.mesos.", []string{"leader.mesos.:5050"}},
-		{srv, "_liquor-store._tcp.marathon.mesos.", []string{
+	rg := testRecordGenerator(t, labels.RFC952, NewConfig().IPSources)
+	rgDocker := testRecordGenerator(t, labels.RFC952, []string{"docker", "host"})
+	rgMesos := testRecordGenerator(t, labels.RFC952, []string{"mesos", "host"})
+	rgSlave := testRecordGenerator(t, labels.RFC952, []string{"host"})
+
+	for i, tt := range []struct {
+		rrs  rrs
+		name string
+		want []string
+	}{
+		{rg.As, "liquor-store.marathon.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
+		{rg.As, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{rg.As, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
+		{rg.As, "nginx.marathon.mesos.", []string{"10.3.0.3"}},
+		{rg.As, "poseidon.marathon.mesos.", nil},
+		{rg.As, "poseidon.marathon.slave.mesos.", nil},
+		{rg.As, "master.mesos.", []string{"144.76.157.37"}},
+		{rg.As, "master0.mesos.", []string{"144.76.157.37"}},
+		{rg.As, "leader.mesos.", []string{"144.76.157.37"}},
+		{rg.As, "slave.mesos.", []string{"1.2.3.10", "1.2.3.11", "1.2.3.12"}},
+		{rg.As, "some-box.chronoswithaspaceandmixe.mesos.", []string{"1.2.3.11"}}, // ensure we translate the framework name as well
+		{rg.As, "marathon.mesos.", []string{"1.2.3.11"}},
+		{rg.SRVs, "_poseidon._tcp.marathon.mesos.", nil},
+		{rg.SRVs, "_leader._tcp.mesos.", []string{"leader.mesos.:5050"}},
+		{rg.SRVs, "_liquor-store._tcp.marathon.mesos.", []string{
 			"liquor-store-17700-0.marathon.mesos.:80",
 			"liquor-store-17700-0.marathon.mesos.:443",
 			"liquor-store-7581-1.marathon.mesos.:80",
 			"liquor-store-7581-1.marathon.mesos.:443",
 		}},
-		{srv, "_liquor-store._udp.marathon.mesos.", nil},
-		{srv, "_liquor-store.marathon.mesos.", nil},
-		{srv, "_car-store._tcp.marathon.mesos.", []string{
+		{rg.SRVs, "_liquor-store._udp.marathon.mesos.", nil},
+		{rg.SRVs, "_liquor-store.marathon.mesos.", nil},
+		{rg.SRVs, "_car-store._tcp.marathon.mesos.", []string{
 			"car-store-50548-0.marathon.slave.mesos.:31364",
 			"car-store-50548-0.marathon.slave.mesos.:31365",
 		}},
-		{srv, "_car-store._udp.marathon.mesos.", []string{
+		{rg.SRVs, "_car-store._udp.marathon.mesos.", []string{
 			"car-store-50548-0.marathon.slave.mesos.:31364",
 			"car-store-50548-0.marathon.slave.mesos.:31365",
 		}},
-		{srv, "_slave._tcp.mesos.", []string{"slave.mesos.:5051"}},
-		{srv, "_framework._tcp.marathon.mesos.", []string{"marathon.mesos.:25501"}},
-	})
-}
+		{rg.SRVs, "_slave._tcp.mesos.", []string{"slave.mesos.:5051"}},
+		{rg.SRVs, "_framework._tcp.marathon.mesos.", []string{"marathon.mesos.:25501"}},
 
-func TestInsertStateWithContainerIPConfig(t *testing.T) {
-	testRecords(t, labels.RFC952, []string{"host"}, []TestRecord{
-		{a, "liquor-store.marathon.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
-		{a, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
-		{a, "nginx.marathon.mesos.", []string{"1.2.3.11"}},
-		{a, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
-	})
+		{rgSlave.As, "liquor-store.marathon.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{rgSlave.As, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{rgSlave.As, "nginx.marathon.mesos.", []string{"1.2.3.11"}},
+		{rgSlave.As, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
 
-	testRecords(t, labels.RFC952, []string{"mesos", "host"}, []TestRecord{
-		{a, "liquor-store.marathon.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
-		{a, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
-		{a, "nginx.marathon.mesos.", []string{"10.3.0.3"}},
-		{a, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
-	})
+		{rgMesos.As, "liquor-store.marathon.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{rgMesos.As, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{rgMesos.As, "nginx.marathon.mesos.", []string{"10.3.0.3"}},
+		{rgMesos.As, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
 
-	testRecords(t, labels.RFC952, []string{"docker", "host"}, []TestRecord{
-		{a, "liquor-store.marathon.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
-		{a, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
-		{a, "nginx.marathon.mesos.", []string{"1.2.3.11"}},
-		{a, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
-	})
+		{rgDocker.As, "liquor-store.marathon.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
+		{rgDocker.As, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
+		{rgDocker.As, "nginx.marathon.mesos.", []string{"1.2.3.11"}},
+		{rgDocker.As, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
+	} {
+		if got := tt.rrs[tt.name]; !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("test #%d: %q: got: %q, want: %q", i, tt.name, got, tt.want)
+		}
+	}
 }
 
 // ensure we only generate one A record for each host
