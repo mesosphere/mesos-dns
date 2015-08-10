@@ -487,11 +487,12 @@ func (rg *RecordGenerator) exists(name, host, rtype string) bool {
 // but only if the pair is unique. returns true if added, false otherwise.
 // TODO(???): REFACTOR when storage is updated
 func (rg *RecordGenerator) insertRR(name, host, rtype string) bool {
-	logging.VeryVerbose.Println("[" + rtype + "]\t" + name + ": " + host)
-
-	if rg.exists(name, host, rtype) {
+	if host == "" || rg.exists(name, host, rtype) {
 		return false
 	}
+
+	logging.VeryVerbose.Println("[" + rtype + "]\t" + name + ": " + host)
+
 	if rtype == "A" {
 		val := rg.As[name]
 		rg.As[name] = append(val, host)
