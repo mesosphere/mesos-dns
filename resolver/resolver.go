@@ -360,15 +360,15 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	name := strings.ToLower(cleanWild(r.Question[0].Name))
 	switch r.Question[0].Qtype {
 	case dns.TypeSRV:
-		errs = append(errs, res.handleSRV(rs, name, m, r))
+		errs.Add(res.handleSRV(rs, name, m, r))
 	case dns.TypeA:
-		errs = append(errs, res.handleA(rs, name, m))
+		errs.Add(res.handleA(rs, name, m))
 	case dns.TypeSOA:
-		errs = append(errs, res.handleSOA(m, r))
+		errs.Add(res.handleSOA(m, r))
 	case dns.TypeNS:
-		errs = append(errs, res.handleNS(m, r))
+		errs.Add(res.handleNS(m, r))
 	case dns.TypeANY:
-		errs = append(errs,
+		errs.AddAll(
 			res.handleSRV(rs, name, m, r),
 			res.handleA(rs, name, m),
 			res.handleSOA(m, r),
@@ -377,14 +377,14 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	if len(m.Answer) == 0 {
-		errs = append(errs, res.handleEmpty(rs, name, m, r))
+		errs.Add(res.handleEmpty(rs, name, m, r))
 	} else {
 		shuffleAnswers(res.rng, m.Answer)
 		logging.CurLog.MesosSuccess.Inc()
 	}
 
 	if !errs.Nil() {
-		logging.Error.Println(errs)
+		logging.Error.Println(errs.Error())
 		logging.CurLog.MesosFailed.Inc()
 	}
 
@@ -396,7 +396,7 @@ func (res *Resolver) handleSRV(rs *records.RecordGenerator, name string, m, r *d
 	for _, srv := range rs.SRVs[name] {
 		srvRR, err := res.formatSRV(r.Question[0].Name, srv)
 		if err != nil {
-			errs = append(errs, err)
+			errs.Add(err)
 			continue
 		}
 
@@ -408,7 +408,7 @@ func (res *Resolver) handleSRV(rs *records.RecordGenerator, name string, m, r *d
 
 		aRR, err := res.formatA(host, rs.As[host][0])
 		if err != nil {
-			errs = append(errs, err)
+			errs.Add(err)
 			continue
 		}
 
@@ -422,7 +422,7 @@ func (res *Resolver) handleA(rs *records.RecordGenerator, name string, m *dns.Ms
 	for _, a := range rs.As[name] {
 		rr, err := res.formatA(name, a)
 		if err != nil {
-			errs = append(errs, err)
+			errs.Add(err)
 			continue
 		}
 		m.Answer = append(m.Answer, rr)
@@ -709,6 +709,22 @@ func cleanWild(name string) string {
 }
 
 type multiError []error
+
+func (e multiError) Add(err error) multiError {
+	if me, ok := err.(multiError); ok {
+		return append(e, me...)
+	} else if err != nil {
+		return append(e, err)
+	}
+	return e
+}
+
+func (e multiError) AddAll(err ...error) multiError {
+	for _, e1 := range err {
+		e = e.Add(e1)
+	}
+	return e
+}
 
 func (e multiError) Error() string {
 	errs := make([]string, len(e))
