@@ -125,20 +125,12 @@ func SetConfig(cjson string) Config {
 			c.Resolvers = GetLocalDNS()
 		}
 		if err = validateResolvers(c.Resolvers); err != nil {
-			logging.Error.Fatalf("Resovlers validation failed: %v", err)
+			logging.Error.Fatalf("Resolvers validation failed: %v", err)
 		}
 	}
 
-	if len(c.IPSources) == 0 {
-		logging.Error.Fatalf("empty ip sources")
-	}
-	c.IPSources = unique(c.IPSources)
-	for _, src := range c.IPSources {
-		switch src {
-		case "host", "docker", "mesos":
-		default:
-			logging.Error.Fatalf("invalid ip source %q", src)
-		}
+	if err = validateIPSources(c.IPSources); err != nil {
+		logging.Error.Fatalf("IPSources validation failed: %v", err)
 	}
 
 	c.Domain = strings.ToLower(c.Domain)

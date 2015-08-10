@@ -53,3 +53,22 @@ func validateResolvers(rs []string) error {
 	}
 	return nil
 }
+
+// validateIPSources checks validity of ip sources
+func validateIPSources(srcs []string) error {
+	if len(srcs) == 0 {
+		return fmt.Errorf("empty ip sources")
+	}
+	if len(srcs) != len(unique(srcs)) {
+		return fmt.Errorf("duplicate ip source specified")
+	}
+	for _, src := range srcs {
+		switch src {
+		case "host", "docker", "mesos":
+		default:
+			return fmt.Errorf("invalid ip source %q", src)
+		}
+	}
+
+	return nil
+}
