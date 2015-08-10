@@ -71,13 +71,20 @@ func (b *broadcast) listen() (*listener, error) {
 	sf := SinkFunc(func(x *Dnstap) {
 		select {
 		case in <- x:
+			select {
+			case <-abort:
+				// continue..
+			default:
+				return
+			}
 		case <-abort:
-			// allow the logRing to die when the listener is destroyed; this func is called by
-			// the broadcaster, so we know we're still registered at this point. close() will
-			// shut down the ring buffer and detach() will remove us from the broadcaster.
-			detach()
-			close(in)
+			// continue..
 		}
+		// allow the logRing to die when the listener is destroyed; this func is called by
+		// the broadcaster, so we know we're still registered at this point. close() will
+		// shut down the ring buffer and detach() will remove us from the broadcaster.
+		detach()
+		close(in)
 	})
 	sid, err := b.register(sf)
 	if err != nil {
