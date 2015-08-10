@@ -406,8 +406,9 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 				target := canonical + tail + ":" + strconv.Itoa(port.Number)
 
 				// use protocol if defined, fallback to tcp+udp
-				if port.Protocol != "" {
-					name := "_" + ctx.taskName + "._" + port.Protocol + "." + fname
+				proto := spec(port.Protocol)
+				if proto != "" {
+					name := "_" + ctx.taskName + "._" + proto + "." + fname
 					rg.insertRR(name + tail, target, "SRV")
 				} else {
 					rg.insertRR(tcpName + tail, target, "SRV")
