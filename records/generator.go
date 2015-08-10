@@ -351,35 +351,72 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 		// insert taks records
 		tail := "." + domain + "."
 		for _, task := range f.Tasks {
-			hostIP, ok := rg.SlaveIPs[task.SlaveID]
+			slaveIP, ok := rg.SlaveIPs[task.SlaveID]
 
 			// skip not running or not discoverable tasks
 			if !ok || (task.State != "TASK_RUNNING") {
 				continue
 			}
 
-			ctx := struct{ TaskName, TaskID, SlaveID string }{
-				spec(task.Name), hashString(task.ID), slaveIDTail(task.SlaveID),
+			// define context
+			di := task.Discovery
+			ctx := struct{ taskName, taskID, slaveID, taskIP, slaveIP, containerIP string }{
+				spec(task.Name),
+				hashString(task.ID),
+				slaveIDTail(task.SlaveID),
+				slaveIP,
+				slaveIP,
+				task.ContainerIP(),
+			}
+
+			// use DiscoveryInfo name if defined instead of task name
+			if di != nil && di.Name != nil && *di.Name != "" {
+				ctx.taskName = *di.Name
+			}
+
+			// point main records to slave or container
+			if ctx.containerIP != "" {
+				ctx.taskIP = ctx.containerIP
 			}
 
 			// insert canonical A records
-			trec := ctx.TaskName + "-" + ctx.TaskID + "-" + ctx.SlaveID + "." + fname
-			arec := ctx.TaskName + "." + fname
-			containerIP := task.ContainerIP()
-			rg.insertRR(arec + tail, hostIP, "A")
-			rg.insertRR(trec + tail, hostIP, "A")
-			if containerIP != "" {
-				rg.insertRR(arec + ".slave" + tail, containerIP, "A")
-				rg.insertRR(trec + ".slave" + tail, containerIP, "A")
-			}
+			canonical := ctx.taskName + "-" + ctx.taskID + "-" + ctx.slaveID + "." + fname
+			arec := ctx.taskName + "." + fname
+
+			rg.insertRR(arec + tail, ctx.taskIP, "A")
+			rg.insertRR(canonical + tail, ctx.taskIP, "A")
+
+			rg.insertRR(arec + ".slave" + tail, ctx.slaveIP, "A")
+			rg.insertRR(canonical + ".slave" + tail, ctx.slaveIP, "A")
 
 			// Add RFC 2782 SRV records
+			slaveHost := canonical + ".slave" + tail
+			tcpName := "_" + ctx.taskName + "._tcp." + fname
+			udpName := "_" + ctx.taskName + "._udp." + fname
 			for _, port := range task.Ports() {
-				srvHost := trec + tail + ":" + port
-				tcp := "_" + ctx.TaskName + "._tcp." + fname + tail
-				udp := "_" + ctx.TaskName + "._udp." + fname + tail
-				rg.insertRR(tcp, srvHost, "SRV")
-				rg.insertRR(udp, srvHost, "SRV")
+				slaveTarget := slaveHost + ":" + port
+
+				if di == nil {
+					rg.insertRR(tcpName + tail, slaveTarget, "SRV")
+					rg.insertRR(udpName + tail, slaveTarget, "SRV")
+				}
+
+				rg.insertRR(tcpName + ".slave" + tail, slaveTarget, "SRV")
+				rg.insertRR(udpName + ".slave" + tail, slaveTarget, "SRV")
+			}
+			if di != nil {
+				for _, port := range task.Discovery.Ports.DiscoveryPorts {
+					target := canonical + tail + ":" + string(port.Number)
+
+					// use protocol if defined, fallback to tcp+udp
+					if port.Protocol != "" {
+						name := "_" + ctx.taskName + "._" + port.Protocol + tail
+						rg.insertRR(name + tail, target, "SRV")
+					} else {
+						rg.insertRR(tcpName + tail, target, "SRV")
+						rg.insertRR(udpName + tail, target, "SRV")
+					}
+				}
 			}
 		}
 	}
