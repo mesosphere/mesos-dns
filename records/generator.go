@@ -376,11 +376,11 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 			canonical := ctx.taskName + "-" + ctx.taskID + "-" + ctx.slaveID + "." + fname
 			arec := ctx.taskName + "." + fname
 
-			rg.insertRR(arec + tail, ctx.taskIP, "A")
-			rg.insertRR(canonical + tail, ctx.taskIP, "A")
+			rg.insertRR(arec+tail, ctx.taskIP, "A")
+			rg.insertRR(canonical+tail, ctx.taskIP, "A")
 
-			rg.insertRR(arec + ".slave" + tail, ctx.slaveIP, "A")
-			rg.insertRR(canonical + ".slave" + tail, ctx.slaveIP, "A")
+			rg.insertRR(arec+".slave"+tail, ctx.slaveIP, "A")
+			rg.insertRR(canonical+".slave"+tail, ctx.slaveIP, "A")
 
 			// Add RFC 2782 SRV records
 			slaveHost := canonical + ".slave" + tail
@@ -390,12 +390,12 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 				slaveTarget := slaveHost + ":" + port
 
 				if !task.HasDiscoveryInfo() {
-					rg.insertRR(tcpName + tail, slaveTarget, "SRV")
-					rg.insertRR(udpName + tail, slaveTarget, "SRV")
+					rg.insertRR(tcpName+tail, slaveTarget, "SRV")
+					rg.insertRR(udpName+tail, slaveTarget, "SRV")
 				}
 
-				rg.insertRR(tcpName + ".slave" + tail, slaveTarget, "SRV")
-				rg.insertRR(udpName + ".slave" + tail, slaveTarget, "SRV")
+				rg.insertRR(tcpName+".slave"+tail, slaveTarget, "SRV")
+				rg.insertRR(udpName+".slave"+tail, slaveTarget, "SRV")
 			}
 
 			if !task.HasDiscoveryInfo() {
@@ -409,10 +409,10 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 				proto := spec(port.Protocol)
 				if proto != "" {
 					name := "_" + ctx.taskName + "._" + proto + "." + fname
-					rg.insertRR(name + tail, target, "SRV")
+					rg.insertRR(name+tail, target, "SRV")
 				} else {
-					rg.insertRR(tcpName + tail, target, "SRV")
-					rg.insertRR(udpName + tail, target, "SRV")
+					rg.insertRR(tcpName+tail, target, "SRV")
+					rg.insertRR(udpName+tail, target, "SRV")
 				}
 			}
 		}
