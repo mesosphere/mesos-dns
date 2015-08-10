@@ -29,8 +29,6 @@ var (
 	ErrAuth error = &Error{err: "bad authentication"}
 	// ErrBuf indicates that the buffer used it too small for the message.
 	ErrBuf error = &Error{err: "buffer size too small"}
-	// ErrConn indicates that a connection has both a TCP and UDP socket.
-	ErrConn error = &Error{err: "conn holds both UDP and TCP connection"}
 	// ErrConnEmpty indicates a connection is being uses before it is initialized.
 	ErrConnEmpty error = &Error{err: "conn has no connection"}
 	// ErrExtendedRcode ...
@@ -51,8 +49,6 @@ var (
 	ErrShortRead error = &Error{err: "short read"}
 	// ErrSig indicates that a signature can not be cryptographically validated.
 	ErrSig error = &Error{err: "bad signature"}
-	// ErrSigGen indicates a faulure to generate a signature.
-	ErrSigGen error = &Error{err: "bad signature generation"}
 	// ErrSOA indicates that no SOA RR was seen when doing zone transfers.
 	ErrSoa error = &Error{err: "no SOA"}
 	// ErrTime indicates a timing error in TSIG authentication.
@@ -237,7 +233,7 @@ var RcodeToString = map[int]string{
 // PackDomainName packs a domain name s into msg[off:].
 // If compression is wanted compress must be true and the compression
 // map needs to hold a mapping between domain names and offsets
-// pointing into msg[].
+// pointing into msg.
 func PackDomainName(s string, msg []byte, off int, compression map[string]int, compress bool) (off1 int, err error) {
 	off1, _, err = packDomainName(s, msg, off, compression, compress)
 	return
@@ -1701,6 +1697,9 @@ func (dns *Msg) Unpack(msg []byte) (err error) {
 	// an error, because technically it isn't an error. So return
 	// without parsing the potentially corrupt packet and hitting an error.
 	// TODO(miek): this isn't the best strategy!
+	// Better stragey would be: set boolean indicating truncated message, go forth and parse
+	// until we hit an error, return the message without the latest parsed rr if this boolean
+	// is true.
 	if dns.Truncated {
 		dns.Answer = nil
 		dns.Ns = nil
