@@ -1,4 +1,4 @@
 tmp/
 config.json
-mesos-dns
-dnstap
+/mesos-dns
+/dnstap
