@@ -68,11 +68,6 @@ func (res *Resolver) records() *records.RecordGenerator {
 // LaunchDNS starts a (TCP and UDP) DNS server for the Resolver,
 // returning a error channel to which errors are asynchronously sent.
 func (res *Resolver) LaunchDNS(tap *tap.Tap) <-chan error {
-	// Handers for Mesos requests
-	dns.HandleFunc(res.config.Domain+".", panicRecover(res.HandleMesos))
-	// Handler for nonMesos requests
-	dns.HandleFunc(".", panicRecover(res.HandleNonMesos))
-
 	errCh := make(chan error, 2)
 	_, e1 := res.Serve("tcp", tap)
 	go func() { errCh <- <-e1 }()
@@ -84,7 +79,7 @@ func (res *Resolver) LaunchDNS(tap *tap.Tap) <-chan error {
 // Serve starts a DNS server for net protocol (tcp/udp), returns immediately.
 // the returned signal chan is closed upon the server successfully entering the listening phase.
 // if the server aborts then an error is sent on the error chan.
-func (res *Resolver) Serve(proto string, dnsInit func(*dns.ServeMux, *dns.Server)) (<-chan struct{}, <-chan error) {
+func (res *Resolver) Serve(proto string, tap *tap.Tap) (<-chan struct{}, <-chan error) {
 	defer util.HandleCrash()
 
 	ch := make(chan struct{})
@@ -97,9 +92,15 @@ func (res *Resolver) Serve(proto string, dnsInit func(*dns.ServeMux, *dns.Server
 		NotifyStartedFunc: func() { close(ch) },
 		Handler:           mux,
 	}
-	if dnsInit != nil {
-		dnsInit(mux, server)
+	if tap != nil {
+		server.DecorateReader, server.DecorateWriter = tap.ClientDecorators(server)
 	}
+
+	// Handers for Mesos requests
+	mux.HandleFunc(res.config.Domain+".", panicRecover(res.HandleMesos))
+
+	// Handler for nonMesos requests
+	mux.HandleFunc(".", panicRecover(res.HandleNonMesos))
 
 	errCh := make(chan error, 1)
 	go func() {

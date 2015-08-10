@@ -1,7 +1,6 @@
 package tap
 
 import (
-	"log"
 	"net"
 	"strconv"
 	"sync"
@@ -25,31 +24,130 @@ type Tap struct {
 	sink Sink
 }
 
-type TapContext struct {
-	tap          *Tap
-	msg          *Message
-	responseType Message_Type
+type clientIO struct {
+	tap           *Tap
+	protocol      *SocketProtocol
+	responseAddr  []byte
+	responsePort  uint32
+	parseAddrOnce sync.Once
 }
 
-type WrappedWriter struct {
-	*TapContext
-	dns.ResponseWriter
+type clientReader struct {
+	clientIO
+	in dns.Reader
 }
 
-func (w *WrappedWriter) Write(buf []byte) (int, error) {
-	w.TapContext.WriteResponse(buf)
-	return w.ResponseWriter.Write(buf)
+type clientWriter struct {
+	clientIO
+	out dns.Writer
 }
 
-func (w *WrappedWriter) WriteMsg(m *dns.Msg) error {
-	//TODO(jdef) terrible for performance! would be nice to have better access to this raw buffer from inside ResponseWriter
-	data, err := m.Pack()
-	if err != nil {
-		log.Println("ERROR:", err.Error())
-	} else {
-		w.TapContext.WriteResponse(data)
+func (c *clientReader) ReadTCP(conn *net.TCPConn, timeout time.Duration) (m []byte, err error) {
+	if m, err = c.in.ReadTCP(conn, timeout); err != nil {
+		return
 	}
-	return w.ResponseWriter.WriteMsg(m)
+	c.parseLocalAddr(conn.LocalAddr)
+	c.logQuery(m, conn.RemoteAddr)
+	return
+}
+
+func (c *clientReader) ReadUDP(conn *net.UDPConn, timeout time.Duration) (m []byte, s *dns.SessionUDP, err error) {
+	if m, s, err = c.in.ReadUDP(conn, timeout); err != nil {
+		return
+	}
+	c.parseLocalAddr(conn.LocalAddr)
+	c.logQuery(m, s.RemoteAddr)
+	return
+}
+
+func (c *clientWriter) Write(m []byte) (int, error) {
+	//TODO(jdef) need to get this somehow from the writer delegate?
+	//c.parseLocalAddr(conn.LocalAddr)
+	c.logResponse(m)
+	return c.out.Write(m)
+}
+
+func (c *clientIO) parseLocalAddr(a func() net.Addr) {
+	c.parseAddrOnce.Do(func() {
+		host, port, err := net.SplitHostPort(a().String())
+		if err != nil {
+			return
+		}
+		if iport, err := strconv.Atoi(port); err != nil {
+			c.responsePort = uint32(iport)
+		}
+		if ip := net.ParseIP(host); ip != nil {
+			c.responseAddr = ([]byte)(ip)
+		}
+	})
+}
+
+func (c *clientReader) logQuery(m []byte, remoteAddr func() net.Addr) {
+	now := time.Now()
+
+	var fam *SocketFamily
+	if remoteAddr != nil {
+		//TODO(jdef) remote address is nil, we're no longer getting it
+		//from dns.ResponseWriter and conn.RemoteAddr() is useless for
+		//UDP sessions.
+		if ra := remoteAddr(); ra != nil {
+			clientAddr := ra.String()
+			_, fam = parseAddr(clientAddr)
+		}
+	}
+
+	qsec := uint64(now.Unix())
+	qnsec := uint32(now.Nanosecond())
+	tapmsg := &Dnstap{
+		Type: Dnstap_MESSAGE.Enum(),
+		Message: &Message{
+			Type:           Message_CLIENT_QUERY.Enum(),
+			SocketFamily:   fam,
+			SocketProtocol: c.protocol,
+			QueryMessage:   m[:],
+			QueryTimeSec:   &qsec,
+			QueryTimeNsec:  &qnsec,
+		},
+	}
+	if c.responsePort != 0 {
+		tapmsg.Message.ResponsePort = &c.responsePort
+	}
+	if c.responseAddr != nil {
+		tapmsg.Message.ResponseAddress = c.responseAddr
+	}
+	c.tap.log(tapmsg)
+}
+
+func (c *clientWriter) logResponse(m []byte) {
+	now := time.Now()
+
+	/*TODO(jdef) need to get this from dns.Writer somehow
+	clientAddr := remoteAddr().String()
+	_, fam := parseAddr(clientAddr)
+	*/
+
+	qsec := uint64(now.Unix())
+	qnsec := uint32(now.Nanosecond())
+	tapmsg := &Dnstap{
+		Type: Dnstap_MESSAGE.Enum(),
+		Message: &Message{
+			Type:           Message_CLIENT_RESPONSE.Enum(),
+			SocketProtocol: c.protocol,
+			/*
+				SocketFamily:   fam,
+			*/
+			ResponseMessage:  m[:],
+			ResponseTimeSec:  &qsec,
+			ResponseTimeNsec: &qnsec,
+		},
+	}
+	if c.responsePort != 0 {
+		tapmsg.Message.ResponsePort = &c.responsePort
+	}
+	if c.responseAddr != nil {
+		tapmsg.Message.ResponseAddress = c.responseAddr
+	}
+	c.tap.log(tapmsg)
 }
 
 func NewTap(sink Sink) *Tap {
@@ -59,7 +157,7 @@ func NewTap(sink Sink) *Tap {
 	return t
 }
 
-func (t *Tap) ClientSpike(s *dns.Server, h dns.Handler) dns.Handler {
+func (t *Tap) ClientDecorators(s *dns.Server) (dns.DecorateReader, dns.DecorateWriter) {
 	var protocol *SocketProtocol
 	switch s.Net {
 	case "tcp", "tcp4", "tcp6":
@@ -68,83 +166,25 @@ func (t *Tap) ClientSpike(s *dns.Server, h dns.Handler) dns.Handler {
 		protocol = SocketProtocol_UDP.Enum()
 	}
 
-	var parseResponseAddrOnce sync.Once
-	return dns.HandlerFunc(func(w dns.ResponseWriter, m *dns.Msg) {
-		var responseAddr []byte
-		var responsePort uint32
-		parseResponseAddrOnce.Do(func() {
-			host, port, err := net.SplitHostPort(w.LocalAddr().String())
-			if err != nil {
-				return
-			}
-			if iport, err := strconv.Atoi(port); err != nil {
-				responsePort = uint32(iport)
-			}
-			if ip := net.ParseIP(host); ip != nil {
-				responseAddr = ([]byte)(ip)
-			}
-		})
-		ctx := t.Begin(w, m, Message_CLIENT_QUERY, protocol, responseAddr, responsePort)
-		wrapped := &WrappedWriter{
-			ResponseWriter: w,
-			TapContext:     ctx,
+	reader := dns.DecorateReader(func(r dns.Reader) dns.Reader {
+		return &clientReader{
+			clientIO: clientIO{
+				tap:      t,
+				protocol: protocol,
+			},
+			in: r,
 		}
-		h.ServeDNS(wrapped, m)
 	})
-}
-
-func (t *Tap) Begin(w dns.ResponseWriter, m *dns.Msg, qtype Message_Type, proto *SocketProtocol, resAddr []byte, resPort uint32) *TapContext {
-	now := time.Now()
-	clientAddr := w.RemoteAddr().String()
-	_, fam := parseAddr(clientAddr)
-	packed, _ := m.Pack() // TODO(jdef) this is terrible, we need to intercept this some other way?!
-	qsec := uint64(now.Unix())
-	qnsec := uint32(now.Nanosecond())
-	tapmsg := &Dnstap{
-		Type: Dnstap_MESSAGE.Enum(),
-		Message: &Message{
-			Type:           &qtype,
-			SocketFamily:   fam,
-			SocketProtocol: proto,
-			QueryMessage:   packed,
-			QueryTimeSec:   &qsec,
-			QueryTimeNsec:  &qnsec,
-		},
-	}
-	if resPort != 0 {
-		tapmsg.Message.ResponsePort = &resPort
-	}
-	if resAddr != nil {
-		tapmsg.Message.ResponseAddress = resAddr
-	}
-	ctx := &TapContext{
-		tap:          t,
-		msg:          tapmsg.Message,
-		responseType: Message_CLIENT_RESPONSE,
-	}
-	t.log(tapmsg)
-	return ctx
-}
-
-func (t *TapContext) WriteResponse(packed []byte) {
-	now := time.Now()
-	qsec := uint64(now.Unix())
-	qnsec := uint32(now.Nanosecond())
-	t.tap.log(&Dnstap{
-		Type: Dnstap_MESSAGE.Enum(),
-		Message: &Message{
-			Type:             &t.responseType,
-			SocketFamily:     t.msg.SocketFamily,
-			SocketProtocol:   t.msg.SocketProtocol,
-			QueryTimeSec:     t.msg.QueryTimeSec,
-			QueryTimeNsec:    t.msg.QueryTimeNsec,
-			ResponseAddress:  t.msg.ResponseAddress,
-			ResponsePort:     t.msg.ResponsePort,
-			ResponseMessage:  packed,
-			ResponseTimeSec:  &qsec,
-			ResponseTimeNsec: &qnsec,
-		},
+	writer := dns.DecorateWriter(func(w dns.Writer) dns.Writer {
+		return &clientWriter{
+			clientIO: clientIO{
+				tap:      t,
+				protocol: protocol,
+			},
+			out: w,
+		}
 	})
+	return reader, writer
 }
 
 func parseAddr(addr string) (ip net.IP, family *SocketFamily) {
