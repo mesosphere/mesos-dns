@@ -2,6 +2,7 @@ package resolver
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -463,4 +464,26 @@ func onError(abort <-chan struct{}, errCh <-chan error, f func(error)) <-chan st
 		}
 	}()
 	return ch
+}
+
+func TestMultiError(t *testing.T) {
+	me := multiError(nil)
+	me = me.Add()
+	me = me.Add(nil)
+	me = me.Add(multiError(nil))
+	if !me.Nil() {
+		t.Fatalf("Expected Nil() multiError instead of %q", me.Error())
+	}
+
+	me = me.Add(errors.New("abc"))
+	me = me.Add(errors.New("123"))
+	me = me.Add(multiError(nil))
+	me = me.Add(multiError(nil).Add(errors.New("456")))
+	me = me.Add(errors.New("789"))
+
+	const expected = "abc; 123; 456; 789"
+	actual := me.Error()
+	if expected != actual {
+		t.Fatalf("expected %q instead of %q", expected, actual)
+	}
 }
