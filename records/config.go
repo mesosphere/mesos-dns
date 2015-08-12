@@ -162,6 +162,7 @@ func readConfig(file string) (*Config, error) {
 	workingDir := "."
 	usr, err := user.Current()
 	if err != nil {
+		// this can happen (on Linux) if you're running mesos-dns as a non-root user.
 		logging.Error.Println("Failed to determine current user, translating ~/ to ./, error was", err)
 	} else {
 		workingDir = usr.HomeDir

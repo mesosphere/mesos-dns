@@ -368,7 +368,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	case dns.TypeNS:
 		errs.Add(res.handleNS(m, r))
 	case dns.TypeANY:
-		errs.AddAll(
+		errs.Add(
 			res.handleSRV(rs, name, m, r),
 			res.handleA(rs, name, m),
 			res.handleSOA(m, r),
@@ -710,18 +710,13 @@ func cleanWild(name string) string {
 
 type multiError []error
 
-func (e multiError) Add(err error) multiError {
-	if me, ok := err.(multiError); ok {
-		return append(e, me...)
-	} else if err != nil {
-		return append(e, err)
-	}
-	return e
-}
-
-func (e multiError) AddAll(err ...error) multiError {
+func (e multiError) Add(err ...error) multiError {
 	for _, e1 := range err {
-		e = e.Add(e1)
+		if me, ok := e1.(multiError); ok {
+			e = append(e, me...)
+		} else if e1 != nil {
+			e = append(e, e1)
+		}
 	}
 	return e
 }
