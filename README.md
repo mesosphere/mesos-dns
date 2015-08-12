@@ -1,4 +1,4 @@
-# [Mesos-DNS](https://mesosphere.github.io/mesos-dns/)
+# [Mesos-DNS](https://mesosphere.github.io/mesos-dns/) [![Circle CI](https://circleci.com/gh/mesosphere/mesos-dns.svg?style=svg)](https://circleci.com/gh/mesosphere/mesos-dns)
 ##### DNS-based service discovery for Mesos
 
 ## Intro
