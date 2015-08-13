@@ -1,10 +1,20 @@
 # Contributing
 
+## Issues
+
+When filing an issue, make sure to answer these five questions:
+
+1. What version of the project are you using?
+2. What operating system and processor architecture are you using?
+3. What did you do?
+4. What did you expect to see?
+5. What did you see instead?
+
 ## Design
 
-This project's development process is design-driven.
-Significant changes must be first discussed, and sometimes formally documented,
-before they can be implemented.
+This project's development process is design-driven. Apart from simple
+bug fixes, typo corrections and the like, significant changes must be
+first discussed, and sometimes formally documented, before they can be implemented.
 
 This document describes the process for proposing, documenting, and implementing
 such changes. It's forked and modified from the Go language proposal process.
@@ -50,7 +60,7 @@ If in doubt, file a proposal.
   - The design doc should be checked in to `design/NNNN-shortname.md`,
     where `NNNN` is the GitHub issue number and `shortname` is a short name
     (a few dash-separated words at most).
-  - The design doc should follow the templat found below.
+  - The design doc should follow the template found below.
   - The design doc should address any specific issues asked for during the
     initial discussion.
   - It is expected that the design doc may go through multiple checked-in revisions.
