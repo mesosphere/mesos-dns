@@ -29,7 +29,7 @@ such changes. It's forked and modified from the Go language proposal process.
 ### Definitions
 
 - A **proposal** is a suggestion filed as a GitHub issue, identified by having
-  the PROPOSAL title prefix.
+  the "Proposal:" title prefix.
 - A **design doc** is the expanded form of a proposal, written when the
   proposal needs more careful explanation and consideration.
 
