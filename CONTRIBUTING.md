@@ -132,5 +132,5 @@ Every contribution must conform to the following rules:
 - Once comments and revisions on the implementation wind down, one or
   preferably two reviewers must add LGTM comments to the pull request.
   There must be consensus across reviewers before merging.
-- Git history must be clean, readable and composed of logically grouped
-  changes.
+- Upon merge, all git commits should represent meaningful milestones or units
+  of work. Use commits to add clarity to the development and review process.
