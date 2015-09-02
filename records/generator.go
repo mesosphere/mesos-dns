@@ -33,10 +33,9 @@ type RecordGenerator struct {
 
 // ParseState retrieves and parses the Mesos master /state.json and converts it
 // into DNS records.
-func (rg *RecordGenerator) ParseState(leader string, c Config) error {
-
+func (rg *RecordGenerator) ParseState(c Config, masters ...string) error {
 	// find master -- return if error
-	sj, err := rg.findMaster(leader, c.Masters)
+	sj, err := rg.findMaster(masters...)
 	if err != nil {
 		logging.Error.Println("no master")
 		return err
@@ -52,15 +51,20 @@ func (rg *RecordGenerator) ParseState(leader string, c Config) error {
 		hostSpec = labels.RFC952
 	}
 
-	return rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, c.Masters, c.IPSources, hostSpec)
+	return rg.InsertState(sj, c.Domain, c.SOARname, c.Listener, masters, c.IPSources, hostSpec)
 }
 
 // Tries each master and looks for the leader
 // if no leader responds it errors
-func (rg *RecordGenerator) findMaster(leader string, masters []string) (state.State, error) {
+func (rg *RecordGenerator) findMaster(masters ...string) (state.State, error) {
 	var sj state.State
+	var leader string
 
-	// Check if ZK master is correct
+	if len(masters) > 0 {
+		leader, masters = masters[0], masters[1:]
+	}
+
+	// Check if ZK leader is correct
 	if leader != "" {
 		logging.VeryVerbose.Println("Zookeeper says the leader is: ", leader)
 		ip, port, err := getProto(leader)
