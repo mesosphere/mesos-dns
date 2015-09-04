@@ -171,8 +171,9 @@ func (res *Resolver) Reload() {
 // extQueryTimeout is the default external resolver query timeout.
 const extQueryTimeout = 5 * time.Second
 
-// defaultExtResolver queries other nameserver, potentially recurses; callers should probably be invoking extResolver
-// instead since that's the pluggable entrypoint into external resolution.
+// defaultExtResolver queries other nameserver (host:port), potentially recurses; callers should
+// probably be invoking extResolver instead since that's the pluggable entrypoint into external
+// resolution.
 func (res *Resolver) defaultExtResolver(r *dns.Msg, nameserver, proto string, cnt int) (in *dns.Msg, err error) {
 	defer logging.CurLog.NonMesosRecursed.Inc()
 
@@ -193,7 +194,11 @@ func (res *Resolver) defaultExtResolver(r *dns.Msg, nameserver, proto string, cn
 		if err != nil || len(in.Ns) == 0 || (in.Authoritative && len(in.Answer) > 0) {
 			break
 		} else if soa, ok := in.Ns[0].(*dns.SOA); ok {
-			nameserver = soa.Ns
+			//TODO(jdef) do we care about loops/cycles here? e.g. what if
+			// nameserver[i] = nameserver[i-x]? The for loop is limited anyway
+			// but it probably makes sense to abort sooner than later in cases
+			// like this.
+			nameserver = net.JoinHostPort(soa.Ns, "53")
 		}
 	}
 
