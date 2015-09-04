@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/kylelemons/godebug/pretty"
+	. "github.com/mesosphere/mesos-dns/dnstest"
+	"github.com/mesosphere/mesos-dns/exchanger"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/records/labels"
@@ -76,19 +78,19 @@ func TestShuffleAnswers(t *testing.T) {
 
 func TestHandlers(t *testing.T) {
 	res := fakeDNS(t)
-	res.extResolver = func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error) {
+	res.extResolver = exchanger.Func(func(m *dns.Msg, a string) (*dns.Msg, time.Duration, error) {
 		rr1, err := res.formatA("google.com.", "1.1.1.1")
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		rr2, err := res.formatA("google.com.", "2.2.2.2")
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		msg := &dns.Msg{Answer: []dns.RR{rr1, rr2}}
-		msg.SetReply(r)
-		return msg, nil
-	}
+		msg.SetReply(m)
+		return msg, 0, nil
+	})
 
 	for i, tt := range []struct {
 		dns.HandlerFunc
@@ -96,119 +98,119 @@ func TestHandlers(t *testing.T) {
 	}{
 		{
 			res.HandleMesos,
-			message(
-				question("chronos.marathon.mesos.", dns.TypeA),
-				header(true, dns.RcodeSuccess),
-				answers(
-					a(rrheader("chronos.marathon.mesos.", dns.TypeA, 60),
+			Message(
+				Question("chronos.marathon.mesos.", dns.TypeA),
+				Header(true, dns.RcodeSuccess),
+				Answers(
+					A(RRHeader("chronos.marathon.mesos.", dns.TypeA, 60),
 						net.ParseIP("1.2.3.11")))),
 		},
 		{ // case insensitive
 			res.HandleMesos,
-			message(
-				question("cHrOnOs.MARATHON.mesoS.", dns.TypeA),
-				header(true, dns.RcodeSuccess),
-				answers(
-					a(rrheader("chronos.marathon.mesos.", dns.TypeA, 60),
+			Message(
+				Question("cHrOnOs.MARATHON.mesoS.", dns.TypeA),
+				Header(true, dns.RcodeSuccess),
+				Answers(
+					A(RRHeader("chronos.marathon.mesos.", dns.TypeA, 60),
 						net.ParseIP("1.2.3.11")))),
 		},
 		{
 			res.HandleMesos,
-			message(
-				question("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV),
-				header(true, dns.RcodeSuccess),
-				answers(
-					srv(rrheader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
+			Message(
+				Question("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV),
+				Header(true, dns.RcodeSuccess),
+				Answers(
+					SRV(RRHeader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
 						"liquor-store-17700-0.marathon.mesos.", 443, 0, 0),
-					srv(rrheader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
+					SRV(RRHeader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
 						"liquor-store-7581-1.marathon.mesos.", 80, 0, 0),
-					srv(rrheader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
+					SRV(RRHeader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
 						"liquor-store-7581-1.marathon.mesos.", 443, 0, 0),
-					srv(rrheader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
+					SRV(RRHeader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
 						"liquor-store-17700-0.marathon.mesos.", 80, 0, 0)),
-				extras(
-					a(rrheader("liquor-store-17700-0.marathon.mesos.", dns.TypeA, 60),
+				Extras(
+					A(RRHeader("liquor-store-17700-0.marathon.mesos.", dns.TypeA, 60),
 						net.ParseIP("10.3.0.1")),
-					a(rrheader("liquor-store-17700-0.marathon.mesos.", dns.TypeA, 60),
+					A(RRHeader("liquor-store-17700-0.marathon.mesos.", dns.TypeA, 60),
 						net.ParseIP("10.3.0.1")),
-					a(rrheader("liquor-store-7581-1.marathon.mesos.", dns.TypeA, 60),
+					A(RRHeader("liquor-store-7581-1.marathon.mesos.", dns.TypeA, 60),
 						net.ParseIP("10.3.0.2")),
-					a(rrheader("liquor-store-7581-1.marathon.mesos.", dns.TypeA, 60),
+					A(RRHeader("liquor-store-7581-1.marathon.mesos.", dns.TypeA, 60),
 						net.ParseIP("10.3.0.2")))),
 		},
 		{
 			res.HandleMesos,
-			message(
-				question("_car-store._udp.marathon.mesos.", dns.TypeSRV),
-				header(true, dns.RcodeSuccess),
-				answers(
-					srv(rrheader("_car-store._udp.marathon.mesos.", dns.TypeSRV, 60),
+			Message(
+				Question("_car-store._udp.marathon.mesos.", dns.TypeSRV),
+				Header(true, dns.RcodeSuccess),
+				Answers(
+					SRV(RRHeader("_car-store._udp.marathon.mesos.", dns.TypeSRV, 60),
 						"car-store-50548-0.marathon.slave.mesos.", 31365, 0, 0),
-					srv(rrheader("_car-store._udp.marathon.mesos.", dns.TypeSRV, 60),
+					SRV(RRHeader("_car-store._udp.marathon.mesos.", dns.TypeSRV, 60),
 						"car-store-50548-0.marathon.slave.mesos.", 31364, 0, 0)),
-				extras(
-					a(rrheader("car-store-50548-0.marathon.slave.mesos.", dns.TypeA, 60),
+				Extras(
+					A(RRHeader("car-store-50548-0.marathon.slave.mesos.", dns.TypeA, 60),
 						net.ParseIP("1.2.3.11")),
-					a(rrheader("car-store-50548-0.marathon.slave.mesos.", dns.TypeA, 60),
+					A(RRHeader("car-store-50548-0.marathon.slave.mesos.", dns.TypeA, 60),
 						net.ParseIP("1.2.3.11")))),
 		},
 		{
 			res.HandleMesos,
-			message(
-				question("non-existing.mesos.", dns.TypeSOA),
-				header(true, dns.RcodeSuccess),
-				nss(
-					soa(rrheader("non-existing.mesos.", dns.TypeSOA, 60),
+			Message(
+				Question("non-existing.mesos.", dns.TypeSOA),
+				Header(true, dns.RcodeSuccess),
+				NSs(
+					SOA(RRHeader("non-existing.mesos.", dns.TypeSOA, 60),
 						"root.ns1.mesos", "ns1.mesos", 60))),
 		},
 		{
 			res.HandleMesos,
-			message(
-				question("non-existing.mesos.", dns.TypeNS),
-				header(true, dns.RcodeSuccess),
-				nss(
-					ns(rrheader("non-existing.mesos.", dns.TypeNS, 60), "ns1.mesos"))),
+			Message(
+				Question("non-existing.mesos.", dns.TypeNS),
+				Header(true, dns.RcodeSuccess),
+				NSs(
+					NS(RRHeader("non-existing.mesos.", dns.TypeNS, 60), "ns1.mesos"))),
 		},
 		{
 			res.HandleMesos,
-			message(
-				question("missing.mesos.", dns.TypeA),
-				header(true, dns.RcodeNameError),
-				nss(
-					soa(rrheader("missing.mesos.", dns.TypeSOA, 60),
+			Message(
+				Question("missing.mesos.", dns.TypeA),
+				Header(true, dns.RcodeNameError),
+				NSs(
+					SOA(RRHeader("missing.mesos.", dns.TypeSOA, 60),
 						"root.ns1.mesos", "ns1.mesos", 60))),
 		},
 		{
 			res.HandleMesos,
-			message(
-				question("chronos.marathon.mesos.", dns.TypeAAAA),
-				header(true, dns.RcodeSuccess),
-				nss(
-					soa(rrheader("chronos.marathon.mesos.", dns.TypeSOA, 60),
+			Message(
+				Question("chronos.marathon.mesos.", dns.TypeAAAA),
+				Header(true, dns.RcodeSuccess),
+				NSs(
+					SOA(RRHeader("chronos.marathon.mesos.", dns.TypeSOA, 60),
 						"root.ns1.mesos", "ns1.mesos", 60))),
 		},
 		{
 			res.HandleMesos,
-			message(
-				question("missing.mesos.", dns.TypeAAAA),
-				header(true, dns.RcodeNameError),
-				nss(
-					soa(rrheader("missing.mesos.", dns.TypeSOA, 60),
+			Message(
+				Question("missing.mesos.", dns.TypeAAAA),
+				Header(true, dns.RcodeNameError),
+				NSs(
+					SOA(RRHeader("missing.mesos.", dns.TypeSOA, 60),
 						"root.ns1.mesos", "ns1.mesos", 60))),
 		},
 		{
 			res.HandleNonMesos,
-			message(
-				question("google.com.", dns.TypeA),
-				header(false, dns.RcodeSuccess),
-				answers(
-					a(rrheader("google.com.", dns.TypeA, 60), net.ParseIP("1.1.1.1")),
-					a(rrheader("google.com.", dns.TypeA, 60), net.ParseIP("2.2.2.2")))),
+			Message(
+				Question("google.com.", dns.TypeA),
+				Header(false, dns.RcodeSuccess),
+				Answers(
+					A(RRHeader("google.com.", dns.TypeA, 60), net.ParseIP("1.1.1.1")),
+					A(RRHeader("google.com.", dns.TypeA, 60), net.ParseIP("2.2.2.2")))),
 		},
 	} {
-		var rw responseRecorder
+		var rw ResponseRecorder
 		tt.HandlerFunc(&rw, tt.Msg)
-		if got, want := rw.msg, tt.Msg; !reflect.DeepEqual(got, want) {
+		if got, want := rw.Msg, tt.Msg; !reflect.DeepEqual(got, want) {
 			t.Logf("Test #%d\n%v\n", i, pretty.Sprint(tt.Msg.Question))
 			t.Error(pretty.Compare(got, want))
 		}
@@ -323,105 +325,6 @@ func TestLaunchZK(t *testing.T) {
 		// expected
 	}
 }
-
-func message(opts ...func(*dns.Msg)) *dns.Msg {
-	var m dns.Msg
-	for _, opt := range opts {
-		opt(&m)
-	}
-	return &m
-}
-
-func header(auth bool, rcode int) func(*dns.Msg) {
-	return func(m *dns.Msg) {
-		m.Authoritative = auth
-		m.Response = true
-		m.Rcode = rcode
-		m.Compress = true
-	}
-}
-
-func question(name string, qtype uint16) func(*dns.Msg) {
-	return func(m *dns.Msg) { m.SetQuestion(name, qtype) }
-}
-
-func answers(rrs ...dns.RR) func(*dns.Msg) {
-	return func(m *dns.Msg) { m.Answer = append(m.Answer, rrs...) }
-}
-
-func nss(rrs ...dns.RR) func(*dns.Msg) {
-	return func(m *dns.Msg) { m.Ns = append(m.Ns, rrs...) }
-}
-
-func extras(rrs ...dns.RR) func(*dns.Msg) {
-	return func(m *dns.Msg) { m.Extra = append(m.Extra, rrs...) }
-}
-
-func rrheader(name string, rrtype uint16, ttl uint32) dns.RR_Header {
-	return dns.RR_Header{
-		Name:   name,
-		Rrtype: rrtype,
-		Class:  dns.ClassINET,
-		Ttl:    ttl,
-	}
-}
-
-func a(hdr dns.RR_Header, ip net.IP) dns.RR {
-	return &dns.A{
-		Hdr: hdr,
-		A:   ip.To4(),
-	}
-}
-
-func srv(hdr dns.RR_Header, target string, port, priority, weight uint16) dns.RR {
-	return &dns.SRV{
-		Hdr:      hdr,
-		Target:   target,
-		Port:     port,
-		Priority: priority,
-		Weight:   weight,
-	}
-}
-
-func ns(hdr dns.RR_Header, s string) dns.RR {
-	return &dns.NS{
-		Hdr: hdr,
-		Ns:  s,
-	}
-}
-
-func soa(hdr dns.RR_Header, ns, mbox string, minttl uint32) dns.RR {
-	return &dns.SOA{
-		Hdr:     hdr,
-		Ns:      ns,
-		Mbox:    mbox,
-		Minttl:  minttl,
-		Refresh: 60,
-		Retry:   600,
-		Expire:  86400,
-	}
-}
-
-// responseRecorder implements the dns.ResponseWriter interface. It's used in
-// tests only.
-type responseRecorder struct {
-	localAddr  net.IPAddr
-	remoteAddr net.IPAddr
-	msg        *dns.Msg
-}
-
-func (r responseRecorder) LocalAddr() net.Addr  { return &r.localAddr }
-func (r responseRecorder) RemoteAddr() net.Addr { return &r.remoteAddr }
-func (r *responseRecorder) WriteMsg(m *dns.Msg) error {
-	r.msg = m
-	return nil
-}
-
-func (r *responseRecorder) Write([]byte) (int, error) { return 0, nil }
-func (r *responseRecorder) Close() error              { return nil }
-func (r responseRecorder) TsigStatus() error          { return nil }
-func (r responseRecorder) TsigTimersOnly(bool)        {}
-func (r *responseRecorder) Hijack()                   {}
 
 func fakeDNS(t *testing.T) *Resolver {
 	config := records.NewConfig()

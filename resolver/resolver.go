@@ -17,14 +17,11 @@ import (
 	"github.com/mesos/mesos-go/detector"
 	_ "github.com/mesos/mesos-go/detector/zoo" // Registers the ZK detector
 	mesos "github.com/mesos/mesos-go/mesosproto"
+	"github.com/mesosphere/mesos-dns/exchanger"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/util"
 	"github.com/miekg/dns"
-)
-
-var (
-	recurseCnt = 3
 )
 
 // Resolver holds configuration state and the resource records
@@ -36,9 +33,8 @@ type Resolver struct {
 	leader     string
 	leaderLock sync.RWMutex
 	rng        *rand.Rand
-
 	// pluggable external DNS resolution, mainly for unit testing
-	extResolver func(r *dns.Msg, nameserver string, proto string, cnt int) (*dns.Msg, error)
+	extResolver exchanger.Exchanger
 	// pluggable ZK detection, mainly for unit testing
 	startZKdetection func(zkurl string, leaderChanged func(string)) error
 }
@@ -51,10 +47,42 @@ func New(version string, config records.Config) *Resolver {
 		rs:      &records.RecordGenerator{},
 		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
-	r.extResolver = r.defaultExtResolver
+
 	r.startZKdetection = startDefaultZKdetector
+
+	if !config.ExternalOn {
+		return r
+	}
+
+	timeout := 5 * time.Second
+	if config.Timeout != 0 {
+		timeout = time.Duration(config.Timeout) * time.Second
+	}
+
+	r.extResolver = newClient(timeout)
+
 	return r
 }
+
+func newClient(timeout time.Duration) exchanger.Exchanger {
+	clients := make([]exchanger.Exchanger, 2)
+	for i, proto := range [...]string{"udp", "tcp"} { // See RFC5966
+		clients[i] = &dns.Client{
+			Net:          proto,
+			DialTimeout:  timeout,
+			ReadTimeout:  timeout,
+			WriteTimeout: timeout,
+		}
+	}
+	return exchanger.Decorate(
+		exchanger.While(truncated, clients...),
+		exchanger.Recursion(3, exchanger.Recurse),
+		exchanger.ErrorLogging(logging.Error),
+		exchanger.Instrumentation(logging.CurLog.NonMesosRecursed),
+	)
+}
+
+func truncated(m *dns.Msg) bool { return m.Truncated }
 
 // return the current (read-only) record set. attempts to write to the returned
 // object will likely result in a data race.
@@ -168,43 +196,6 @@ func (res *Resolver) Reload() {
 	}
 }
 
-// extQueryTimeout is the default external resolver query timeout.
-const extQueryTimeout = 5 * time.Second
-
-// defaultExtResolver queries other nameserver (host:port), potentially recurses; callers should
-// probably be invoking extResolver instead since that's the pluggable entrypoint into external
-// resolution.
-func (res *Resolver) defaultExtResolver(r *dns.Msg, nameserver, proto string, cnt int) (in *dns.Msg, err error) {
-	defer logging.CurLog.NonMesosRecursed.Inc()
-
-	timeout := extQueryTimeout
-	if res.config.Timeout != 0 {
-		timeout = time.Duration(res.config.Timeout) * time.Second
-	}
-
-	c := dns.Client{
-		Net:          proto,
-		DialTimeout:  timeout,
-		ReadTimeout:  timeout,
-		WriteTimeout: timeout,
-	}
-
-	for i := 0; i < cnt; i++ {
-		in, _, err = c.Exchange(r, nameserver)
-		if err != nil || len(in.Ns) == 0 || (in.Authoritative && len(in.Answer) > 0) {
-			break
-		} else if soa, ok := in.Ns[0].(*dns.SOA); ok {
-			//TODO(jdef) do we care about loops/cycles here? e.g. what if
-			// nameserver[i] = nameserver[i-x]? The for loop is limited anyway
-			// but it probably makes sense to abort sooner than later in cases
-			// like this.
-			nameserver = net.JoinHostPort(soa.Ns, "53")
-		}
-	}
-
-	return in, err
-}
-
 // formatSRV returns the SRV resource record for target
 func (res *Resolver) formatSRV(name string, target string) (*dns.SRV, error) {
 	ttl := uint32(res.config.TTL)
@@ -306,20 +297,14 @@ func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
 	logging.CurLog.NonMesosRequests.Inc()
 
 	// If external request are disabled
-	if !res.config.ExternalOn {
+	if res.extResolver == nil {
 		m = new(dns.Msg)
 		// set refused
 		m.SetRcode(r, 5)
 	} else {
-
-		proto := "udp"
-		if _, ok := w.RemoteAddr().(*net.TCPAddr); ok {
-			proto = "tcp"
-		}
-
 		for _, resolver := range res.config.Resolvers {
 			nameserver := net.JoinHostPort(resolver, "53")
-			m, err = res.extResolver(r, nameserver, proto, recurseCnt)
+			m, _, err = res.extResolver.Exchange(r, nameserver)
 			if err == nil {
 				break
 			}
