@@ -32,24 +32,17 @@ func validateMasters(ms []string) error {
 	return nil
 }
 
-// validateResolvers checks that each resolver in the list is a properly formatted IP address.
-// duplicate resolvers in the list are not allowed.
-// returns nil if the resolver list is empty, or else all resolvers in the list are valid.
+// validateResolvers errors if there are duplicate resolvers, otherwise returns nil.
 func validateResolvers(rs []string) error {
 	if len(rs) == 0 {
 		return nil
 	}
 	ips := make(map[string]struct{}, len(rs))
 	for _, r := range rs {
-		ip := net.ParseIP(r)
-		if ip == nil {
-			return fmt.Errorf("illegal IP specified for resolver %q", r)
-		}
-		ipstr := ip.String()
-		if _, found := ips[ipstr]; found {
+		if _, found := ips[r]; found {
 			return fmt.Errorf("duplicate resolver IP specified: %v", r)
 		}
-		ips[ipstr] = struct{}{}
+		ips[r] = struct{}{}
 	}
 	return nil
 }
