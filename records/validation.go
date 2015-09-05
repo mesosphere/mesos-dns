@@ -25,31 +25,27 @@ func validateMasters(ms []string) error {
 		}
 		//TODO(jdef) distinguish between intended hostnames and invalid ip addresses
 		if _, found := valid[m]; found {
-			return fmt.Errorf("duplicate master specified: %v", ms[i])
+			return fmt.Errorf("duplicate master specified: %q", ms[i])
 		}
 		valid[m] = struct{}{}
 	}
 	return nil
 }
 
-// validateResolvers checks that each resolver in the list is a properly formatted IP address.
-// duplicate resolvers in the list are not allowed.
-// returns nil if the resolver list is empty, or else all resolvers in the list are valid.
+// validateResolvers errors if there are duplicate resolvers, otherwise returns nil.
 func validateResolvers(rs []string) error {
 	if len(rs) == 0 {
 		return nil
 	}
 	ips := make(map[string]struct{}, len(rs))
 	for _, r := range rs {
-		ip := net.ParseIP(r)
-		if ip == nil {
-			return fmt.Errorf("illegal IP specified for resolver %q", r)
+		if r == "" {
+			return fmt.Errorf("empty resolver IP specified: %q", r)
 		}
-		ipstr := ip.String()
-		if _, found := ips[ipstr]; found {
-			return fmt.Errorf("duplicate resolver IP specified: %v", r)
+		if _, found := ips[r]; found {
+			return fmt.Errorf("duplicate resolver IP specified: %q", r)
 		}
-		ips[ipstr] = struct{}{}
+		ips[r] = struct{}{}
 	}
 	return nil
 }
