@@ -18,7 +18,8 @@ func TestValidateMasters(t *testing.T) {
 		{[]string{"1.2.3.4"}, false},
 		{[]string{"1.2.3.4:5"}, true},
 		{[]string{"1.2.3.4.5"}, false},
-		{[]string{"1.2.3.4.5:6"}, true}, // no validation of hostnames
+		{[]string{"1.2.3.4.5:6"}, false}, // TLD must not be all digits
+		{[]string{"1.2.3.4.5x:6"}, true}, // custom TLD may start with a digit
 		{[]string{"1.2.3.4", "1.2.3.4"}, false},
 		{[]string{"1.2.3.4:1", "1.2.3.4:1"}, false},
 		{[]string{"1.2.3.4:1", "5.6.7.8:1"}, true},
@@ -42,12 +43,13 @@ func TestValidateResolvers(t *testing.T) {
 		{[]string{"example.com", "localhost"}, true},
 		{[]string{"localhost", "localhost"}, false},
 		{[]string{"1.2.3.4"}, true},
-//		{[]string{"1.2.3.4.5"}, false},
+		{[]string{"1.2.3.4.5"}, false}, // TLD must not be all digits
+		{[]string{"1.2.3.4.5x"}, true}, // TLD may start with a digit
 		{[]string{"1.2.3.4", "1.2.3.4"}, false},
 		{[]string{"1.2.3.4", "5.6.7.8"}, true},
 		{[]string{"2001:0db8:3c4d:0015:0000:0000:1a2f:1a2b"}, true},
 		{[]string{"2001:db8:3c4d:15::1a2f:1a2b"}, true},
-//		{[]string{"2001:0db8:3c4d:0015:0000:0000:1a2f:1a2b", "2001:db8:3c4d:15::1a2f:1a2b"}, false},
+		{[]string{"2001:0db8:3c4d:0015:0000:0000:1a2f:1a2b", "2001:db8:3c4d:15::1a2f:1a2b"}, false},
 	} {
 		validate(t, i+1, tc, validateResolvers)
 	}

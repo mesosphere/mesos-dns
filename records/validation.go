@@ -3,7 +3,13 @@ package records
 import (
 	"fmt"
 	"net"
+	"regexp"
+	"strconv"
 )
+
+const hostnamePattern = `^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$`
+
+var hostnameRegexp *regexp.Regexp
 
 // validateMasters checks that each master in the list is a properly formatted host:ip pair.
 // duplicate masters in the list are not allowed.
@@ -16,14 +22,14 @@ func validateMasters(ms []string) error {
 	for i, m := range ms {
 		h, p, err := net.SplitHostPort(m)
 		if err != nil {
-			return fmt.Errorf("illegal host:port specified for master %q", ms[i])
+			return fmt.Errorf("invalid host:port specified for master %q", ms[i])
 		}
-		// normalize ipv6 addresses
 		if ip := net.ParseIP(h); ip != nil {
-			h = ip.String()
-			m = h + "_" + p
+			// normalize ipv6 addresses
+			m = net.JoinHostPort(ip.String(), p)
+		} else if !isHostname(h) {
+			return fmt.Errorf("invalid hostname or IP specified for master %q", ms[i])
 		}
-		//TODO(jdef) distinguish between intended hostnames and invalid ip addresses
 		if _, found := valid[m]; found {
 			return fmt.Errorf("duplicate master specified: %q", ms[i])
 		}
@@ -39,11 +45,14 @@ func validateResolvers(rs []string) error {
 	}
 	ips := make(map[string]struct{}, len(rs))
 	for _, r := range rs {
-		if r == "" {
-			return fmt.Errorf("empty resolver IP specified: %q", r)
+		if ip := net.ParseIP(r); ip != nil {
+			// normalize ipv6 addresses
+			r = ip.String()
+		} else if !isHostname(r) {
+			return fmt.Errorf("invalid hostname or IP specified for resolver %q", r)
 		}
 		if _, found := ips[r]; found {
-			return fmt.Errorf("duplicate resolver IP specified: %q", r)
+			return fmt.Errorf("duplicate resolver specified: %q", r)
 		}
 		ips[r] = struct{}{}
 	}
@@ -67,4 +76,20 @@ func validateIPSources(srcs []string) error {
 	}
 
 	return nil
+}
+
+func isHostname(host string) bool {
+	if hostnameRegexp == nil {
+		hostnameRegexp = regexp.MustCompile(hostnamePattern)
+	}
+	matchSubstrings := hostnameRegexp.FindStringSubmatch(host)
+	if matchSubstrings == nil {
+		return false
+	}
+	tld := matchSubstrings[len(matchSubstrings)-1]
+	// TLD must not be all digits
+	if _, err := strconv.Atoi(tld); err == nil {
+		return false
+	}
+	return true
 }
