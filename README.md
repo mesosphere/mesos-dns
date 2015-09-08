@@ -1,4 +1,4 @@
-# [Mesos-DNS](https://mesosphere.github.io/mesos-dns/) [![Circle CI](https://circleci.com/gh/mesosphere/mesos-dns.svg?style=svg)](https://circleci.com/gh/mesosphere/mesos-dns)
+# [Mesos-DNS](https://mesosphere.github.io/mesos-dns/) [![Circle CI](https://circleci.com/gh/mesosphere/mesos-dns.svg?style=svg)](https://circleci.com/gh/mesosphere/mesos-dns) [![Coverage Status](https://coveralls.io/repos/mesosphere/mesos-dns/badge.svg?branch=master&service=github)](https://coveralls.io/github/mesosphere/mesos-dns?branch=master)
 ##### DNS-based service discovery for Mesos
 
 ## Intro
