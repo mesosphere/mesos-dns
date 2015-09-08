@@ -11,9 +11,9 @@ const hostnamePattern = `^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)
 
 var hostnameRegexp *regexp.Regexp
 
-// validateMasters checks that each master in the list is a properly formatted host:ip pair.
-// duplicate masters in the list are not allowed.
-// returns nil if the masters list is empty, or else all masters in the list are valid.
+// validateMasters checks that each element in the list is valid.
+// List elements must be either a valid IP:port or a valid hostname:port.
+// List must not contain duplicates (after IPv6 normalization).
 func validateMasters(ms []string) error {
 	if len(ms) == 0 {
 		return nil
@@ -38,7 +38,9 @@ func validateMasters(ms []string) error {
 	return nil
 }
 
-// validateResolvers errors if there are duplicate resolvers, otherwise returns nil.
+// validateResolvers checks that each element in the list is valid.
+// List elements must be either a valid IP or a valid hostname.
+// List must not contain duplicates (after IPv6 normalization).
 func validateResolvers(rs []string) error {
 	if len(rs) == 0 {
 		return nil
