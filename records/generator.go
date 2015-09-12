@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -109,9 +110,18 @@ func (rg *RecordGenerator) findMaster(masters ...string) (state.State, error) {
 // Loads state.json from mesos master
 func (rg *RecordGenerator) loadFromMaster(ip string, port string) (sj state.State) {
 	// REFACTOR: state.json security
-	url := "http://" + ip + ":" + port + "/master/state.json"
 
-	req, err := http.NewRequest("GET", url, nil)
+	u := url.URL{
+		Scheme: "http",
+		Host:   net.JoinHostPort(ip, port),
+		Path:   "/master/state.json",
+	}
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		logging.Error.Println(err)
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
