@@ -15,10 +15,6 @@ import (
 	"github.com/mesosphere/mesos-dns/util"
 )
 
-const (
-	zkInitialDetectionTimeout = 30 * time.Second
-)
-
 func main() {
 	util.PanicHandlers = append(util.PanicHandlers, func(_ interface{}) {
 		// by default the handler already logs the panic
@@ -69,8 +65,10 @@ func main() {
 	}
 
 	reload := time.NewTicker(time.Second * time.Duration(config.RefreshSeconds))
-	timeout := time.AfterFunc(zkInitialDetectionTimeout, func() {
-		errch <- fmt.Errorf("master detection timed out after %s", zkInitialDetectionTimeout)
+
+	zkTimeout := time.Second * time.Duration(config.ZkDetectionTimeout)
+	timeout := time.AfterFunc(zkTimeout, func() {
+		errch <- fmt.Errorf("master detection timed out after %s", zkTimeout)
 	})
 
 	defer reload.Stop()
