@@ -46,9 +46,22 @@ type Label struct {
 
 // Status holds a task status as defined in the /state.json Mesos HTTP endpoint.
 type Status struct {
-	Timestamp float64 `json:"timestamp"`
-	State     string  `json:"state"`
-	Labels    []Label `json:"labels,omitempty"`
+	Timestamp       float64         `json:"timestamp"`
+	State           string          `json:"state"`
+	Labels          []Label         `json:"labels,omitempty"`
+	ContainerStatus ContainerStatus `json:"container_status"`
+}
+
+// ContainerStatus holds container metadata as defined in the /state.json
+// Mesos HTTP endpoint.
+type ContainerStatus struct {
+	NetworkInfos []NetworkInfo `json:"network_infos"`
+}
+
+// NetworkInfo holds a network address resolution as defined in the
+// /state.json Mesos HTTP endpoint.
+type NetworkInfo struct {
+	IPAddress string `json:"ip_address"`
 }
 
 // Task holds a task as defined in the /state.json Mesos HTTP endpoint.
@@ -103,7 +116,18 @@ func (t *Task) containerIP(src string) string {
 			continue
 		}
 
-		// find the latest docker-inspect label
+		// first try to extract the address from the NetworkInfo structure
+		if len(status.ContainerStatus.NetworkInfos) > 0 {
+			// TODO(CD): handle multiple NetworkInfo objects
+			// TODO(CD): only create A records if the address is IPv4
+			// TODO(CD): create AAAA records if the address is IPv6
+			latestContainerIP = status.ContainerStatus.NetworkInfos[0].IPAddress
+			latestTimestamp = status.Timestamp
+			break
+		}
+
+		// next, fall back to the docker-inspect label
+		// TODO(CD): deprecate and then remove this address discovery method
 		for _, label := range status.Labels {
 			if label.Key == ipLabel {
 				latestContainerIP = label.Value

@@ -38,3 +38,63 @@ func TestPID_UnmarshalJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestTask_containerIP(t *testing.T) {
+	makeTask := func(networkInfoAddress string, label Label) Task {
+		labels := make([]Label, 0, 1)
+		if label.Key != "" {
+			labels = append(labels, label)
+		}
+
+		var containerStatus ContainerStatus
+		if networkInfoAddress != "" {
+			containerStatus = ContainerStatus{
+				NetworkInfos: []NetworkInfo{
+					NetworkInfo{
+						IPAddress: networkInfoAddress,
+					},
+				},
+			}
+		}
+
+		return Task{
+			State: "TASK_RUNNING",
+			Statuses: []Status{
+				Status{
+					Timestamp:       1.0,
+					State:           "TASK_RUNNING",
+					Labels:          labels,
+					ContainerStatus: containerStatus,
+				},
+			},
+		}
+	}
+
+	// Verify IP extraction from NetworkInfo
+	task := makeTask("1.2.3.4", Label{})
+	if task.containerIP("mesos") != "1.2.3.4" {
+		t.Errorf("Failed to extract IP from NetworkInfo")
+	}
+
+	// Verify IP extraction from NetworkInfo takes precedence over
+	// labels
+	task = makeTask("1.2.3.4",
+		Label{Key: ipLabels["mesos"], Value: "2.4.6.8"})
+	if task.containerIP("mesos") != "1.2.3.4" {
+		t.Errorf("Failed to extract IP from NetworkInfo when label also supplied")
+	}
+
+	// Verify IP extraction from the Mesos label without NetworkInfo
+	task = makeTask("",
+		Label{Key: ipLabels["mesos"], Value: "1.2.3.4"})
+	if task.containerIP("mesos") != "1.2.3.4" {
+		t.Errorf("Failed to extract IP from Mesos label")
+	}
+
+	// Verify IP extraction from the Docker label without NetworkInfo
+	task = makeTask("",
+		Label{Key: ipLabels["docker"], Value: "1.2.3.4"})
+	if task.containerIP("docker") != "1.2.3.4" {
+		t.Errorf("Failed to extract IP from Docker label")
+	}
+}
