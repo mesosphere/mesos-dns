@@ -1,0 +1,13 @@
+2015-09-15: v0.2.0
+  Mesos 0.24.0 compatibility (#263, #228)
+  Configurable ZooKeeper detection timeout (#260)
+  Configurable "IPSources" for A and SRV records (#226)
+  Mesos framework A and SRV records (#209)
+  Mesos slave A and SRV records (#208)
+  Mesos task container A records (#204)
+  Default to RFC1123 labels (#177)
+  Compress all DNS replies (#173)
+  Mesos master A and SRV records (#169)
+  Resolver and masters configuration validation (#158)
+  Fix buggy character range used for RFC952 label conversion (#155)
+  Patch up slave address resolution (#153, #151)
