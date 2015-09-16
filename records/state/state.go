@@ -49,19 +49,19 @@ type Status struct {
 	Timestamp       float64         `json:"timestamp"`
 	State           string          `json:"state"`
 	Labels          []Label         `json:"labels,omitempty"`
-	ContainerStatus ContainerStatus `json:"container_status"`
+	ContainerStatus ContainerStatus `json:"container_status,omitempty"`
 }
 
 // ContainerStatus holds container metadata as defined in the /state.json
 // Mesos HTTP endpoint.
 type ContainerStatus struct {
-	NetworkInfos []NetworkInfo `json:"network_infos"`
+	NetworkInfos []NetworkInfo `json:"network_infos,omitempty"`
 }
 
 // NetworkInfo holds a network address resolution as defined in the
 // /state.json Mesos HTTP endpoint.
 type NetworkInfo struct {
-	IPAddress string `json:"ip_address"`
+	IPAddress string `json:"ip_address,omitempty"`
 }
 
 // Task holds a task as defined in the /state.json Mesos HTTP endpoint.
