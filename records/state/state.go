@@ -123,7 +123,7 @@ func (t *Task) containerIP(src string) string {
 			// TODO(CD): create AAAA records if the address is IPv6
 			latestContainerIP = status.ContainerStatus.NetworkInfos[0].IPAddress
 			latestTimestamp = status.Timestamp
-			break
+			continue // Skip label inspection step below for this element
 		}
 
 		// next, fall back to the docker-inspect label
