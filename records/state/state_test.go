@@ -1,11 +1,13 @@
-package state
+package state_test
 
 import (
 	"encoding/json"
+	"net"
 	"reflect"
 	"testing"
 
 	"github.com/mesos/mesos-go/upid"
+	. "github.com/mesosphere/mesos-dns/records/state"
 )
 
 func TestResources_Ports(t *testing.T) {
@@ -37,4 +39,143 @@ func TestPID_UnmarshalJSON(t *testing.T) {
 			t.Errorf("test #%d: got: %v, want: %v", i, got, tt.want)
 		}
 	}
+}
+
+func TestTask_IPs(t *testing.T) {
+	for i, tt := range []struct {
+		*Task
+		srcs []string
+		want []net.IP
+	}{
+		{nil, nil, nil},
+		{nil, []string{}, nil},
+		{nil, []string{"host"}, nil},
+		{ // no IPs for the given sources
+			Task: task(statuses(status(state("TASK_RUNNING"), netinfo("1.2.3.4")))),
+			srcs: []string{"host", "mesos"},
+			want: nil,
+		},
+		{ // unknown IP sources are ignored
+			Task: task(statuses(status(state("TASK_RUNNING"), netinfo("1.2.3.4")))),
+			srcs: []string{"foo", "netinfo", "bar"},
+			want: ips("1.2.3.4"),
+		},
+		{ // source order
+			Task: task(
+				slaveIP("2.3.4.5"),
+				statuses(status(state("TASK_RUNNING"), netinfo("1.2.3.4"))),
+			),
+			srcs: []string{"host", "netinfo"},
+			want: ips("2.3.4.5", "1.2.3.4"),
+		},
+		{ // statuses state
+			Task: task(
+				statuses(
+					status(state("TASK_RUNNING"), netinfo("1.2.3.4")),
+					status(state("TASK_STOPPED"), netinfo("2.3.4.5")),
+				),
+			),
+			srcs: []string{"netinfo"},
+			want: ips("1.2.3.4"),
+		},
+		{ // statuses ordering
+			Task: task(
+				statuses(
+					status(state("TASK_RUNNING"), netinfo("1.2.3.4"), timestamp(1)),
+					status(state("TASK_RUNNING"), netinfo("1.3.5.7"), timestamp(4)),
+					status(state("TASK_RUNNING"), labels(DockerIPLabel, "2.3.4.5"), timestamp(3)),
+					status(state("TASK_RUNNING"), labels(DockerIPLabel, "2.4.6.8"), timestamp(5)),
+					status(state("TASK_RUNNING"), labels(DockerIPLabel, "2.5.8.1"), timestamp(2)),
+				),
+			),
+			srcs: []string{"docker", "netinfo"},
+			want: ips("2.4.6.8"),
+		},
+		{ // label ordering
+			Task: task(
+				statuses(
+					status(
+						state("TASK_RUNNING"),
+						labels(DockerIPLabel, "1.2.3.4", DockerIPLabel, "2.3.4.5"),
+					),
+				),
+			),
+			srcs: []string{"docker"},
+			want: ips("1.2.3.4", "2.3.4.5"),
+		},
+	} {
+		if got := tt.IPs(tt.srcs...); !reflect.DeepEqual(got, tt.want) {
+			t.Logf("%+v", tt.Task)
+			t.Errorf("test #%d: got %+v, want %+v", i, got, tt.want)
+		}
+	}
+}
+
+// test helpers
+
+type (
+	taskOpt   func(*Task)
+	statusOpt func(*Status)
+)
+
+func ips(ss ...string) []net.IP {
+	addrs := make([]net.IP, len(ss))
+	for i := range ss {
+		addrs[i] = net.ParseIP(ss[i])
+	}
+	return addrs
+}
+
+func task(opts ...taskOpt) *Task {
+	var t Task
+	for _, opt := range opts {
+		opt(&t)
+	}
+	return &t
+}
+
+func statuses(st ...Status) taskOpt {
+	return func(t *Task) {
+		t.Statuses = append(t.Statuses, st...)
+	}
+}
+
+func slaveIP(ip string) taskOpt {
+	return func(t *Task) { t.SlaveIP = ip }
+}
+
+func status(opts ...statusOpt) Status {
+	var s Status
+	for _, opt := range opts {
+		opt(&s)
+	}
+	return s
+}
+
+func labels(kvs ...string) statusOpt {
+	if len(kvs)%2 != 0 {
+		panic("odd number")
+	}
+	return func(s *Status) {
+		for i := 0; i < len(kvs); i += 2 {
+			s.Labels = append(s.Labels, Label{Key: kvs[i], Value: kvs[i+1]})
+		}
+	}
+}
+
+func state(st string) statusOpt {
+	return func(s *Status) { s.State = st }
+}
+
+func netinfo(ips ...string) statusOpt {
+	return func(s *Status) {
+		netinfos := &s.ContainerStatus.NetworkInfos
+		for _, ip := range ips {
+			*netinfos = append(*netinfos, NetworkInfo{IPAddress: ip})
+		}
+	}
+}
+
+func timestamp(t float64) statusOpt {
+	return func(s *Status) { s.Timestamp = t }
 }
