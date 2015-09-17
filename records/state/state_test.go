@@ -81,12 +81,15 @@ func TestTask_IPs(t *testing.T) {
 		{ // statuses ordering
 			Task: task(
 				statuses(
-					status(state("TASK_RUNNING"), netinfo("1.2.3.4")),
-					status(state("TASK_RUNNING"), labels(DockerIPLabel, "2.3.4.5")),
+					status(state("TASK_RUNNING"), netinfo("1.2.3.4"), timestamp(1)),
+					status(state("TASK_RUNNING"), netinfo("1.3.5.7"), timestamp(4)),
+					status(state("TASK_RUNNING"), labels(DockerIPLabel, "2.3.4.5"), timestamp(3)),
+					status(state("TASK_RUNNING"), labels(DockerIPLabel, "2.4.6.8"), timestamp(5)),
+					status(state("TASK_RUNNING"), labels(DockerIPLabel, "2.5.8.1"), timestamp(2)),
 				),
 			),
 			srcs: []string{"docker", "netinfo"},
-			want: ips("2.3.4.5"),
+			want: ips("2.4.6.8"),
 		},
 		{ // label ordering
 			Task: task(
@@ -171,4 +174,8 @@ func netinfo(ips ...string) statusOpt {
 			*netinfos = append(*netinfos, NetworkInfo{IPAddress: ip})
 		}
 	}
+}
+
+func timestamp(t float64) statusOpt {
+	return func(s *Status) { s.Timestamp = t }
 }
