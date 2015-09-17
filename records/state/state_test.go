@@ -1,11 +1,13 @@
-package state
+package state_test
 
 import (
 	"encoding/json"
+	"net"
 	"reflect"
 	"testing"
 
 	"github.com/mesos/mesos-go/upid"
+	. "github.com/mesosphere/mesos-dns/records/state"
 )
 
 func TestResources_Ports(t *testing.T) {
@@ -39,62 +41,134 @@ func TestPID_UnmarshalJSON(t *testing.T) {
 	}
 }
 
-func TestTask_containerIP(t *testing.T) {
-	makeTask := func(networkInfoAddress string, label Label) Task {
-		labels := make([]Label, 0, 1)
-		if label.Key != "" {
-			labels = append(labels, label)
+func TestTask_IPs(t *testing.T) {
+	for i, tt := range []struct {
+		*Task
+		srcs []string
+		want []net.IP
+	}{
+		{nil, nil, nil},
+		{nil, []string{}, nil},
+		{nil, []string{"host"}, nil},
+		{ // no IPs for the given sources
+			Task: task(statuses(status(state("TASK_RUNNING"), netinfo("1.2.3.4")))),
+			srcs: []string{"host", "mesos"},
+			want: nil,
+		},
+		{ // unknown IP sources are ignored
+			Task: task(statuses(status(state("TASK_RUNNING"), netinfo("1.2.3.4")))),
+			srcs: []string{"foo", "netinfo", "bar"},
+			want: ips("1.2.3.4"),
+		},
+		{ // source order
+			Task: task(
+				slaveIP("2.3.4.5"),
+				statuses(status(state("TASK_RUNNING"), netinfo("1.2.3.4"))),
+			),
+			srcs: []string{"host", "netinfo"},
+			want: ips("2.3.4.5", "1.2.3.4"),
+		},
+		{ // statuses state
+			Task: task(
+				statuses(
+					status(state("TASK_RUNNING"), netinfo("1.2.3.4")),
+					status(state("TASK_STOPPED"), netinfo("2.3.4.5")),
+				),
+			),
+			srcs: []string{"netinfo"},
+			want: ips("1.2.3.4"),
+		},
+		{ // statuses ordering
+			Task: task(
+				statuses(
+					status(state("TASK_RUNNING"), netinfo("1.2.3.4")),
+					status(state("TASK_RUNNING"), labels(DockerIPLabel, "2.3.4.5")),
+				),
+			),
+			srcs: []string{"docker", "netinfo"},
+			want: ips("2.3.4.5"),
+		},
+		{ // label ordering
+			Task: task(
+				statuses(
+					status(
+						state("TASK_RUNNING"),
+						labels(DockerIPLabel, "1.2.3.4", DockerIPLabel, "2.3.4.5"),
+					),
+				),
+			),
+			srcs: []string{"docker"},
+			want: ips("1.2.3.4", "2.3.4.5"),
+		},
+	} {
+		if got := tt.IPs(tt.srcs...); !reflect.DeepEqual(got, tt.want) {
+			t.Logf("%+v", tt.Task)
+			t.Errorf("test #%d: got %+v, want %+v", i, got, tt.want)
 		}
+	}
+}
 
-		var containerStatus ContainerStatus
-		if networkInfoAddress != "" {
-			containerStatus = ContainerStatus{
-				NetworkInfos: []NetworkInfo{
-					NetworkInfo{
-						IPAddress: networkInfoAddress,
-					},
-				},
-			}
+// test helpers
+
+type (
+	taskOpt   func(*Task)
+	statusOpt func(*Status)
+)
+
+func ips(ss ...string) []net.IP {
+	addrs := make([]net.IP, len(ss))
+	for i := range ss {
+		addrs[i] = net.ParseIP(ss[i])
+	}
+	return addrs
+}
+
+func task(opts ...taskOpt) *Task {
+	var t Task
+	for _, opt := range opts {
+		opt(&t)
+	}
+	return &t
+}
+
+func statuses(st ...Status) taskOpt {
+	return func(t *Task) {
+		t.Statuses = append(t.Statuses, st...)
+	}
+}
+
+func slaveIP(ip string) taskOpt {
+	return func(t *Task) { t.SlaveIP = ip }
+}
+
+func status(opts ...statusOpt) Status {
+	var s Status
+	for _, opt := range opts {
+		opt(&s)
+	}
+	return s
+}
+
+func labels(kvs ...string) statusOpt {
+	if len(kvs)%2 != 0 {
+		panic("odd number")
+	}
+	return func(s *Status) {
+		for i := 0; i < len(kvs); i += 2 {
+			s.Labels = append(s.Labels, Label{Key: kvs[i], Value: kvs[i+1]})
 		}
+	}
+}
 
-		return Task{
-			State: "TASK_RUNNING",
-			Statuses: []Status{
-				Status{
-					Timestamp:       1.0,
-					State:           "TASK_RUNNING",
-					Labels:          labels,
-					ContainerStatus: containerStatus,
-				},
-			},
+func state(st string) statusOpt {
+	return func(s *Status) { s.State = st }
+}
+
+func netinfo(ips ...string) statusOpt {
+	return func(s *Status) {
+		netinfos := &s.ContainerStatus.NetworkInfos
+		for _, ip := range ips {
+			*netinfos = append(*netinfos, NetworkInfo{IPAddress: ip})
 		}
-	}
-
-	// Verify IP extraction from NetworkInfo
-	task := makeTask("1.2.3.4", Label{})
-	if task.containerIP("mesos") != "1.2.3.4" {
-		t.Errorf("Failed to extract IP from NetworkInfo")
-	}
-
-	// Verify IP extraction from NetworkInfo takes precedence over
-	// labels
-	task = makeTask("1.2.3.4",
-		Label{Key: ipLabels["mesos"], Value: "2.4.6.8"})
-	if task.containerIP("mesos") != "1.2.3.4" {
-		t.Errorf("Failed to extract IP from NetworkInfo when label also supplied")
-	}
-
-	// Verify IP extraction from the Mesos label without NetworkInfo
-	task = makeTask("",
-		Label{Key: ipLabels["mesos"], Value: "1.2.3.4"})
-	if task.containerIP("mesos") != "1.2.3.4" {
-		t.Errorf("Failed to extract IP from Mesos label")
-	}
-
-	// Verify IP extraction from the Docker label without NetworkInfo
-	task = makeTask("",
-		Label{Key: ipLabels["docker"], Value: "1.2.3.4"})
-	if task.containerIP("docker") != "1.2.3.4" {
-		t.Errorf("Failed to extract IP from Docker label")
 	}
 }

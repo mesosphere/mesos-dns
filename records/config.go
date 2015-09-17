@@ -103,7 +103,7 @@ func NewConfig() Config {
 		HTTPOn:             true,
 		ExternalOn:         true,
 		RecurseOn:          true,
-		IPSources:          []string{"mesos", "host"},
+		IPSources:          []string{"netinfo", "mesos", "host"},
 	}
 }
 
