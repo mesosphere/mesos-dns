@@ -62,9 +62,11 @@ func validateIPSources(srcs []string) error {
 	if len(srcs) != len(unique(srcs)) {
 		return fmt.Errorf("duplicate ip source specified")
 	}
+	//TODO(jdef) we need a unit test that (minimally) validates that the default config options
+	// pass validation
 	for _, src := range srcs {
 		switch src {
-		case "host", "docker", "mesos":
+		case "host", "docker", "mesos", "netinfo":
 		default:
 			return fmt.Errorf("invalid ip source %q", src)
 		}
