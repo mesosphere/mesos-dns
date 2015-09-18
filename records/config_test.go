@@ -14,3 +14,12 @@ func TestNonLocalAddies(t *testing.T) {
 		}
 	}
 }
+
+func TestNewConfigValidates(t *testing.T) {
+	c := NewConfig()
+	err := validateIPSources(c.IPSources)
+	if err != nil {
+		t.Fatal(err)
+	}
+	//TODO(jdef) add other validators here..
+}
