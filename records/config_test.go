@@ -21,5 +21,12 @@ func TestNewConfigValidates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	//TODO(jdef) add other validators here..
+	err = validateResolvers(c.Resolvers)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = validateMasters(c.Masters)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
