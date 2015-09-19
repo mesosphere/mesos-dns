@@ -29,4 +29,13 @@ func TestNewConfigValidates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = validateEnabledServices(&c)
+	if err == nil {
+		t.Fatal("expected error because no masters and no zk servers are configured by default")
+	}
+	c.Zk = "foo"
+	err = validateEnabledServices(&c)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

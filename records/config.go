@@ -114,11 +114,9 @@ func SetConfig(cjson string) Config {
 		logging.Error.Fatal(err)
 	}
 	// validate and complete configuration file
-	if !c.DNSOn && !c.HTTPOn {
-		logging.Error.Fatalf("Either DNS or HTTP server should be on")
-	}
-	if len(c.Masters) == 0 && c.Zk == "" {
-		logging.Error.Fatalf("specify mesos masters or zookeeper in config.json")
+	err = validateEnabledServices(c)
+	if err != nil {
+		logging.Error.Fatalf("service validation failed: %v", err)
 	}
 	if err = validateMasters(c.Masters); err != nil {
 		logging.Error.Fatalf("Masters validation failed: %v", err)
