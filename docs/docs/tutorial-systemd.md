@@ -21,35 +21,13 @@ This tutorial assumes the following cluster topology:
 
 For this tutorial we will assume the master IP address is `10.14.245.208`.
 
-### Step 2: Build and install Mesos-DNS
+### Step 2: Install Mesos-DNS
 
-We will build and install Mesos-DNS on node `10.14.245.208`.  Access the node through ssh.
+We will install Mesos-DNS on node `10.14.245.208`.  Access the node through ssh.
 
-You will need git for this process.   For SUSE this means `sudo zypper install git-core`
-
-The build process includes installing `go`:
-
-```
-wget https://storage.googleapis.com/golang/go1.4.linux-amd64.tar.gz
-tar xzf go*
-sudo mv go /usr/local/.
-export PATH=$PATH:/usr/local/go/bin
-export GOROOT=/usr/local/go
-export PATH=$PATH:$GOROOT/bin
-export GOPATH=$HOME/go
-go get github.com/tools/godep
-export PATH=$PATH:$GOPATH/bin
-```
-
-Now, we are ready to compile Mesos-DNS:
-
-```
-go get github.com/mesosphere/mesos-dns
-cd $GOPATH/src/github.com/mesosphere/mesos-dns
-make all
-cd
-sudo mv ~/go/bin/mesos-dns /usr/bin/mesos-dns
-```
+After downloading a [release](https://github.com/mesosphere/mesos-dns/releases) and
+extracting it, place the executable in well known location such as
+`/usr/bin/mesos-dns`.
 
 In the `/etc/mesos-dns/` directory lets create a file named `config.json` with the following contents: 
 

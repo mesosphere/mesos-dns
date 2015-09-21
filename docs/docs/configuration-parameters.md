@@ -29,7 +29,7 @@ The configuration file should include the following fields:
   "SOARetry":   600,
   "SOAExpire":  86400,
   "SOAMinttl": 60,
-  "IPSources": ["mesos", "host"]
+  "IPSources": ["netinfo", "mesos", "host"]
 }
 ```
 
@@ -74,3 +74,11 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 `recurseon` controls if the DNS replies for names in the Mesos domain will indicate that recursion is available. The default value is `true`. 
 
 `enforceRFC952` will enforce an older, more strict set of rules for DNS labels. For details, see the [RFC-952](https://tools.ietf.org/html/rfc952). The default value is `false`.
+
+`IPSources` defines a fallback list of IP sources for task records,
+sorted by priority. The default value is: `["netinfo", "mesos", "host"]`
+
+- `host`: Host IP of the Mesos slave where a task is running.
+- `mesos`: Mesos containerizer IP. **DEPRECATED**
+- `docker`: Docker containerizer IP. **DEPRECATED**
+- `netinfo`: Mesos 0.25 NetworkInfo.

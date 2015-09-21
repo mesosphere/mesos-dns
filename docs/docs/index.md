@@ -1,34 +1,11 @@
 ---
-title: Building and Running Mesos-DNS
+title: Installing and running Mesos-DNS
 ---
 
-## Building And Running Mesos-DNS
+## Installing and running Mesos-DNS
 
-### Building Mesos-DNS
-
-To build Mesos-DNS, you need to install [`go`](https://golang.org/doc/install) and [`godep`](https://github.com/tools/godep) on your computer. You **must** set the `GOPATH` environment variable to point to the directory where outside `go` packages will be installed. You **must** also add `$GOPATH/bin` to the `PATH` environment variable. If you install go to a custom location, you may need to set the `GOROOT` environment properly and add `$GOROOT/bin` to the `PATH` environment variable. For instance, you may need to do the following:
-
-```
-export GOPATH=$HOME/go
-export PATH=$PATH:$GOPATH/bin
-export GOROOT=/usr/local/go      # assuming go is installed at /usr/local/go
-export PATH=$PATH:$GOROOT/bin
-```   
-
-To build Mesos-DNS using `godep`: 
-
-```
-go get github.com/mesosphere/mesos-dns
-cd $GOPATH/src/github.com/mesosphere/mesos-dns
-make all
-``` 
-
-This generates `mesos-dns`, a statically-linked binary that can be installed anywhere. You will find a sample configuration file `config.json` in the same directory. 
-
-We have built and tested Mesos-DNS with `go` versions 1.3.3 and 1.4. Newer versions of `go` should work as well. 
-
-
-### Running Mesos-DNS
+Stable binaries for the project are published via the GitHub release
+channel: https://github.com/mesosphere/mesos-dns/releases.
 
 To run Mesos-DNS, you first need to install the `mesos-dns` binary somewhere on a selected server. The server can be the same machine as one of the Mesos masters, one of the slaves, or a dedicated machine on the same network. Next, follow [these instructions](configuration-parameters.html) to create a configuration file for your cluster. You can launch Mesos-DNS with: 
 
@@ -66,4 +43,4 @@ If multiple instances of Mesos-DNS are launched, add a nameserver line for each 
 
 All other nameserver settings in `/etc/resolv.conf` should remain unchanged. The `/etc/resolv.conf` file in the masters should only change if the master machines are also used as slaves. 
 
-You can also use Mesos-DNS to serve just a *forward lookup zone* from your primary DNS server (see [this tutorial](tutorial-forward.html)). In this case, you do not need to make any changes to the slaves in the cluster. 
+You can also use Mesos-DNS to serve just a *forward lookup zone* from your primary DNS server (see [this tutorial](tutorial-forward.html)). In this case, you do not need to make any changes to the slaves in the cluster.

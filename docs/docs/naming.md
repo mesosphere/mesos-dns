@@ -103,6 +103,7 @@ The following table illustrates the rules that govern SRV generation:
 
 Mesos-DNS generates a few special records:
 - for the leading master: A record (`leader.domain`) and SRV records (`_leader._tcp.domain` and `_leader._udp.domain`); and
+- for all framework schedulers: A records (`{framework}.domain`) and SRV records (`_framework._tcp.{framework}.domain`)
 - for every known Mesos master: A records (`master.domain`) and SRV records (`_master._tcp.domain` and `_master._udp.domain`); and
 - for every known Mesos slave: A records (`slave.domain`) and SRV records (`_slave._tcp.domain`).
 
