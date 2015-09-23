@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os/user"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -177,14 +177,13 @@ func readConfig(file string) (*Config, error) {
 	c := NewConfig()
 
 	workingDir := "."
-	usr, err := user.Current()
-	if err != nil {
-		// this can happen (on Linux) if you're running mesos-dns as a non-root user.
-		logging.Error.Println("Failed to determine current user, translating ~/ to ./, error was", err)
-	} else {
-		workingDir = usr.HomeDir
+	for _, name := range []string{"HOME", "USERPROFILE"} { // *nix, windows
+		if dir := os.Getenv(name); dir != "" {
+			workingDir = dir
+		}
 	}
 
+	var err error
 	c.File, err = filepath.Abs(strings.Replace(file, "~/", workingDir+"/", 1))
 	if err != nil {
 		return nil, fmt.Errorf("cannot find configuration file")
