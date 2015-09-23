@@ -30,7 +30,7 @@ func main() {
 
 	// -version
 	if versionFlag {
-		fmt.Println(version)
+		fmt.Println(Version)
 		os.Exit(0)
 	}
 
@@ -39,7 +39,7 @@ func main() {
 
 	// initialize resolver
 	config := records.SetConfig(*cjson)
-	res := resolver.New(version, config)
+	res := resolver.New(Version, config)
 	errch := make(chan error)
 
 	// launch DNS server
