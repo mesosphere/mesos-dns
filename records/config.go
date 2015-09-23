@@ -113,6 +113,7 @@ func SetConfig(cjson string) Config {
 	if err != nil {
 		logging.Error.Fatal(err)
 	}
+	logging.Verbose.Printf("config loaded from %q", c.File)
 	// validate and complete configuration file
 	err = validateEnabledServices(c)
 	if err != nil {
