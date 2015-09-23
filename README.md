@@ -8,6 +8,10 @@ Diagram](http://mesosphere.github.io/mesos-dns/img/architecture.png)
 This project is undergoing heavy refactoring, hardening and testing and
 is considered **alpha**. We have adopted a [semantic versioning](http://semver.org/) scheme which clearly communicates its status and progression over time.
 
+## Compatibility
+`mesos-N` tags mark the start of support for a specific Mesos version while
+maintaining backwards compatibility with the previous major version.
+
 ## Installing
 The official distribution and installation channel is pre-compiled binaries available in [Github releases](https://github.com/mesosphere/mesos-dns/releases).
 
