@@ -1,3 +1,7 @@
+2015-09-23: v0.3.0
+  Add support for Mesos 0.25 "NetworkInfo" as an IPSource (#266, #267, #268)
+  Find home directory with environment variables (#275, #277, #278)
+
 2015-09-15: v0.2.0
   Mesos 0.24.0 compatibility (#263, #228)
   Configurable ZooKeeper detection timeout (#260)
