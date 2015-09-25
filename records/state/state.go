@@ -155,19 +155,21 @@ func mesosIPs(t *Task) []string {
 }
 
 // statusIPs returns the latest running status IPs extracted with the given src
-func statusIPs(st []Status, src func(*Status) []string) (ips []string) {
+func statusIPs(st []Status, src func(*Status) []string) []string {
 	// the state.json we extract from mesos makes no guarantees re: the order
 	// of the task statuses so we should check the timestamps to avoid problems
 	// down the line. we can't rely on seeing the same sequence. (@joris)
 	// https://github.com/apache/mesos/blob/0.24.0/src/slave/slave.cpp#L5226-L5238
-	lastTimestamp := float64(-1.0)
+	ts, j := -1.0, -1
 	for i := range st {
-		if st[i].State == "TASK_RUNNING" && st[i].Timestamp > lastTimestamp {
-			lastTimestamp = st[i].Timestamp
-			ips = src(&st[i])
+		if st[i].State == "TASK_RUNNING" && st[i].Timestamp > ts {
+			ts, j = st[i].Timestamp, i
 		}
 	}
-	return
+	if j >= 0 {
+		return src(&st[j])
+	}
+	return nil
 }
 
 // labels returns all given Status.[]Labels' values whose keys are equal
