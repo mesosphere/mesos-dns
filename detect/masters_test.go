@@ -1,6 +1,8 @@
 package detect
 
 import (
+	"encoding/binary"
+	"net"
 	"reflect"
 	"testing"
 
@@ -20,15 +22,15 @@ func TestMasters_UpdatedMasters(t *testing.T) {
 		{
 			// update a single master
 			// leave the unknown leader "" unchanged
-			newMasterInfos([]string{"a"}),
-			[]string{"", "a:5050"},
+			newMasterInfos([]string{"1.1.1.1"}),
+			[]string{"", "1.1.1.1:5050"},
 		},
 		{
 			// update additional masters,
 			// expect them to be appended with the default port number,
 			// leave the unknown leader "" unchanged
-			newMasterInfos([]string{"b", "c", "d"}),
-			[]string{"", "b:5050", "c:5050", "d:5050"},
+			newMasterInfos([]string{"1.1.1.1", "1.1.1.2", "1.1.1.3"}),
+			[]string{"", "1.1.1.1:5050", "1.1.1.2:5050", "1.1.1.3:5050"},
 		},
 		{
 			// update additional masters with an empty slice
@@ -53,39 +55,32 @@ func TestMasters_UpdatedMasters(t *testing.T) {
 
 func TestMasters_OnMasterChanged(t *testing.T) {
 	// create a new masters detector with an unknown leader
-	// and two initial masters "a:5050", "b:5050"
+	// and two initial masters "1.1.1.1:5050", "1.1.1.2:5050"
 	ch := make(chan []string, 1)
-	m := NewMasters([]string{"a:5050", "b:5050"}, ch)
+	m := NewMasters([]string{"1.1.1.1:5050", "1.1.1.2:5050"}, ch)
 
 	for i, tt := range []struct {
 		leader *mesos.MasterInfo
 		want   []string
 	}{
 		{
-			// update new leader "a",
+			// update new leader "1.1.1.1",
 			// expect an appended port number
-			// leaving "b:5050" as the only additional master
-			newMasterInfo("a"),
-			[]string{"a:5050", "b:5050"},
+			// leaving "1.1.1.2:5050" as the only additional master
+			newMasterInfo("1.1.1.1"),
+			[]string{"1.1.1.1:5050", "1.1.1.2:5050"},
 		},
 		{
-			// update new leader "c"
-			// replacing "a:5050"
-			newMasterInfo("c"),
-			[]string{"c:5050", "b:5050"},
+			// update new leader "1.1.1.3"
+			// replacing "1.1.1.1:5050"
+			newMasterInfo("1.1.1.3"),
+			[]string{"1.1.1.3:5050", "1.1.1.2:5050"},
 		},
 		{
-			// update new leader "b"
-			// replacing "c"
-			newMasterInfo("b"),
-			[]string{"b:5050"},
-		},
-		{
-			// update new leader "", the hostname being the empty string
-			// expect to fallback to its ip address,
-			// being 0 by default, implying "0.0.0.0"
-			newMasterInfo(""),
-			[]string{"0.0.0.0:5050"},
+			// update new leader "1.1.1.2"
+			// replacing "1.1.1.3"
+			newMasterInfo("1.1.1.2"),
+			[]string{"1.1.1.2:5050"},
 		},
 		{
 			// update new leader with a niladic value
@@ -112,15 +107,20 @@ func recv(ch <-chan []string) []string {
 	}
 }
 
-func newMasterInfo(hostname string) *mesos.MasterInfo {
-	return &mesos.MasterInfo{Hostname: &hostname}
+func newMasterInfo(ip string) *mesos.MasterInfo {
+	ip4 := net.ParseIP(ip).To4()
+	ipr := binary.LittleEndian.Uint32(ip4)
+
+	return &mesos.MasterInfo{
+		Ip: &ipr,
+	}
 }
 
-func newMasterInfos(hostnames []string) []*mesos.MasterInfo {
-	ms := make([]*mesos.MasterInfo, len(hostnames))
+func newMasterInfos(ips []string) []*mesos.MasterInfo {
+	ms := make([]*mesos.MasterInfo, len(ips))
 
-	for i, h := range hostnames {
-		ms[i] = newMasterInfo(h)
+	for i, ip := range ips {
+		ms[i] = newMasterInfo(ip)
 	}
 
 	return ms

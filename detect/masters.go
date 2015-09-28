@@ -101,17 +101,13 @@ func validMasterInfo(info *mesos.MasterInfo) bool {
 }
 
 func masterHostPort(info *mesos.MasterInfo) string {
-	host := info.GetHostname()
+	// unpack IPv4
+	octets := make([]byte, net.IPv4len)
+	binary.LittleEndian.PutUint32(octets, info.GetIp())
+	// we're using an octet slice of len IPv4len, thus no need to convert with To4()
+	ipv4 := net.IP(octets)
 
-	if host == "" {
-		// unpack IPv4
-		octets := make([]byte, 4)
-		binary.BigEndian.PutUint32(octets, info.GetIp())
-		ipv4 := net.IP(octets)
-		host = ipv4.String()
-	}
-
-	return net.JoinHostPort(host, masterPort(info))
+	return net.JoinHostPort(ipv4.String(), masterPort(info))
 }
 
 func masterPort(info *mesos.MasterInfo) string {
