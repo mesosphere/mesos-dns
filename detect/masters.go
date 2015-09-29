@@ -103,6 +103,7 @@ func validMasterInfo(info *mesos.MasterInfo) bool {
 func masterHostPort(info *mesos.MasterInfo) string {
 	// unpack IPv4
 	octets := make([]byte, net.IPv4len)
+	// TODO(sur): refactor to use the Address.ip string field once available
 	binary.LittleEndian.PutUint32(octets, info.GetIp())
 	// we're using an octet slice of len IPv4len, thus no need to convert with To4()
 	ipv4 := net.IP(octets)
