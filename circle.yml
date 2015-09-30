@@ -1,20 +1,20 @@
 dependencies:
-    pre:
-        - go get github.com/tools/godep
-        - go get github.com/alecthomas/gometalinter
-        - go get github.com/axw/gocov/gocov # https://github.com/golang/go/issues/6909
-        - go get github.com/mattn/goveralls
-        - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
-    post:
-        - go install ./...
-        - gometalinter --install
+  pre:
+    - go get github.com/tools/godep
+    - go get github.com/alecthomas/gometalinter
+    - go get github.com/axw/gocov/gocov # https://github.com/golang/go/issues/6909
+    - go get github.com/mattn/goveralls
+    - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
+  post:
+    - go install ./...
+    - go test -i ./...
+    - gometalinter --install
 
 test:
-    override:
-        - ! gofmt -s -d . 2>&1 | read
-        - gometalinter --cyclo-over=12 ./...
-        - gocov test ./... -short -timeout=2m > cov.json
-        - godep go test -v -timeout=2m ./...
-        - godep go test -v -short -race -timeout=2m ./...
-    post:
-      - goveralls -service=circleci -gocovdata=cov.json -repotoken=$COVERALLS_REPO_TOKEN || true
+  override:
+    - gometalinter --cyclo-over=12 --tests --deadline=60s ./...
+    - gocov test ./... -short -timeout=2m > cov.json
+    - godep go test -v -timeout=2m ./...
+    - godep go test -v -short -race -timeout=2m ./...
+  post:
+    - goveralls -service=circleci -gocovdata=cov.json -repotoken=$COVERALLS_REPO_TOKEN || true

@@ -16,69 +16,51 @@ import (
 
 // Config holds mesos dns configuration
 type Config struct {
-
-	// Mesos master(s): a list of IP:port pairs for one or more Mesos masters
-	Masters []string
-
-	// Zookeeper: a single Zk url
-	Zk string
-
-	// Zookeeper Detection Timeout: how long in seconds to wait for Zookeeper to be initially responsive (default 30)
-	ZkDetectionTimeout int
-
 	// Refresh frequency: the frequency in seconds of regenerating records (default 60)
 	RefreshSeconds int
-
-	// TTL: the TTL value used for SRV and A records (default 60)
-	TTL int32
-
 	// Resolver port: port used to listen for slave requests (default 53)
 	Port int
-
-	//  Domain: name of the domain used (default "mesos", ie .mesos domain)
-	Domain string
-
-	// DNS server: IP address of the DNS server for forwarded accesses
-	Resolvers []string
-
 	// Timeout is the default connect/read/write timeout for outbound
 	// queries
 	Timeout int
-
-	// File is the location of the config.json file
-	File string
-
+	// Zookeeper Detection Timeout: how long in seconds to wait for Zookeeper to be initially responsive (default 30)
+	ZkDetectionTimeout int
+	// NOTE(tsenart): HTTPPort, DNSOn and HTTPOn have defined JSON keys for
+	// backwards compatibility with external API clients.
+	HTTPPort int `json:"HttpPort"`
+	// TTL: the TTL value used for SRV and A records (default 60)
+	TTL int32
 	// SOA record fields (see http://tools.ietf.org/html/rfc1035#page-18)
-	SOAMname   string // primary name server
-	SOARname   string // email of admin esponsible
 	SOASerial  uint32 // initial version number (incremented on refresh)
 	SOARefresh uint32 // refresh interval
 	SOARetry   uint32 // retry interval
 	SOAExpire  uint32 // expiration time
 	SOAMinttl  uint32 // minimum TTL
-
-	// Value of RecursionAvailable for responses in Mesos domain
-	RecurseOn bool
-
+	SOAMname   string // primary name server
+	SOARname   string // email of admin esponsible
+	// Mesos master(s): a list of IP:port pairs for one or more Mesos masters
+	Masters []string
+	// DNS server: IP address of the DNS server for forwarded accesses
+	Resolvers []string
+	// IPSources is the prioritized list of task IP sources
+	IPSources []string // e.g. ["host", "docker", "mesos", "rkt"]
+	// Zookeeper: a single Zk url
+	Zk string
+	//  Domain: name of the domain used (default "mesos", ie .mesos domain)
+	Domain string
+	// File is the location of the config.json file
+	File string
 	// ListenAddr is the server listener address
 	Listener string
-
-	// NOTE(tsenart): HTTPPort, DNSOn and HTTPOn have defined JSON keys for
-	// backwards compatibility with external API clients.
-	HTTPPort int `json:"HttpPort"`
-
+	// Value of RecursionAvailable for responses in Mesos domain
+	RecurseOn bool
 	// Enable serving DSN and HTTP requests
 	DNSOn  bool `json:"DnsOn"`
 	HTTPOn bool `json:"HttpOn"`
-
 	// Enable replies for external requests
 	ExternalOn bool
-
 	// EnforceRFC952 will enforce an older, more strict set of rules for DNS labels
 	EnforceRFC952 bool
-
-	// IPSources is the prioritized list of task IP sources
-	IPSources []string // e.g. ["host", "docker", "mesos", "rkt"]
 }
 
 // NewConfig return the default config of the resolver

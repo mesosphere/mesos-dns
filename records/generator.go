@@ -305,8 +305,7 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 	addedLeaderMasterN := false
 	idx := 0
 	for _, master := range masters {
-
-		ip, _, err := getProto(master)
+		masterIP, _, err := getProto(master)
 		if err != nil {
 			logging.Error.Println(err)
 			continue
@@ -315,7 +314,7 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 		// A records (master and masterN)
 		if master != leaderAddress {
 			arec := "master." + domain + "."
-			added := rg.insertRR(arec, ip, "A")
+			added := rg.insertRR(arec, masterIP, "A")
 			if !added {
 				// duplicate master?!
 				continue
@@ -328,7 +327,7 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 		}
 
 		arec := "master" + strconv.Itoa(idx) + "." + domain + "."
-		rg.insertRR(arec, ip, "A")
+		rg.insertRR(arec, masterIP, "A")
 		idx++
 
 		if master == leaderAddress {
