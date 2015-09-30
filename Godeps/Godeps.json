@@ -29,23 +29,23 @@
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/detector",
-			"Comment": "mesos-0.24.0-1-g669fe5e",
-			"Rev": "669fe5e283d6c51e8c9e91fccf97823ebda49a43"
+			"Comment": "v0.0.2-1-g068d547",
+			"Rev": "068d5470506e3780189fe607af40892814197c5e"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosproto",
-			"Comment": "mesos-0.24.0-1-g669fe5e",
-			"Rev": "669fe5e283d6c51e8c9e91fccf97823ebda49a43"
+			"Comment": "v0.0.2-1-g068d547",
+			"Rev": "068d5470506e3780189fe607af40892814197c5e"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/mesosutil",
-			"Comment": "mesos-0.24.0-1-g669fe5e",
-			"Rev": "669fe5e283d6c51e8c9e91fccf97823ebda49a43"
+			"Comment": "v0.0.2-1-g068d547",
+			"Rev": "068d5470506e3780189fe607af40892814197c5e"
 		},
 		{
 			"ImportPath": "github.com/mesos/mesos-go/upid",
-			"Comment": "mesos-0.24.0-1-g669fe5e",
-			"Rev": "669fe5e283d6c51e8c9e91fccf97823ebda49a43"
+			"Comment": "v0.0.2-1-g068d547",
+			"Rev": "068d5470506e3780189fe607af40892814197c5e"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
