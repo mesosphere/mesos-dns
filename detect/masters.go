@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"net"
 	"strconv"
+	"unsafe"
 
 	"github.com/mesos/mesos-go/detector"
 	mesos "github.com/mesos/mesos-go/mesosproto"
@@ -50,7 +51,7 @@ func (ms *Masters) OnMasterChanged(leader *mesos.MasterInfo) {
 		return
 	}
 
-	ms.masters = ordered(masterHostPort(leader), ms.masters[1:])
+	ms.masters = ordered(masterAddr(leader), ms.masters[1:])
 	emit(ms.changed, ms.masters)
 }
 
@@ -67,8 +68,8 @@ func (ms *Masters) UpdatedMasters(infos []*mesos.MasterInfo) {
 
 	masters := make([]string, 0, len(infos))
 	for _, info := range infos {
-		if validMasterInfo(info) {
-			masters = append(masters, masterHostPort(info))
+		if addr := masterAddr(info); addr != "" {
+			masters = append(masters, addr)
 		}
 	}
 
@@ -96,24 +97,37 @@ func ordered(leader string, masters []string) []string {
 	return ms
 }
 
-func validMasterInfo(info *mesos.MasterInfo) bool {
-	return info.GetHostname() != "" || info.GetIp() != 0
-}
-
-func masterHostPort(info *mesos.MasterInfo) string {
-	host := info.GetHostname()
-
-	if host == "" {
-		// unpack IPv4
-		octets := make([]byte, 4)
-		binary.BigEndian.PutUint32(octets, info.GetIp())
-		ipv4 := net.IP(octets)
-		host = ipv4.String()
+// masterAddr returns an address (ip:port) from the given *mesos.MasterInfo or
+// an empty string if it nil.
+//
+// BUG(tsenart): The byte order of the `ip` field in MasterInfo is platform
+// dependent. We assume that Mesos is compiled with the same architecture as
+// Mesos-DNS and hence same byte order. If this isn't the case, the address
+// returned will be wrong. This only affects Mesos versions < 0.24.0
+func masterAddr(info *mesos.MasterInfo) string {
+	if info == nil {
+		return ""
 	}
-
-	return net.JoinHostPort(host, masterPort(info))
+	ip, port := "", int64(0)
+	if addr := info.GetAddress(); addr != nil { // Mesos >= 0.24.0
+		ip, port = addr.GetIp(), int64(addr.GetPort())
+	} else { // Mesos < 0.24.0
+		ipv4 := make([]byte, net.IPv4len)
+		byteOrder.PutUint32(ipv4, info.GetIp())
+		ip, port = net.IP(ipv4).String(), int64(info.GetPort())
+	}
+	return net.JoinHostPort(ip, strconv.FormatInt(port, 10))
 }
 
-func masterPort(info *mesos.MasterInfo) string {
-	return strconv.FormatUint(uint64(info.GetPort()), 10)
-}
+// byteOrder is instantiated at package initialization time to the
+// binary.ByteOrder of the running process.
+// https://groups.google.com/d/msg/golang-nuts/zmh64YkqOV8/iJe-TrTTeREJ
+var byteOrder = func() binary.ByteOrder {
+	switch x := uint32(0x01020304); *(*byte)(unsafe.Pointer(&x)) {
+	case 0x01:
+		return binary.BigEndian
+	case 0x04:
+		return binary.LittleEndian
+	}
+	panic("unknown byte order")
+}()

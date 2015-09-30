@@ -1,12 +1,19 @@
 package detect
 
 import (
+	"net"
 	"reflect"
 	"testing"
 
 	mesos "github.com/mesos/mesos-go/mesosproto"
 	"github.com/mesosphere/mesos-dns/logging"
 )
+
+func init() {
+	// TODO(tsenart): Refactor the logging package
+	logging.VerboseFlag = true
+	logging.SetupLogs()
+}
 
 func TestMasters_UpdatedMasters(t *testing.T) {
 	// create a new masters detector with an unknown leader and no masters
@@ -20,20 +27,24 @@ func TestMasters_UpdatedMasters(t *testing.T) {
 		{
 			// update a single master
 			// leave the unknown leader "" unchanged
-			newMasterInfos([]string{"a"}),
-			[]string{"", "a:5050"},
+			masterInfos(masterInfo(ip("1.1.1.1"))),
+			[]string{"", "1.1.1.1:5050"},
 		},
 		{
 			// update additional masters,
 			// expect them to be appended with the default port number,
 			// leave the unknown leader "" unchanged
-			newMasterInfos([]string{"b", "c", "d"}),
-			[]string{"", "b:5050", "c:5050", "d:5050"},
+			masterInfos(
+				masterInfo(ip("1.1.1.1")),
+				masterInfo(ip("1.1.1.2")),
+				masterInfo(ip("1.1.1.3")),
+			),
+			[]string{"", "1.1.1.1:5050", "1.1.1.2:5050", "1.1.1.3:5050"},
 		},
 		{
 			// update additional masters with an empty slice
 			// expect no update at all (nil)
-			newMasterInfos([]string{}),
+			masterInfos(),
 			nil,
 		},
 		{
@@ -53,39 +64,32 @@ func TestMasters_UpdatedMasters(t *testing.T) {
 
 func TestMasters_OnMasterChanged(t *testing.T) {
 	// create a new masters detector with an unknown leader
-	// and two initial masters "a:5050", "b:5050"
+	// and two initial masters "1.1.1.1:5050", "1.1.1.2:5050"
 	ch := make(chan []string, 1)
-	m := NewMasters([]string{"a:5050", "b:5050"}, ch)
+	m := NewMasters([]string{"1.1.1.1:5050", "1.1.1.2:5050"}, ch)
 
 	for i, tt := range []struct {
 		leader *mesos.MasterInfo
 		want   []string
 	}{
 		{
-			// update new leader "a",
+			// update new leader "1.1.1.1",
 			// expect an appended port number
-			// leaving "b:5050" as the only additional master
-			newMasterInfo("a"),
-			[]string{"a:5050", "b:5050"},
+			// leaving "1.1.1.2:5050" as the only additional master
+			masterInfo(ip("1.1.1.1")),
+			[]string{"1.1.1.1:5050", "1.1.1.2:5050"},
 		},
 		{
-			// update new leader "c"
-			// replacing "a:5050"
-			newMasterInfo("c"),
-			[]string{"c:5050", "b:5050"},
+			// update new leader "1.1.1.3"
+			// replacing "1.1.1.1:5050"
+			masterInfo(ip("1.1.1.3")),
+			[]string{"1.1.1.3:5050", "1.1.1.2:5050"},
 		},
 		{
-			// update new leader "b"
-			// replacing "c"
-			newMasterInfo("b"),
-			[]string{"b:5050"},
-		},
-		{
-			// update new leader "", the hostname being the empty string
-			// expect to fallback to its ip address,
-			// being 0 by default, implying "0.0.0.0"
-			newMasterInfo(""),
-			[]string{"0.0.0.0:5050"},
+			// update new leader "1.1.1.2"
+			// replacing "1.1.1.3"
+			masterInfo(ip("1.1.1.2")),
+			[]string{"1.1.1.2:5050"},
 		},
 		{
 			// update new leader with a niladic value
@@ -102,6 +106,25 @@ func TestMasters_OnMasterChanged(t *testing.T) {
 	}
 }
 
+func TestMasterAddr(t *testing.T) {
+	for i, tt := range []struct {
+		*mesos.MasterInfo
+		addr string
+	}{
+		{nil, ""},
+		{masterInfo(addr("", 1234)), ":1234"},
+		{masterInfo(addr("1.1.1.1", 0)), "1.1.1.1:0"},
+		{masterInfo(addr("1.1.1.1", 1234)), "1.1.1.1:1234"},
+		{masterInfo(port(1234)), "0.0.0.0:1234"},
+		{masterInfo(ip("1.1.1.1")), "1.1.1.1:5050"},
+		{masterInfo(ip("1.1.1.1"), port(1234)), "1.1.1.1:1234"},
+	} {
+		if got, want := masterAddr(tt.MasterInfo), tt.addr; got != want {
+			t.Errorf("test #%d: got %v, want %v", i, got, want)
+		}
+	}
+}
+
 // recv receives from a channel in a non-blocking way, returning the received value or nil.
 func recv(ch <-chan []string) []string {
 	select {
@@ -112,22 +135,40 @@ func recv(ch <-chan []string) []string {
 	}
 }
 
-func newMasterInfo(hostname string) *mesos.MasterInfo {
-	return &mesos.MasterInfo{Hostname: &hostname}
-}
+// masterInfoOpt is a functional option type for *mesos.MasterInfo structs
+type masterInfoOpt func(*mesos.MasterInfo)
 
-func newMasterInfos(hostnames []string) []*mesos.MasterInfo {
-	ms := make([]*mesos.MasterInfo, len(hostnames))
-
-	for i, h := range hostnames {
-		ms[i] = newMasterInfo(h)
+// masterInfo returns a *mesos.MasterInfo with the given opts applied.
+func masterInfo(opts ...masterInfoOpt) *mesos.MasterInfo {
+	var info mesos.MasterInfo
+	for _, opt := range opts {
+		opt(&info)
 	}
-
-	return ms
+	return &info
 }
 
-func init() {
-	// TODO(tsenart): Refactor the logging package
-	logging.VerboseFlag = true
-	logging.SetupLogs()
+// masterInfos is an utility function that simply returns the given masterInfos.
+func masterInfos(infos ...*mesos.MasterInfo) []*mesos.MasterInfo { return infos }
+
+// ip returns a masterInfoOpt that sets the Ip field to the given value.
+func ip(a string) masterInfoOpt {
+	return func(info *mesos.MasterInfo) {
+		ipv4 := byteOrder.Uint32(net.ParseIP(a).To4())
+		info.Ip = &ipv4
+	}
+}
+
+// port returns a masterInfoOpt that sets the Port field to the given value.
+func port(n uint32) masterInfoOpt {
+	return func(info *mesos.MasterInfo) {
+		info.Port = &n
+	}
+}
+
+// addr returns a masterInfoOpt that sets the Address field with the given
+// ip and port.
+func addr(ip string, port int32) masterInfoOpt {
+	return func(info *mesos.MasterInfo) {
+		info.Address = &mesos.Address{Ip: &ip, Port: &port}
+	}
 }
