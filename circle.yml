@@ -7,6 +7,7 @@ dependencies:
     - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
   post:
     - go install ./...
+    - go test -i ./...
     - gometalinter --install
 
 test:
