@@ -4,7 +4,7 @@ title: Service Naming
 
 # Service Naming
 
-Mesos-DNS defines a DNS domain for Mesos tasks (default `.mesos`, see [instructions on configruation](configuration-parameters.html)). Running tasks can be discovered by looking up A and, optionally, SRV records within the Mesos domain. 
+Mesos-DNS defines a DNS domain for Mesos tasks (default `.mesos`, see [instructions on configuration](configuration-parameters.html)). Running tasks can be discovered by looking up A and, optionally, SRV records within the Mesos domain. 
 
 ## A Records
 
