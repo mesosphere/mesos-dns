@@ -320,20 +320,21 @@ func onError(abort <-chan struct{}, errCh <-chan error, f func(error)) <-chan st
 
 func TestMultiError(t *testing.T) {
 	me := multiError(nil)
-	me = me.Add()
-	me = me.Add(nil)
-	me = me.Add(multiError(nil))
+	me.Add()
+	me.Add(nil)
+	me.Add(multiError(nil))
 	if !me.Nil() {
 		t.Fatalf("Expected Nil() multiError instead of %q", me.Error())
 	}
 
-	me = me.Add(errors.New("abc"))
-	me = me.Add(errors.New("123"))
-	me = me.Add(multiError(nil))
-	me = me.Add(multiError(nil).Add(errors.New("456")))
-	me = me.Add(errors.New("789"))
+	me.Add(errors.New("abc"))
+	me.Add(errors.New("123"))
+	me.Add(multiError(nil))
+	me.Add(multiError([]error{errors.New("456")}))
+	me.Add(multiError{errors.New("789")})
+	me.Add(errors.New("def"))
 
-	const expected = "abc; 123; 456; 789"
+	const expected = "abc; 123; 456; 789; def"
 	actual := me.Error()
 	if expected != actual {
 		t.Fatalf("expected %q instead of %q", expected, actual)

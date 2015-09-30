@@ -618,15 +618,14 @@ func cleanWild(name string) string {
 
 type multiError []error
 
-func (e multiError) Add(err ...error) multiError {
+func (e *multiError) Add(err ...error) {
 	for _, e1 := range err {
 		if me, ok := e1.(multiError); ok {
-			e = append(e, me...)
+			*e = append(*e, me...)
 		} else if e1 != nil {
-			e = append(e, e1)
+			*e = append(*e, e1)
 		}
 	}
-	return e
 }
 
 func (e multiError) Error() string {
