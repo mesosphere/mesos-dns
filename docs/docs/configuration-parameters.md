@@ -23,8 +23,8 @@ The configuration file should include the following fields:
   "httpport": 8123,
   "externalon": true,
   "listener": "10.101.160.16",
-  "SOAMname": "root.ns1.mesos",
-  "SOARname": "ns1.mesos",
+  "SOAMname": "ns1.mesos",
+  "SOARname": "root.ns1.mesos",
   "SOARefresh": 60,
   "SOARetry":   600,
   "SOAExpire":  86400,
@@ -61,7 +61,9 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 
 `externalon` is a boolean field that controls whether Mesos-DNS serves requests outside of the Mesos domain. The default value is `true`. 
 
-`SOAMname` is the MNAME field in the SOA record for the Mesos domain. The format is `mailbox.domain`, using a `.` instead of `@`. For example, if the email address is `root@ns1.mesos`, the `email` field should be `root.mesos-dns.mesos`. For details, see the [RFC-1035](http://tools.ietf.org/html/rfc1035#page-18). The default value is `root.ns1.mesos`. 
+`SOAMname` specifies the domain name of the name server that was the original or primary source of data for the configured domain. The default value is `ns1.mesos`.
+
+`SOARname` specifies the mailbox of the person responsible for the configured domain. The format is `mailbox.domain`, using a `.` instead of `@`. i.e. `root@ns1.mesos` becomes `root.ns1.mesos`. For details, see the [RFC-1035](http://tools.ietf.org/html/rfc1035#page-18). The default value is `root.ns1.mesos`.
 
 `SOARefresh` is the REFRESH field in the SOA record for the Mesos domain. For details, see the [RFC-1035](http://tools.ietf.org/html/rfc1035#page-18). The default value is `60`.
 

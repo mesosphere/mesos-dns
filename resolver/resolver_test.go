@@ -160,7 +160,7 @@ func TestHandlers(t *testing.T) {
 				Header(true, dns.RcodeSuccess),
 				NSs(
 					SOA(RRHeader("non-existing.mesos.", dns.TypeSOA, 60),
-						"root.ns1.mesos", "ns1.mesos", 60))),
+						"ns1.mesos", "root.ns1.mesos", 60))),
 		},
 		{
 			res.HandleMesos,
@@ -177,7 +177,7 @@ func TestHandlers(t *testing.T) {
 				Header(true, dns.RcodeNameError),
 				NSs(
 					SOA(RRHeader("missing.mesos.", dns.TypeSOA, 60),
-						"root.ns1.mesos", "ns1.mesos", 60))),
+						"ns1.mesos", "root.ns1.mesos", 60))),
 		},
 		{
 			res.HandleMesos,
@@ -186,7 +186,7 @@ func TestHandlers(t *testing.T) {
 				Header(true, dns.RcodeSuccess),
 				NSs(
 					SOA(RRHeader("chronos.marathon.mesos.", dns.TypeSOA, 60),
-						"root.ns1.mesos", "ns1.mesos", 60))),
+						"ns1.mesos", "root.ns1.mesos", 60))),
 		},
 		{
 			res.HandleMesos,
@@ -195,7 +195,7 @@ func TestHandlers(t *testing.T) {
 				Header(true, dns.RcodeNameError),
 				NSs(
 					SOA(RRHeader("missing.mesos.", dns.TypeSOA, 60),
-						"root.ns1.mesos", "ns1.mesos", 60))),
+						"ns1.mesos", "root.ns1.mesos", 60))),
 		},
 		{
 			res.HandleNonMesos,
