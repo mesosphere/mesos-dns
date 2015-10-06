@@ -46,28 +46,28 @@ func (lc *LogCounter) String() string {
 
 // LogOut holds metrics captured in an instrumented runtime.
 type LogOut struct {
-	MesosRequests    Counter
-	MesosSuccess     Counter
-	MesosNXDomain    Counter
-	MesosFailed      Counter
-	NonMesosRequests Counter
-	NonMesosSuccess  Counter
-	NonMesosNXDomain Counter
-	NonMesosFailed   Counter
-	NonMesosRecursed Counter
+	MesosRequests     Counter
+	MesosSuccess      Counter
+	MesosNXDomain     Counter
+	MesosFailed       Counter
+	NonMesosRequests  Counter
+	NonMesosSuccess   Counter
+	NonMesosNXDomain  Counter
+	NonMesosFailed    Counter
+	NonMesosForwarded Counter
 }
 
 // CurLog is the default package level LogOut.
 var CurLog = LogOut{
-	MesosRequests:    &LogCounter{},
-	MesosSuccess:     &LogCounter{},
-	MesosNXDomain:    &LogCounter{},
-	MesosFailed:      &LogCounter{},
-	NonMesosRequests: &LogCounter{},
-	NonMesosSuccess:  &LogCounter{},
-	NonMesosNXDomain: &LogCounter{},
-	NonMesosFailed:   &LogCounter{},
-	NonMesosRecursed: &LogCounter{},
+	MesosRequests:     &LogCounter{},
+	MesosSuccess:      &LogCounter{},
+	MesosNXDomain:     &LogCounter{},
+	MesosFailed:       &LogCounter{},
+	NonMesosRequests:  &LogCounter{},
+	NonMesosSuccess:   &LogCounter{},
+	NonMesosNXDomain:  &LogCounter{},
+	NonMesosFailed:    &LogCounter{},
+	NonMesosForwarded: &LogCounter{},
 }
 
 // PrintCurLog prints out the current LogOut and then resets

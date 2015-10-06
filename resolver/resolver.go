@@ -29,9 +29,7 @@ type Resolver struct {
 	rs      *records.RecordGenerator
 	rsLock  sync.RWMutex
 	rng     *rand.Rand
-
-	// pluggable external DNS resolution, mainly for unit testing
-	extResolver exchanger.Exchanger
+	fwd     exchanger.Forwarder
 }
 
 // New returns a Resolver with the given version and configuration.
@@ -44,39 +42,40 @@ func New(version string, config records.Config) *Resolver {
 		masters: append([]string{""}, config.Masters...),
 	}
 
-	if !config.ExternalOn {
-		return r
-	}
-
 	timeout := 5 * time.Second
 	if config.Timeout != 0 {
 		timeout = time.Duration(config.Timeout) * time.Second
 	}
 
-	r.extResolver = newClient(timeout)
+	rs := config.Resolvers
+	if !config.ExternalOn {
+		rs = rs[:0]
+	}
+	r.fwd = exchanger.NewForwarder(rs, exchangers(timeout, "udp", "tcp"))
 
 	return r
 }
 
-func newClient(timeout time.Duration) exchanger.Exchanger {
-	clients := make([]exchanger.Exchanger, 2)
-	for i, proto := range [...]string{"udp", "tcp"} { // See RFC5966
-		clients[i] = &dns.Client{
-			Net:          proto,
-			DialTimeout:  timeout,
-			ReadTimeout:  timeout,
-			WriteTimeout: timeout,
-		}
+func exchangers(timeout time.Duration, protos ...string) map[string]exchanger.Exchanger {
+	exs := make(map[string]exchanger.Exchanger, len(protos))
+	for _, proto := range protos {
+		exs[proto] = exchanger.Decorate(
+			&dns.Client{
+				Net:          proto,
+				DialTimeout:  timeout,
+				ReadTimeout:  timeout,
+				WriteTimeout: timeout,
+			},
+			exchanger.ErrorLogging(logging.Error),
+			exchanger.Instrumentation(
+				logging.CurLog.NonMesosForwarded,
+				logging.CurLog.NonMesosSuccess,
+				logging.CurLog.NonMesosFailed,
+			),
+		)
 	}
-	return exchanger.Decorate(
-		exchanger.While(truncated, clients...),
-		exchanger.Recursion(3, exchanger.Recurse),
-		exchanger.ErrorLogging(logging.Error),
-		exchanger.Instrumentation(logging.CurLog.NonMesosRecursed),
-	)
+	return exs
 }
-
-func truncated(m *dns.Msg) bool { return m.Truncated }
 
 // return the current (read-only) record set. attempts to write to the returned
 // object will likely result in a data race.
@@ -246,50 +245,26 @@ func shuffleAnswers(rng *rand.Rand, answers []dns.RR) []dns.RR {
 	return answers
 }
 
-// HandleNonMesos handles non-mesos queries by recursing to a configured
-// external resolver.
+// HandleNonMesos handles non-mesos queries by forwarding to configured
+// external DNS servers.
 func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
-	var err error
-	var m *dns.Msg
-
-	// tracing info
 	logging.CurLog.NonMesosRequests.Inc()
-
-	// If external request are disabled
-	if res.extResolver == nil {
-		m = new(dns.Msg)
-		// set refused
-		m.SetRcode(r, 5)
-	} else {
-		for _, resolver := range res.config.Resolvers {
-			nameserver := net.JoinHostPort(resolver, "53")
-			m, _, err = res.extResolver.Exchange(r, nameserver)
-			if err == nil {
-				break
-			}
-		}
-	}
-
-	// extResolver returns nil Msg sometimes cause of perf
-	if m == nil {
-		m = new(dns.Msg)
-		m.SetRcode(r, 2)
-		err = fmt.Errorf("failed external DNS lookup of %q: %v", r.Question[0].Name, err)
-	}
+	m, err := res.fwd(r, w.RemoteAddr().Network())
 	if err != nil {
-		logging.Error.Println(r.Question[0].Name)
-		logging.Error.Println(err)
-		logging.CurLog.NonMesosFailed.Inc()
-	} else {
-		// nxdomain
-		if len(m.Answer) == 0 {
-			logging.CurLog.NonMesosNXDomain.Inc()
-		} else {
-			logging.CurLog.NonMesosSuccess.Inc()
-		}
+		m = new(dns.Msg).SetRcode(r, rcode(err))
+	} else if len(m.Answer) == 0 {
+		logging.CurLog.NonMesosNXDomain.Inc()
 	}
-
 	reply(w, m)
+}
+
+func rcode(err error) int {
+	switch err.(type) {
+	case *exchanger.ForwardError:
+		return dns.RcodeRefused
+	default:
+		return dns.RcodeServerFailure
+	}
 }
 
 // HandleMesos is a resolver request handler that responds to a resource
