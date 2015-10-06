@@ -61,7 +61,7 @@ func ErrorLogging(l *log.Logger) Decorator {
 		return Func(func(m *dns.Msg, a string) (r *dns.Msg, rtt time.Duration, err error) {
 			defer func() {
 				if err != nil {
-					l.Printf("error exchanging with %q: %v", a, err)
+					l.Printf("%v: exchanging %#v with %q", err, m, a)
 				}
 			}()
 			return ex.Exchange(m, a)
