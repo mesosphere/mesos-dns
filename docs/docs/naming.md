@@ -111,7 +111,7 @@ Note that, if you configure Mesos-DNS to detect the leading master through Zooke
 If you configure Mesos-DNS using the `masters` field, it will generate master records for every master in the list.
 Also note that there is inherent delay between the election of a new master and the update of leader/master records in Mesos-DNS. 
 
-Mesos-DNS generates A records for itself that list all the IP addresses that Mesos-DNS is listening to. The name for Mesos-DNS can be selected using the `SOARname` [configuration parameter](configuration-parameters.html). The default name is `ns1.mesos`. 
+Mesos-DNS generates A records for itself that list all the IP addresses that Mesos-DNS is listening to. The name for Mesos-DNS can be selected using the `SOAMname` [configuration parameter](configuration-parameters.html). The default name is `ns1.mesos`.
 
 In addition to A and SRV records for Mesos tasks, Mesos-DNS supports requests for SOA and NS records for the Mesos domain. DNS requests for records of other types in the Mesos domain will return `NXDOMAIN`. Mesos-DNS does not support PTR records needed fo reserve lookups. 
 
