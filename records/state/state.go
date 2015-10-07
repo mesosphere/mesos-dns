@@ -234,21 +234,15 @@ type DiscoveryInfo struct {
 	Location    string `json:"location,omitempty"`
 	Environment string `json:"environment,omitempty"`
 	Labels      struct {
-		Labels `json:"labels"`
+		Labels []Label `json:"labels"`
 	} `json:"labels"`
 	Ports struct {
-		DiscoveryPorts `json:"ports"`
+		DiscoveryPorts []DiscoveryPort `json:"ports"`
 	} `json:"ports"`
 }
 
-// Labels holds the key/value labels of a task defined in the /state.json Mesos HTTP endpoint.
-type Labels []struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
-// DiscoveryPorts holds the ports for a task defined in the /state.json Mesos HTTP endpoint.
-type DiscoveryPorts []struct {
+// DiscoveryPort holds a port for a task defined in the /state.json Mesos HTTP endpoint.
+type DiscoveryPort struct {
 	Protocol string `json:"protocol"`
 	Number   int    `json:"number"`
 	Name     string `json:"name"`
