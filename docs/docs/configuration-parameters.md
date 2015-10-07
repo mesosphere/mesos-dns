@@ -61,7 +61,8 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 
 `externalon` is a boolean field that controls whether Mesos-DNS serves requests outside of the Mesos domain. The default value is `true`. 
 
-`SOAMname` specifies the domain name of the name server that was the original or primary source of data for the configured domain. The default value is `ns1.mesos`.
+`SOAMname` specifies the domain name of the name server that was the original or primary source of data for the configured domain.
+The configured name will always be converted to a FQDN by ensuring it ends with a `.`. The default value is `ns1.mesos`.
 
 `SOARname` specifies the mailbox of the person responsible for the configured domain. The format is `mailbox.domain`, using a `.` instead of `@`. i.e. `root@ns1.mesos` becomes `root.ns1.mesos`. For details, see the [RFC-1035](http://tools.ietf.org/html/rfc1035#page-18). The default value is `root.ns1.mesos`.
 
