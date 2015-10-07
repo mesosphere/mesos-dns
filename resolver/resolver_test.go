@@ -11,11 +11,9 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/kylelemons/godebug/pretty"
 	. "github.com/mesosphere/mesos-dns/dnstest"
-	"github.com/mesosphere/mesos-dns/exchanger"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/records/labels"
@@ -77,19 +75,19 @@ func TestShuffleAnswers(t *testing.T) {
 
 func TestHandlers(t *testing.T) {
 	res := fakeDNS(t)
-	res.extResolver = exchanger.Func(func(m *dns.Msg, a string) (*dns.Msg, time.Duration, error) {
+	res.fwd = func(m *dns.Msg, net string) (*dns.Msg, error) {
 		rr1, err := res.formatA("google.com.", "1.1.1.1")
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		rr2, err := res.formatA("google.com.", "2.2.2.2")
 		if err != nil {
-			return nil, 0, err
+			return nil, err
 		}
 		msg := &dns.Msg{Answer: []dns.RR{rr1, rr2}}
 		msg.SetReply(m)
-		return msg, 0, nil
-	})
+		return msg, nil
+	}
 
 	for i, tt := range []struct {
 		dns.HandlerFunc
