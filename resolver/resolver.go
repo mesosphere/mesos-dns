@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/emicklei/go-restful"
@@ -38,7 +39,9 @@ func New(version string, config records.Config) *Resolver {
 		version: version,
 		config:  config,
 		rs:      &records.RecordGenerator{},
-		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
+		// rand.Sources aren't safe for concurrent use, except the global one.
+		// See: https://github.com/golang/go/issues/3611
+		rng:     rand.New(&lockedSource{src: rand.NewSource(time.Now().UnixNano())}),
 		masters: append([]string{""}, config.Masters...),
 	}
 
@@ -145,7 +148,7 @@ func (res *Resolver) Reload() {
 		// may need to refactor for fairness
 		res.rsLock.Lock()
 		defer res.rsLock.Unlock()
-		res.config.SOASerial = timestamp
+		atomic.StoreUint32(&res.config.SOASerial, timestamp)
 		res.rs = &t
 	} else {
 		logging.VeryVerbose.Println("Warning: master not found; keeping old DNS state")
@@ -211,7 +214,7 @@ func (res *Resolver) formatSOA(dom string) (*dns.SOA, error) {
 		},
 		Ns:      res.config.SOAMname,
 		Mbox:    res.config.SOARname,
-		Serial:  res.config.SOASerial,
+		Serial:  atomic.LoadUint32(&res.config.SOASerial),
 		Refresh: res.config.SOARefresh,
 		Retry:   res.config.SOARetry,
 		Expire:  res.config.SOAExpire,
