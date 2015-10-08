@@ -202,7 +202,7 @@ func (res *Resolver) formatA(dom string, target string) (*dns.A, error) {
 }
 
 // formatSOA returns the SOA resource record for the mesos domain
-func (res *Resolver) formatSOA(dom string) (*dns.SOA, error) {
+func (res *Resolver) formatSOA(dom string) *dns.SOA {
 	ttl := uint32(res.config.TTL)
 
 	return &dns.SOA{
@@ -219,11 +219,11 @@ func (res *Resolver) formatSOA(dom string) (*dns.SOA, error) {
 		Retry:   res.config.SOARetry,
 		Expire:  res.config.SOAExpire,
 		Minttl:  ttl,
-	}, nil
+	}
 }
 
 // formatNS returns the NS  record for the mesos domain
-func (res *Resolver) formatNS(dom string) (*dns.NS, error) {
+func (res *Resolver) formatNS(dom string) *dns.NS {
 	ttl := uint32(res.config.TTL)
 
 	return &dns.NS{
@@ -234,7 +234,7 @@ func (res *Resolver) formatNS(dom string) (*dns.NS, error) {
 			Ttl:    ttl,
 		},
 		Ns: res.config.SOAMname,
-	}, nil
+	}
 }
 
 // reorders answers for very basic load balancing
@@ -358,20 +358,12 @@ func (res *Resolver) handleA(rs *records.RecordGenerator, name string, m *dns.Ms
 }
 
 func (res *Resolver) handleSOA(m, r *dns.Msg) error {
-	rr, err := res.formatSOA(r.Question[0].Name)
-	if err != nil {
-		return err
-	}
-	m.Ns = append(m.Ns, rr)
+	m.Ns = append(m.Ns, res.formatSOA(r.Question[0].Name))
 	return nil
 }
 
 func (res *Resolver) handleNS(m, r *dns.Msg) error {
-	rr, err := res.formatNS(r.Question[0].Name)
-	if err != nil {
-		return err
-	}
-	m.Ns = append(m.Ns, rr)
+	m.Ns = append(m.Ns, res.formatNS(r.Question[0].Name))
 	return nil
 }
 
@@ -392,12 +384,8 @@ func (res *Resolver) handleEmpty(rs *records.RecordGenerator, name string, m, r 
 	logging.VeryVerbose.Println("total A rrs:\t" + strconv.Itoa(len(rs.As)))
 	logging.VeryVerbose.Println("failed looking for " + r.Question[0].String())
 
-	rr, err := res.formatSOA(r.Question[0].Name)
-	if err != nil {
-		return err
-	}
+	m.Ns = append(m.Ns, res.formatSOA(r.Question[0].Name))
 
-	m.Ns = append(m.Ns, rr)
 	return nil
 }
 
