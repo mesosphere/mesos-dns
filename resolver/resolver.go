@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/emicklei/go-restful"
@@ -38,7 +39,9 @@ func New(version string, config records.Config) *Resolver {
 		version: version,
 		config:  config,
 		rs:      &records.RecordGenerator{},
-		rng:     rand.New(rand.NewSource(time.Now().UnixNano())),
+		// rand.Sources aren't safe for concurrent use, except the global one.
+		// See: https://github.com/golang/go/issues/3611
+		rng:     rand.New(&lockedSource{src: rand.NewSource(time.Now().UnixNano())}),
 		masters: append([]string{""}, config.Masters...),
 	}
 
