@@ -368,7 +368,6 @@ func (res *Resolver) handleSOA(m, r *dns.Msg) error {
 
 func (res *Resolver) handleNS(m, r *dns.Msg) error {
 	rr, err := res.formatNS(r.Question[0].Name)
-	logging.Error.Println("NS request")
 	if err != nil {
 		return err
 	}
