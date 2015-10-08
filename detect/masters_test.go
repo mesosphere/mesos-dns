@@ -43,21 +43,21 @@ func TestMasters_UpdatedMasters(t *testing.T) {
 		},
 		{
 			// update additional masters with an empty slice
-			// expect no update at all (nil)
+			// expect empty masters
 			masterInfos(),
-			nil,
+			[]string{""},
 		},
 		{
 			// update masters with a niladic value
-			// expect no update at all (nil)
+			// expect empty masters
 			nil,
-			nil,
+			[]string{""},
 		},
 	} {
 		m.UpdatedMasters(tt.masters)
 
 		if got := recv(ch); !reflect.DeepEqual(got, tt.want) {
-			t.Errorf("test #%d: got %v, want: %v", i, got, tt.want)
+			t.Errorf("test #%d: got %#v, want: %#v", i, got, tt.want)
 		}
 	}
 }
@@ -93,15 +93,15 @@ func TestMasters_OnMasterChanged(t *testing.T) {
 		},
 		{
 			// update new leader with a niladic value
-			// expect no update at all (nil)
+			// expect empty leader
 			nil,
-			nil,
+			[]string{""},
 		},
 	} {
 		m.OnMasterChanged(tt.leader)
 
 		if got := recv(ch); !reflect.DeepEqual(got, tt.want) {
-			t.Errorf("test #%d: got %v, want: %v", i, got, tt.want)
+			t.Errorf("test #%d: got %#v, want: %#v", i, got, tt.want)
 		}
 	}
 }
