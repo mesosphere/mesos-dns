@@ -23,7 +23,8 @@ type Config struct {
 	// Timeout is the default connect/read/write timeout for outbound
 	// queries
 	Timeout int
-	// Zookeeper Detection Timeout: how long in seconds to wait for Zookeeper to be initially responsive (default 30)
+	// Zookeeper Detection Timeout: how long in seconds to wait for Zookeeper to
+	// be initially responsive. Default is 30 and 0 means no timeout.
 	ZkDetectionTimeout int
 	// NOTE(tsenart): HTTPPort, DNSOn and HTTPOn have defined JSON keys for
 	// backwards compatibility with external API clients.

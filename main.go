@@ -65,10 +65,11 @@ func main() {
 	}
 
 	reload := time.NewTicker(time.Second * time.Duration(config.RefreshSeconds))
-
 	zkTimeout := time.Second * time.Duration(config.ZkDetectionTimeout)
 	timeout := time.AfterFunc(zkTimeout, func() {
-		errch <- fmt.Errorf("master detection timed out after %s", zkTimeout)
+		if zkTimeout > 0 {
+			errch <- fmt.Errorf("master detection timed out after %s", zkTimeout)
+		}
 	})
 
 	defer reload.Stop()
@@ -78,7 +79,11 @@ func main() {
 		case <-reload.C:
 			res.Reload()
 		case masters := <-changed:
-			timeout.Stop()
+			if len(masters) == 0 || masters[0] == "" { // no leader
+				timeout.Reset(zkTimeout)
+			} else {
+				timeout.Stop()
+			}
 			logging.VeryVerbose.Printf("new masters detected: %v", masters)
 			res.SetMasters(masters)
 			res.Reload()

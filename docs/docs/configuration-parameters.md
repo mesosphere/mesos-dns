@@ -35,6 +35,18 @@ The configuration file should include the following fields:
 
 `zk` is a link to the Zookeeper instances on the Mesos cluster. Its format is `zk://host1:port1,host2:port2/mesos/`, where the number of hosts can be one or more. The default port for Zookeeper is `2181`. Mesos-DNS will monitor the Zookeeper instances to detect the current leading master. 
 
+`zkDetectionTimeout` defines how long to wait (in seconds) for Zookeeper to report a new leading Mesos master.
+This timeout is activated on:
+
+- Start up, where it plays the role of the "initial leader detection timeout" via ZK.
+- Mesos cluster changes, where there is no leading master for some period of time.
+- Zookeeper or network failure, when losing connection to the ZK cluster.
+
+If a *non-zero* timeout is specified and the timeout threshold is exceeded before
+a new leading Mesos master is reported by the ZK-based master detector, the program will exit.
+
+Defaults to `30` seconds.
+
 `masters` is a comma separated list with the IP address and port number for the master(s) in the Mesos cluster. Mesos-DNS will automatically find the leading master at any point in order to retrieve state about running tasks. If there is no leading master or the leading master is not responsive, Mesos-DNS will continue serving DNS requests based on stale information about running tasks. The `masters` field is required. 
 
 It is sufficient to specify just one of the `zk` or `masters` field. If both are defined, Mesos-DNS will first attempt to detect the leading master through Zookeeper. If Zookeeper is not responding, it will fall back to using the `masters` field. Both `zk` and `master` fields are static. To update them you need to restart Mesos-DNS. We recommend you use the `zk` field since this allows the dynamic addition to Mesos masters. 
