@@ -148,7 +148,7 @@ func (res *Resolver) Reload() {
 		// may need to refactor for fairness
 		res.rsLock.Lock()
 		defer res.rsLock.Unlock()
-		res.config.SOASerial = timestamp
+		atomic.StoreUint32(&res.config.SOASerial, timestamp)
 		res.rs = &t
 	} else {
 		logging.VeryVerbose.Println("Warning: master not found; keeping old DNS state")
@@ -214,7 +214,7 @@ func (res *Resolver) formatSOA(dom string) (*dns.SOA, error) {
 		},
 		Ns:      res.config.SOAMname,
 		Mbox:    res.config.SOARname,
-		Serial:  res.config.SOASerial,
+		Serial:  atomic.LoadUint32(&res.config.SOASerial),
 		Refresh: res.config.SOARefresh,
 		Retry:   res.config.SOARetry,
 		Expire:  res.config.SOAExpire,
