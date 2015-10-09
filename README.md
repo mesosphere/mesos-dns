@@ -1,4 +1,4 @@
-# Mesos-DNS [![Circle CI](https://circleci.com/gh/mesosphere/mesos-dns.svg?style=svg)](https://circleci.com/gh/mesosphere/mesos-dns) [![Coverage Status](https://coveralls.io/repos/mesosphere/mesos-dns/badge.svg?branch=master&service=github)](https://coveralls.io/github/mesosphere/mesos-dns?branch=master) [![GoDoc](https://godoc.org/github.com/mesosphere/mesos-dns?status.svg)](https://godoc.org/github.com/mesosphere/mesos-dns)
+# Mesos-DNS [![Circle CI](https://circleci.com/gh/mesosphere/mesos-dns.svg?style=svg)](https://circleci.com/gh/mesosphere/mesos-dns) [![Coverage Status](https://coveralls.io/repos/mesosphere/mesos-dns/badge.svg?branch=master&service=github)](https://coveralls.io/github/mesosphere/mesos-dns?branch=master) [![GoDoc](https://godoc.org/github.com/mesosphere/mesos-dns?status.svg)](https://godoc.org/github.com/mesosphere/mesos-dns) [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/mesosphere/mesos-dns?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 Mesos-DNS enables [DNS](http://en.wikipedia.org/wiki/Domain_Name_System) based service discovery in [Apache Mesos](http://mesos.apache.org/) clusters.
 
 ![Architecture
@@ -41,7 +41,8 @@ Contributions are welcome. Please refer to [CONTRIBUTING.md](CONTRIBUTING.md) fo
 guidelines.
 
 ## Contact
-For any discussion that isn't well suited for Github [issues](https://github.com/mesosphere/mesos-dns/issues), please use our [mailing list](https://groups.google.com/forum/#!forum/mesos-dns).
+For any discussion that isn't well suited for Github [issues](https://github.com/mesosphere/mesos-dns/issues),
+please use our [mailing list](https://groups.google.com/forum/#!forum/mesos-dns) or our public [chat room](https://gitter.im/mesosphere/mesos-dns).
 
 ## License
 This project is [Apache License 2.0](LICENSE).
