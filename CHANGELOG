@@ -1,3 +1,14 @@
+2015-10-09: v0.4.0
+  Smarter leading Mesos master detection timeout logic (#284, #306, #320)
+  resolver: Fix data races to RNG and SOASerial (#317)
+  Remove bogus "NS request" error log line (#316)
+  Transparent forwarding as per RFC5625 (#301, #307)
+  Idiomatic struct definitions (#232, #312)
+  exchanger: Improve error logging (#303)
+  Generate correct SOA and NS records (#295, #296)
+  detect: Extract address from MasterInfo.Address (#289, #290)
+  state: Call given src only once per statusIPs call (#285)
+
 2015-09-23: v0.3.0
   Add support for Mesos 0.25 "NetworkInfo" as an IPSource (#266, #267, #268)
   Find home directory with environment variables (#275, #277, #278)
