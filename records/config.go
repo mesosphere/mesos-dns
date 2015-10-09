@@ -23,6 +23,9 @@ type Config struct {
 	// Timeout is the default connect/read/write timeout for outbound
 	// queries
 	Timeout int
+	// Zookeeper Detection Timeout: how long in seconds to wait for Zookeeper to
+	// be initially responsive. Default is 30 and 0 means no timeout.
+	ZkDetectionTimeout int
 	// NOTE(tsenart): HTTPPort, DNSOn and HTTPOn have defined JSON keys for
 	// backwards compatibility with external API clients.
 	HTTPPort int `json:"HttpPort"`
@@ -64,25 +67,26 @@ type Config struct {
 // NewConfig return the default config of the resolver
 func NewConfig() Config {
 	return Config{
-		RefreshSeconds: 60,
-		TTL:            60,
-		Domain:         "mesos",
-		Port:           53,
-		Timeout:        5,
-		SOARname:       "root.ns1.mesos",
-		SOAMname:       "ns1.mesos",
-		SOARefresh:     60,
-		SOARetry:       600,
-		SOAExpire:      86400,
-		SOAMinttl:      60,
-		Resolvers:      []string{"8.8.8.8"},
-		Listener:       "0.0.0.0",
-		HTTPPort:       8123,
-		DNSOn:          true,
-		HTTPOn:         true,
-		ExternalOn:     true,
-		RecurseOn:      true,
-		IPSources:      []string{"netinfo", "mesos", "host"},
+		ZkDetectionTimeout: 30,
+		RefreshSeconds:     60,
+		TTL:                60,
+		Domain:             "mesos",
+		Port:               53,
+		Timeout:            5,
+		SOARname:           "root.ns1.mesos",
+		SOAMname:           "ns1.mesos",
+		SOARefresh:         60,
+		SOARetry:           600,
+		SOAExpire:          86400,
+		SOAMinttl:          60,
+		Resolvers:          []string{"8.8.8.8"},
+		Listener:           "0.0.0.0",
+		HTTPPort:           8123,
+		DNSOn:              true,
+		HTTPOn:             true,
+		ExternalOn:         true,
+		RecurseOn:          true,
+		IPSources:          []string{"netinfo", "mesos", "host"},
 	}
 }
 
@@ -126,6 +130,7 @@ func SetConfig(cjson string) Config {
 	logging.Verbose.Println("Mesos-DNS configuration:")
 	logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
 	logging.Verbose.Println("   - Zookeeper: ", c.Zk)
+	logging.Verbose.Println("   - ZookeeperDetectionTimeout: ", c.ZkDetectionTimeout)
 	logging.Verbose.Println("   - RefreshSeconds: ", c.RefreshSeconds)
 	logging.Verbose.Println("   - Domain: " + c.Domain)
 	logging.Verbose.Println("   - Listener: " + c.Listener)

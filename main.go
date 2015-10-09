@@ -52,19 +52,14 @@ func main() {
 		go func() { errch <- <-res.LaunchHTTP() }()
 	}
 
-	changed := make(chan []string, 1)
-	if config.Zk != "" {
-		logging.Verbose.Println("Starting master detector for ZK ", config.Zk)
-		if md, err := detector.New(config.Zk); err != nil {
-			log.Fatalf("failed to create master detector: %v", err)
-		} else if err := md.Detect(detect.NewMasters(config.Masters, changed)); err != nil {
-			log.Fatalf("failed to initialize master detector: %v", err)
-		}
-	} else {
-		changed <- config.Masters
-	}
-
+	changed := detectMasters(config.Zk, config.Masters)
 	reload := time.NewTicker(time.Second * time.Duration(config.RefreshSeconds))
+	zkTimeout := time.Second * time.Duration(config.ZkDetectionTimeout)
+	timeout := time.AfterFunc(zkTimeout, func() {
+		if zkTimeout > 0 {
+			errch <- fmt.Errorf("master detection timed out after %s", zkTimeout)
+		}
+	})
 
 	defer reload.Stop()
 	defer util.HandleCrash()
@@ -73,6 +68,11 @@ func main() {
 		case <-reload.C:
 			res.Reload()
 		case masters := <-changed:
+			if len(masters) == 0 || masters[0] == "" { // no leader
+				timeout.Reset(zkTimeout)
+			} else {
+				timeout.Stop()
+			}
 			logging.VeryVerbose.Printf("new masters detected: %v", masters)
 			res.SetMasters(masters)
 			res.Reload()
@@ -80,4 +80,19 @@ func main() {
 			logging.Error.Fatal(err)
 		}
 	}
+}
+
+func detectMasters(zk string, masters []string) <-chan []string {
+	changed := make(chan []string, 1)
+	if zk != "" {
+		logging.Verbose.Println("Starting master detector for ZK ", zk)
+		if md, err := detector.New(zk); err != nil {
+			log.Fatalf("failed to create master detector: %v", err)
+		} else if err := md.Detect(detect.NewMasters(masters, changed)); err != nil {
+			log.Fatalf("failed to initialize master detector: %v", err)
+		}
+	} else {
+		changed <- masters
+	}
+	return changed
 }

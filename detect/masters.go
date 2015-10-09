@@ -45,12 +45,6 @@ func NewMasters(masters []string, changed chan<- []string) *Masters {
 // It implements the detector.MasterChanged interface.
 func (ms *Masters) OnMasterChanged(leader *mesos.MasterInfo) {
 	logging.VeryVerbose.Println("Updated leader: ", leader)
-
-	if leader == nil {
-		logging.Error.Println("No master available in Zookeeper.")
-		return
-	}
-
 	ms.masters = ordered(masterAddr(leader), ms.masters[1:])
 	emit(ms.changed, ms.masters)
 }
@@ -60,24 +54,12 @@ func (ms *Masters) OnMasterChanged(leader *mesos.MasterInfo) {
 // It implements the detector.AllMasters interface.
 func (ms *Masters) UpdatedMasters(infos []*mesos.MasterInfo) {
 	logging.VeryVerbose.Println("Updated masters: ", infos)
-
-	if infos == nil {
-		logging.Error.Println("No masters available in Zookeeper.")
-		return
-	}
-
 	masters := make([]string, 0, len(infos))
 	for _, info := range infos {
 		if addr := masterAddr(info); addr != "" {
 			masters = append(masters, addr)
 		}
 	}
-
-	if len(masters) == 0 {
-		logging.Error.Println("No valid masters available in Zookeeper.")
-		return
-	}
-
 	ms.masters = ordered(ms.masters[0], masters)
 	emit(ms.changed, ms.masters)
 }
