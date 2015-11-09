@@ -59,9 +59,17 @@ type ContainerStatus struct {
 	NetworkInfos []NetworkInfo `json:"network_infos,omitempty"`
 }
 
-// NetworkInfo holds a network address resolution as defined in the
-// /state.json Mesos HTTP endpoint.
+// NetworkInfo holds the network configuration for a single interface
+// as defined in the /state.json Mesos HTTP endpoint.
 type NetworkInfo struct {
+	IPAddresses []IPAddress `json:"ip_addresses,omitempty"`
+	// back-compat with 0.25 IPAddress format
+	IPAddress string `json:"ip_address,omitempty"`
+}
+
+// IPAddress holds a single IP address configured on an interface,
+// as defined in the /state.json Mesos HTTP endpoint.
+type IPAddress struct {
 	IPAddress string `json:"ip_address,omitempty"`
 }
 
@@ -123,12 +131,22 @@ var sources = map[string]func(*Task) []string{
 func hostIPs(t *Task) []string { return []string{t.SlaveIP} }
 
 // networkInfoIPs returns IP addresses from a given Task's
-// []Status.ContainerStatus.[]NetworkInfos.IPAddress
+// []Status.ContainerStatus.[]NetworkInfos.[]IPAddresses.IPAddress
 func networkInfoIPs(t *Task) []string {
 	return statusIPs(t.Statuses, func(s *Status) []string {
 		ips := make([]string, len(s.ContainerStatus.NetworkInfos))
-		for i, netinfo := range s.ContainerStatus.NetworkInfos {
-			ips[i] = netinfo.IPAddress
+		for _, netinfo := range s.ContainerStatus.NetworkInfos {
+			if len(netinfo.IPAddresses) > 0 {
+				// In v0.26, we use the IPAddresses field.
+				for _, ipAddress := range netinfo.IPAddresses {
+					ips = append(ips, ipAddress.IPAddress)
+				}
+			} else {
+				// Fall back to v0.25 syntax of single IPAddress if that's being used.
+				if netinfo.IPAddress != "" {
+					ips = append(ips, netinfo.IPAddress)
+				}
+			}
 		}
 		return ips
 	})

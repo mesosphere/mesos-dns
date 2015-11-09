@@ -51,19 +51,44 @@ func TestTask_IPs(t *testing.T) {
 		{nil, []string{}, nil},
 		{nil, []string{"host"}, nil},
 		{ // no IPs for the given sources
-			Task: task(statuses(status(state("TASK_RUNNING"), netinfo("1.2.3.4")))),
+			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4"))))),
 			srcs: []string{"host", "mesos"},
 			want: nil,
 		},
 		{ // unknown IP sources are ignored
-			Task: task(statuses(status(state("TASK_RUNNING"), netinfo("1.2.3.4")))),
+			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4"))))),
 			srcs: []string{"foo", "netinfo", "bar"},
 			want: ips("1.2.3.4"),
+		},
+		{ // multiple IPs on a NetworkInfo
+			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4"), netinfo("2.3.4.5"))))),
+			srcs: []string{"netinfo"},
+			want: ips("1.2.3.4", "2.3.4.5"),
+		},
+		{ // multiple NetworkInfos each with one IP
+			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4", "2.3.4.5"))))),
+			srcs: []string{"netinfo"},
+			want: ips("1.2.3.4", "2.3.4.5"),
+		},
+		{ // back-compat with 0.25 IPAddress format
+			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(oldnetinfo("1.2.3.4"))))),
+			srcs: []string{"netinfo"},
+			want: ips("1.2.3.4"),
+		},
+		{ // check back-compat doesn't break multi-netinfo case
+			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(oldnetinfo(""), netinfo("1.2.3.4"))))),
+			srcs: []string{"netinfo"},
+			want: ips("1.2.3.4"),
+		},
+		{ // check that we prefer 0.26 IPAddresses over 0.25 IPAddress
+			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(oldnewnetinfo("1.2.3.4", "1.2.4.8"))))),
+			srcs: []string{"netinfo"},
+			want: ips("1.2.4.8"),
 		},
 		{ // source order
 			Task: task(
 				slaveIP("2.3.4.5"),
-				statuses(status(state("TASK_RUNNING"), netinfo("1.2.3.4"))),
+				statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4")))),
 			),
 			srcs: []string{"host", "netinfo"},
 			want: ips("2.3.4.5", "1.2.3.4"),
@@ -71,8 +96,8 @@ func TestTask_IPs(t *testing.T) {
 		{ // statuses state
 			Task: task(
 				statuses(
-					status(state("TASK_RUNNING"), netinfo("1.2.3.4")),
-					status(state("TASK_STOPPED"), netinfo("2.3.4.5")),
+					status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4"))),
+					status(state("TASK_STOPPED"), netinfos(netinfo("2.3.4.5"))),
 				),
 			),
 			srcs: []string{"netinfo"},
@@ -81,8 +106,8 @@ func TestTask_IPs(t *testing.T) {
 		{ // statuses ordering
 			Task: task(
 				statuses(
-					status(state("TASK_RUNNING"), netinfo("1.2.3.4"), timestamp(1)),
-					status(state("TASK_RUNNING"), netinfo("1.3.5.7"), timestamp(4)),
+					status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4")), timestamp(1)),
+					status(state("TASK_RUNNING"), netinfos(netinfo("1.3.5.7")), timestamp(4)),
 					status(state("TASK_RUNNING"), labels(DockerIPLabel, "2.3.4.5"), timestamp(3)),
 					status(state("TASK_RUNNING"), labels(DockerIPLabel, "2.4.6.8"), timestamp(5)),
 					status(state("TASK_RUNNING"), labels(DockerIPLabel, "2.5.8.1"), timestamp(2)),
@@ -167,13 +192,33 @@ func state(st string) statusOpt {
 	return func(s *Status) { s.State = st }
 }
 
-func netinfo(ips ...string) statusOpt {
+func netinfos(netinfos ...NetworkInfo) statusOpt {
 	return func(s *Status) {
-		netinfos := &s.ContainerStatus.NetworkInfos
-		for _, ip := range ips {
-			*netinfos = append(*netinfos, NetworkInfo{IPAddress: ip})
-		}
+		s.ContainerStatus.NetworkInfos = append(s.ContainerStatus.NetworkInfos, netinfos...)
 	}
+}
+
+func netinfo(ips ...string) NetworkInfo {
+	netinfo := NetworkInfo{}
+	for _, ip := range ips {
+		netinfo.IPAddresses = append(netinfo.IPAddresses, IPAddress{ip})
+	}
+	return netinfo
+}
+
+// NetworkInfo using v0.25 syntax for storing a single IP.
+func oldnetinfo(ip string) NetworkInfo {
+	netinfo := NetworkInfo{}
+	netinfo.IPAddress = ip
+	return netinfo
+}
+
+// NetworkInfo using both 0.25 and 0.26 syntax for IPs.
+func oldnewnetinfo(oldip string, newip string) NetworkInfo {
+	netinfo := NetworkInfo{}
+	netinfo.IPAddress = oldip
+	netinfo.IPAddresses = append(netinfo.IPAddresses, IPAddress{newip})
+	return netinfo
 }
 
 func timestamp(t float64) statusOpt {
