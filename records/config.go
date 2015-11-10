@@ -23,6 +23,8 @@ type Config struct {
 	// Timeout is the default connect/read/write timeout for outbound
 	// queries
 	Timeout int
+	// Timeout in seconds waiting for the master to return data from StateJson
+	StateTimeoutSeconds int
 	// Zookeeper Detection Timeout: how long in seconds to wait for Zookeeper to
 	// be initially responsive. Default is 30 and 0 means no timeout.
 	ZkDetectionTimeout int
@@ -67,26 +69,27 @@ type Config struct {
 // NewConfig return the default config of the resolver
 func NewConfig() Config {
 	return Config{
-		ZkDetectionTimeout: 30,
-		RefreshSeconds:     60,
-		TTL:                60,
-		Domain:             "mesos",
-		Port:               53,
-		Timeout:            5,
-		SOARname:           "root.ns1.mesos",
-		SOAMname:           "ns1.mesos",
-		SOARefresh:         60,
-		SOARetry:           600,
-		SOAExpire:          86400,
-		SOAMinttl:          60,
-		Resolvers:          []string{"8.8.8.8"},
-		Listener:           "0.0.0.0",
-		HTTPPort:           8123,
-		DNSOn:              true,
-		HTTPOn:             true,
-		ExternalOn:         true,
-		RecurseOn:          true,
-		IPSources:          []string{"netinfo", "mesos", "host"},
+		ZkDetectionTimeout:  30,
+		RefreshSeconds:      60,
+		TTL:                 60,
+		Domain:              "mesos",
+		Port:                53,
+		Timeout:             5,
+		StateTimeoutSeconds: 300,
+		SOARname:            "root.ns1.mesos",
+		SOAMname:            "ns1.mesos",
+		SOARefresh:          60,
+		SOARetry:            600,
+		SOAExpire:           86400,
+		SOAMinttl:           60,
+		Resolvers:           []string{"8.8.8.8"},
+		Listener:            "0.0.0.0",
+		HTTPPort:            8123,
+		DNSOn:               true,
+		HTTPOn:              true,
+		ExternalOn:          true,
+		RecurseOn:           true,
+		IPSources:           []string{"netinfo", "mesos", "host"},
 	}
 }
 
@@ -138,6 +141,7 @@ func SetConfig(cjson string) Config {
 	logging.Verbose.Println("   - DnsOn: ", c.DNSOn)
 	logging.Verbose.Println("   - TTL: ", c.TTL)
 	logging.Verbose.Println("   - Timeout: ", c.Timeout)
+	logging.Verbose.Println("   - StateTimeoutSeconds: ", c.StateTimeoutSeconds)
 	logging.Verbose.Println("   - Resolvers: " + strings.Join(c.Resolvers, ", "))
 	logging.Verbose.Println("   - ExternalOn: ", c.ExternalOn)
 	logging.Verbose.Println("   - SOAMname: " + c.SOAMname)

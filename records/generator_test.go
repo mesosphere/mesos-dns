@@ -3,9 +3,14 @@ package records
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"testing"
 	"testing/quick"
+	"time"
 
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
@@ -265,5 +270,37 @@ func TestHashString(t *testing.T) {
 	fn := func(a, b string) bool { return hashString(a) != hashString(b) }
 	if err := quick.Check(fn, &quick.Config{MaxCount: 1e9}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestTimeout(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Integration test - skipping for short mode.")
+	}
+
+	sleepForeverHandler := func(w http.ResponseWriter, req *http.Request) {
+		req.Close = true
+		notify := w.(http.CloseNotifier).CloseNotify()
+		<-notify
+	}
+	server := httptest.NewServer(http.HandlerFunc(sleepForeverHandler))
+	defer server.Close()
+
+	rg := NewRecordGenerator(500 * time.Millisecond)
+	host, port, err := net.SplitHostPort(server.Listener.Addr().String())
+	_, err = rg.loadFromMaster(host, port)
+	if err == nil {
+		t.Fatal("Expect error because of timeout handler")
+	}
+	urlErr, ok := (err).(*url.Error)
+	if !ok {
+		t.Fatalf("Expected url.Error, instead: %#v", urlErr)
+	}
+	netErr, ok := urlErr.Err.(net.Error)
+	if !ok {
+		t.Fatalf("Expected net.Error, instead: %#v", netErr)
+	}
+	if !netErr.Timeout() {
+		t.Errorf("Did not receive a timeout, instead: %#v", err)
 	}
 }

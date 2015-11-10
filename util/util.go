@@ -52,3 +52,14 @@ func logPanic(r interface{}) {
 	}
 	log.Printf("Recovered from panic: %#v (%v)\n%v", r, r, callers)
 }
+
+// ErrorFunction A function definition that returns an error
+// to be passed to the Ignore or Panic error handler
+type ErrorFunction func() error
+
+// IgnoreError Calls an ErrorFunction, and ignores the result.
+// This allows us to be more explicit when there is no error
+// handling to be done, for example in defers
+func IgnoreError(f ErrorFunction) {
+	_ = f()
+}

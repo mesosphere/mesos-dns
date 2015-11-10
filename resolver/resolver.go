@@ -35,10 +35,12 @@ type Resolver struct {
 
 // New returns a Resolver with the given version and configuration.
 func New(version string, config records.Config) *Resolver {
+	var recordGenerator *records.RecordGenerator
+	recordGenerator = records.NewRecordGenerator(time.Duration(config.StateTimeoutSeconds) * time.Second)
 	r := &Resolver{
 		version: version,
 		config:  config,
-		rs:      &records.RecordGenerator{},
+		rs:      recordGenerator,
 		// rand.Sources aren't safe for concurrent use, except the global one.
 		// See: https://github.com/golang/go/issues/3611
 		rng:     rand.New(&lockedSource{src: rand.NewSource(time.Now().UnixNano())}),
@@ -140,7 +142,7 @@ func (res *Resolver) SetMasters(masters []string) {
 // Reload triggers a new state load from the configured mesos masters.
 // This method is not goroutine-safe.
 func (res *Resolver) Reload() {
-	t := records.RecordGenerator{}
+	t := records.NewRecordGenerator(time.Duration(res.config.StateTimeoutSeconds) * time.Second)
 	err := t.ParseState(res.config, res.masters...)
 
 	if err == nil {
@@ -149,9 +151,9 @@ func (res *Resolver) Reload() {
 		res.rsLock.Lock()
 		defer res.rsLock.Unlock()
 		atomic.StoreUint32(&res.config.SOASerial, timestamp)
-		res.rs = &t
+		res.rs = t
 	} else {
-		logging.VeryVerbose.Println("Warning: master not found; keeping old DNS state")
+		logging.Error.Printf("Warning: Error generating records: %v; keeping old DNS state", err)
 	}
 
 	logging.PrintCurLog()
