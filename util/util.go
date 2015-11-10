@@ -22,7 +22,7 @@ import (
 	"runtime"
 )
 
-// For testing, bypass HandleCrash.
+// ReallyCrash is for testing, to bypass HandleCrash.
 var ReallyCrash bool
 
 // PanicHandlers is a list of functions which will be invoked when a panic happens.
