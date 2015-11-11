@@ -19,8 +19,11 @@ The official distribution and installation channel is pre-compiled binaries avai
 Building the **master** branch from source should always succeed but doesn't provide
 the same stability and compatibility guarantees as releases.
 
-All dependencies are vendored using `Godeps` which require you to
-install it in order to build from source.
+All branches and pull requests are tested by [Circle-CI](https://circleci.com/gh/mesosphere/mesos-dns), which also
+outputs artifacts for Mac OS X, Windows, and Linux via cross-compilation.
+
+You will need [Go](https://golang.org/) *1.5* or later to build the project.
+All dependencies are vendored using `Godeps`. You must first install it in order to build from source.
 
 ```shell
 $ go get github.com/tools/godep

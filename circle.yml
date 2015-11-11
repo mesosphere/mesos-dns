@@ -1,14 +1,29 @@
+machine:
+  pre:
+    - wget https://storage.googleapis.com/golang/go1.5.1.linux-amd64.tar.gz
+    - tar zxvf go1.5.1.linux-amd64.tar.gz
+  environment:
+    GOROOT: ${HOME}/go
+    PATH: ${GOROOT}/bin:${PATH}
+  post:
+    - go version
+
 dependencies:
   pre:
+    - go version
+    - go get github.com/mitchellh/gox
     - go get github.com/tools/godep
     - go get github.com/alecthomas/gometalinter
     - go get github.com/axw/gocov/gocov # https://github.com/golang/go/issues/6909
     - go get github.com/mattn/goveralls
     - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
+    - git describe --tags > VERSION
   post:
     - go install ./...
     - go test -i ./...
     - gometalinter --install
+    - gox -arch=amd64 -os="linux darwin windows" -output="${CIRCLE_ARTIFACTS}/{{.Dir}}-$(<VERSION)-{{.OS}}-{{.Arch}}" -ldflags="-X main.Version=$(<VERSION)"
+
 
 test:
   override:
