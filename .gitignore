@@ -3,3 +3,4 @@ config.json
 mesos-dns
 *.gz
 VERSION
+cov.json
