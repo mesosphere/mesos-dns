@@ -13,10 +13,12 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
 	"github.com/mesosphere/mesos-dns/records/state"
+	"github.com/mesosphere/mesos-dns/util"
 )
 
 // Map host/service name to DNS answer
@@ -27,9 +29,16 @@ type rrs map[string][]string
 // RecordGenerator contains DNS records and methods to access and manipulate
 // them. TODO(kozyraki): Refactor when discovery id is available.
 type RecordGenerator struct {
-	As       rrs
-	SRVs     rrs
-	SlaveIPs map[string]string
+	As         rrs
+	SRVs       rrs
+	SlaveIPs   map[string]string
+	httpClient http.Client
+}
+
+// NewRecordGenerator returns a RecordGenerator that's been configured with a timeout.
+func NewRecordGenerator(httpTimeout time.Duration) *RecordGenerator {
+	rg := &RecordGenerator{httpClient: http.Client{Timeout: httpTimeout}}
+	return rg
 }
 
 // ParseState retrieves and parses the Mesos master /state.json and converts it
@@ -73,8 +82,7 @@ func (rg *RecordGenerator) findMaster(masters ...string) (state.State, error) {
 			logging.Error.Println(err)
 		}
 
-		sj, _ = rg.loadWrap(ip, port)
-		if sj.Leader != "" {
+		if sj, err = rg.loadWrap(ip, port); err == nil && sj.Leader != "" {
 			return sj, nil
 		}
 		logging.Verbose.Println("Warning: Zookeeper is wrong about leader")
@@ -91,13 +99,11 @@ func (rg *RecordGenerator) findMaster(masters ...string) (state.State, error) {
 			logging.Error.Println(err)
 		}
 
-		sj, _ = rg.loadWrap(ip, port)
-		if sj.Leader == "" {
+		if sj, err = rg.loadWrap(ip, port); err == nil && sj.Leader == "" {
 			logging.VeryVerbose.Println("Warning: not a leader - trying next one")
 			if len(masters)-1 == i {
 				return sj, errors.New("no master")
 			}
-
 		} else {
 			return sj, nil
 		}
@@ -108,9 +114,10 @@ func (rg *RecordGenerator) findMaster(masters ...string) (state.State, error) {
 }
 
 // Loads state.json from mesos master
-func (rg *RecordGenerator) loadFromMaster(ip string, port string) (sj state.State) {
+func (rg *RecordGenerator) loadFromMaster(ip string, port string) (state.State, error) {
 	// REFACTOR: state.json security
 
+	var sj state.State
 	u := url.URL{
 		Scheme: "http",
 		Host:   net.JoinHostPort(ip, port),
@@ -120,28 +127,31 @@ func (rg *RecordGenerator) loadFromMaster(ip string, port string) (sj state.Stat
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		logging.Error.Println(err)
+		return state.State{}, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := rg.httpClient.Do(req)
 	if err != nil {
 		logging.Error.Println(err)
+		return state.State{}, err
 	}
 
+	defer util.IgnoreError(resp.Body.Close)
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		logging.Error.Println(err)
+		return state.State{}, err
 	}
-	_ = resp.Body.Close()
 
 	err = json.Unmarshal(body, &sj)
 	if err != nil {
 		logging.Error.Println(err)
+		return state.State{}, err
 	}
 
-	return sj
+	return sj, nil
 }
 
 // Catches an attempt to load state.json from a mesos master
@@ -152,22 +162,17 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (state.State, error)
 	var err error
 	var sj state.State
 
-	defer func() {
-		if rec := recover(); rec != nil {
-			err = errors.New("can't connect to master")
-		}
-
-	}()
-
 	logging.VeryVerbose.Println("reloading from master " + ip)
-	sj = rg.loadFromMaster(ip, port)
-
+	sj, err = rg.loadFromMaster(ip, port)
+	if err != nil {
+		return state.State{}, err
+	}
 	if rip := leaderIP(sj.Leader); rip != ip {
 		logging.VeryVerbose.Println("Warning: master changed to " + ip)
-		sj = rg.loadFromMaster(rip, port)
+		sj, err = rg.loadFromMaster(rip, port)
+		return sj, err
 	}
-
-	return sj, err
+	return sj, nil
 }
 
 // BUG: The probability of hashing collisions is too high with only 17 bits.

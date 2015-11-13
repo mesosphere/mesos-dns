@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -51,4 +52,18 @@ func TestCustomHandleCrash(t *testing.T) {
 	if result != "test" {
 		t.Errorf("did not receive custom handler")
 	}
+}
+
+func returnsError() error {
+	return errors.New("test")
+}
+func TestIgnoreHandler(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatal("IgnoreHandler did not ignore Error")
+		}
+	}()
+
+	IgnoreError(returnsError)
+
 }
