@@ -113,7 +113,7 @@ Also note that there is inherent delay between the election of a new master and 
 
 Mesos-DNS generates A records for itself that list all the IP addresses that Mesos-DNS is listening to. The name for Mesos-DNS can be selected using the `SOAMname` [configuration parameter](configuration-parameters.html). The default name is `ns1.mesos`.
 
-In addition to A and SRV records for Mesos tasks, Mesos-DNS supports requests for SOA and NS records for the Mesos domain. DNS requests for records of other types in the Mesos domain will return `NXDOMAIN`. Mesos-DNS does not support PTR records needed fo reserve lookups. 
+In addition to A and SRV records for Mesos tasks, Mesos-DNS supports requests for SOA and NS records for the Mesos domain. DNS requests for records of other types in the Mesos domain will return `NXDOMAIN`. Mesos-DNS does not support PTR records needed for reverse lookups. 
 
 ## Notes
 
