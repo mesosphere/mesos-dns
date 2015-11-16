@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mesosphere/mesos-dns/errorutil"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
 	"github.com/mesosphere/mesos-dns/records/state"
-	"github.com/mesosphere/mesos-dns/util"
 )
 
 // Map host/service name to DNS answer
@@ -138,7 +138,7 @@ func (rg *RecordGenerator) loadFromMaster(ip string, port string) (state.State, 
 		return state.State{}, err
 	}
 
-	defer util.IgnoreError(resp.Body.Close)
+	defer errorutil.Ignore(resp.Body.Close)
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		logging.Error.Println(err)
