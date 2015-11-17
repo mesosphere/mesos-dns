@@ -395,6 +395,7 @@ func (res *Resolver) handleEmpty(rs *records.RecordGenerator, name string, m, r 
 // compressing the message first and truncating it accordingly.
 func reply(w dns.ResponseWriter, m *dns.Msg) {
 	m.Compress = true // https://github.com/mesosphere/mesos-dns/issues/{170,173,174}
+
 	if err := w.WriteMsg(truncate(m, isUDP(w))); err != nil {
 		logging.Error.Println(err)
 	}
@@ -405,11 +406,40 @@ func isUDP(w dns.ResponseWriter) bool {
 	return strings.HasPrefix(w.RemoteAddr().Network(), "udp")
 }
 
-// truncate sets the TC bit in the given dns.Msg if its length exceeds the
-// permitted length of the given transmission channel.
+// truncate removes answers until the given dns.Msg fits the permitted
+// length of the given transmission channel and sets the TC bit.
 // See https://tools.ietf.org/html/rfc1035#section-4.2.1
 func truncate(m *dns.Msg, udp bool) *dns.Msg {
-	m.Truncated = udp && m.Len() > dns.MinMsgSize
+	max := dns.MinMsgSize
+	if !udp {
+		max = dns.MaxMsgSize
+	} else if opt := m.IsEdns0(); opt != nil {
+		max = int(opt.UDPSize())
+	}
+
+	m.Truncated = m.Len() > max
+	if !m.Truncated {
+		return m
+	}
+
+	m.Extra = nil // Drop all extra records first
+	if m.Len() < max {
+		return m
+	}
+	answers := m.Answer[:]
+	left, right := 0, len(m.Answer)
+	for {
+		if left == right {
+			break
+		}
+		mid := (left + right) / 2
+		m.Answer = answers[:mid]
+		if m.Len() < max {
+			left = mid + 1
+			continue
+		}
+		right = mid
+	}
 	return m
 }
 

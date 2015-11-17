@@ -1,8 +1,10 @@
 package resolver
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -74,7 +76,24 @@ func TestShuffleAnswers(t *testing.T) {
 }
 
 func TestHandlers(t *testing.T) {
-	res := fakeDNS(t)
+	if err := runHandlers(); err != nil {
+		t.Error(err)
+	}
+}
+
+func BenchmarkHandlers(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		if err := runHandlers(); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func runHandlers() error {
+	res, err := fakeDNS()
+	if err != nil {
+		return err
+	}
 	res.fwd = func(m *dns.Msg, net string) (*dns.Msg, error) {
 		rr1, err := res.formatA("google.com.", "1.1.1.1")
 		if err != nil {
@@ -208,15 +227,18 @@ func TestHandlers(t *testing.T) {
 		var rw ResponseRecorder
 		tt.HandlerFunc(&rw, tt.Msg)
 		if got, want := rw.Msg, tt.Msg; !reflect.DeepEqual(got, want) {
-			t.Logf("Test #%d\n%v\n", i, pretty.Sprint(tt.Msg.Question))
-			t.Error(pretty.Compare(got, want))
+			return fmt.Errorf("Test #%d\n%v\n%s\n", i, pretty.Sprint(tt.Msg.Question), pretty.Compare(got, want))
 		}
 	}
+	return nil
 }
 
 func TestHTTP(t *testing.T) {
 	// setup DNS server (just http)
-	res := fakeDNS(t)
+	res, err := fakeDNS()
+	if err != nil {
+		t.Fatal(err)
+	}
 	res.version = "0.1.1"
 
 	res.configureHTTP()
@@ -273,7 +295,7 @@ func TestHTTP(t *testing.T) {
 	}
 }
 
-func fakeDNS(t *testing.T) *Resolver {
+func fakeDNS() (*Resolver, error) {
 	config := records.NewConfig()
 	config.Masters = []string{"144.76.157.37:5050"}
 	config.RecurseOn = false
@@ -284,21 +306,21 @@ func fakeDNS(t *testing.T) *Resolver {
 
 	b, err := ioutil.ReadFile("../factories/fake.json")
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
 	var sj state.State
 	err = json.Unmarshal(b, &sj)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
 	spec := labels.RFC952
 	err = res.rs.InsertState(sj, "mesos", "mesos-dns.mesos.", "127.0.0.1", res.config.Masters, res.config.IPSources, spec)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	return res
+	return res, nil
 }
 
 func onError(abort <-chan struct{}, errCh <-chan error, f func(error)) <-chan struct{} {
@@ -337,4 +359,43 @@ func TestMultiError(t *testing.T) {
 	if expected != actual {
 		t.Fatalf("expected %q instead of %q", expected, actual)
 	}
+}
+
+func TestTruncate(t *testing.T) {
+	tm := newTruncated()
+	if !tm.Truncated {
+		t.Fatal("Message not truncated")
+	}
+	if l := tm.Len(); l > 512 {
+		t.Fatalf("Message to large: %d bytes", l)
+	}
+	tm.Answer = append(tm.Answer, genA(1)...)
+	if l := tm.Len(); l < 512 {
+		t.Fatalf("Message to small after adding answers: %d bytes", l)
+	}
+}
+
+func BenchmarkTruncate(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		newTruncated()
+	}
+}
+
+func newTruncated() *dns.Msg {
+	m := Message(
+		Question("example.com.", dns.TypeA),
+		Header(false, dns.RcodeSuccess),
+		Answers(genA(50)...))
+
+	return truncate(m, true)
+}
+
+func genA(n int) []dns.RR {
+	records := make([]dns.RR, n)
+	ip := []byte{0, 0, 0, 0}
+	for i := 0; i < n; i++ {
+		binary.PutUvarint(ip, uint64(i))
+		records[i] = A(RRHeader("example.com.", dns.TypeA, 60), ip)
+	}
+	return records
 }
