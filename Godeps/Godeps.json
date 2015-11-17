@@ -70,6 +70,10 @@
 			"Rev": "b8dc1cecf15bdaf1988d9e87aa7cd98d899a06d6"
 		},
 		{
+			"ImportPath": "github.com/tv42/zbase32",
+			"Rev": "03389da7e0bf9844767f82690f4d68fc097a1306"
+		},
+		{
 			"ImportPath": "golang.org/x/net/context",
 			"Rev": "db8e4de5b2d6653f66aea53094624468caad15d2"
 		}
