@@ -3,6 +3,7 @@ package records
 import (
 	"encoding/json"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -210,20 +211,20 @@ func TestInsertState(t *testing.T) {
 		{rg.SRVs, "_poseidon._tcp.marathon.mesos.", nil},
 		{rg.SRVs, "_leader._tcp.mesos.", []string{"leader.mesos.:5050"}},
 		{rg.SRVs, "_liquor-store._tcp.marathon.mesos.", []string{
-			"liquor-store-17700-0.marathon.mesos.:80",
-			"liquor-store-17700-0.marathon.mesos.:443",
-			"liquor-store-7581-1.marathon.mesos.:80",
-			"liquor-store-7581-1.marathon.mesos.:443",
+			"liquor-store-4dfjd-0.marathon.mesos.:80",
+			"liquor-store-4dfjd-0.marathon.mesos.:443",
+			"liquor-store-zasmd-1.marathon.mesos.:80",
+			"liquor-store-zasmd-1.marathon.mesos.:443",
 		}},
 		{rg.SRVs, "_liquor-store._udp.marathon.mesos.", nil},
 		{rg.SRVs, "_liquor-store.marathon.mesos.", nil},
 		{rg.SRVs, "_car-store._tcp.marathon.mesos.", []string{
-			"car-store-50548-0.marathon.slave.mesos.:31364",
-			"car-store-50548-0.marathon.slave.mesos.:31365",
+			"car-store-zinaz-0.marathon.slave.mesos.:31364",
+			"car-store-zinaz-0.marathon.slave.mesos.:31365",
 		}},
 		{rg.SRVs, "_car-store._udp.marathon.mesos.", []string{
-			"car-store-50548-0.marathon.slave.mesos.:31364",
-			"car-store-50548-0.marathon.slave.mesos.:31365",
+			"car-store-zinaz-0.marathon.slave.mesos.:31364",
+			"car-store-zinaz-0.marathon.slave.mesos.:31365",
 		}},
 		{rg.SRVs, "_slave._tcp.mesos.", []string{"slave.mesos.:5051"}},
 		{rg.SRVs, "_framework._tcp.marathon.mesos.", []string{"marathon.mesos.:25501"}},
@@ -266,10 +267,28 @@ func TestNTasks(t *testing.T) {
 }
 
 func TestHashString(t *testing.T) {
-	t.Skip("TODO: Increase entropy, fix the bug!")
-	fn := func(a, b string) bool { return hashString(a) != hashString(b) }
-	if err := quick.Check(fn, &quick.Config{MaxCount: 1e9}); err != nil {
-		t.Fatal(err)
+	val := hashString("test")
+	if len(val) != 5 {
+		t.Fatal("Hash length not 5")
+	}
+	if val != "iffe9" {
+		t.Fatal("hashString(test) != iffe9")
+	}
+}
+func TestHashStringCollisions(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Quickcheck - skipping for short mode.")
+	}
+
+	// Quickcheck config with seed from random.org
+	// for deterministic behaviour
+	quickConfig := &quick.Config{
+		MaxCount: 1e7,
+		Rand:     rand.New(rand.NewSource(34553613)),
+	}
+	fn := func(a, b string) bool { return (a == b) || (hashString(a) != hashString(b)) }
+	if err := quick.Check(fn, quickConfig); err != nil {
+		t.Fatal("hashString collision encountered ", err)
 	}
 }
 

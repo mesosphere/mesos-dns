@@ -3,10 +3,10 @@
 package records
 
 import (
+	"crypto/sha1"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -19,6 +19,7 @@ import (
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
 	"github.com/mesosphere/mesos-dns/records/state"
+	"github.com/tv42/zbase32"
 )
 
 // Map host/service name to DNS answer
@@ -175,15 +176,14 @@ func (rg *RecordGenerator) loadWrap(ip string, port string) (state.State, error)
 	return sj, nil
 }
 
-// BUG: The probability of hashing collisions is too high with only 17 bits.
-// NOTE: Using a numerical base as high as valid characters in DNS names would
-// reduce the resulting length without risking more collisions.
+// hashes a given name using a truncated sha1 hash
+// 5 characters extracted from the zbase32 encoded hash provides
+// enough entropy to avoid collisions
+// zbase32: http://philzimmermann.com/docs/human-oriented-base-32-encoding.txt
+// is used to promote human-readable names
 func hashString(s string) string {
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(s))
-	sum := h.Sum32()
-	lower, upper := uint16(sum), uint16(sum>>16)
-	return strconv.FormatUint(uint64(lower+upper), 10)
+	hash := sha1.Sum([]byte(s))
+	return zbase32.EncodeToString(hash[:])[:5]
 }
 
 // attempt to translate the hostname into an IPv4 address. logs an error if IP
