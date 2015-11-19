@@ -15,9 +15,9 @@ Assuming that Mesos-DNS will run on host `192.168.0.100` and uses port `8053`, y
 
 ```
 zone "mesos" {
-type forward;
-forward only;
-forwarders { 192.168.0.100 port 8053; }; 
+  type forward;
+  forward only;
+  forwarders { 192.168.0.100 port 8053; };
 }; 
 ```
 

@@ -10,20 +10,26 @@ The following are suggestions for further performance tuning, focusing primarily
 
 ### Basic Tuning
 
-To increase the number of cores used by Mesos-DNS, set the `GOMAXPROCS` environment variable. For instance, use the following command line to launch Mesos-DNS on 8 cores:
+#### GOMAXPROCS
+In Mesos-DNS 0.5.0, we've moved to Go *1.5*, which automatically sets `GOMAXPROCS` to the number of CPUs that are detected by the Go runtime via `runtime.NumCPU`.
 
-```` 
+In previous versions, it may make sense to increase the number of cores used by Mesos-DNS by setting the `GOMAXPROCS` environment variable. For instance, use the following command line to launch Mesos-DNS on 8 cores:
+
+````
 GOMAXPROCS=8 mesos-dns
 ````
 
+#### Scaling out
 If a single Mesos-DNS server cannot meet the performance requirements in a very large cluster, you can bring up multiple Mesos-DNS servers and configure a subset of the slaves to use each Mesos-DNS server. All Mesos-DNS servers will serve the same settings derived from the Mesos master state. 
 
 
-You should also increase the shell limits for the maximum number of file descriptors and processes. Use `ulimit -a` to check the current settings and, if needed, increase them by executing the following shell commands before launching Mesos-DNS.
+#### Fundamental Operating system limits
+You should also increase the shell limits for the maximum number of file descriptors and processes. Use `ulimit -a` to check the current settings and, if needed, increase them by executing the following shell commands before launching Mesos-DNS. Mesos-DNS uses file descriptors for forwarding queries, making requests to the Mesos master, and keeps FDs open for accepting queries.
 
 ```
 ulimit -n 65536
 ulimit -p 16384
+
 ```
 ### Tuning External Lookups
 

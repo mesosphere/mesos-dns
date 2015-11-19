@@ -17,12 +17,12 @@ For fault tolerance, we ***recommend*** that you use [Marathon](https://mesosphe
 
 ```
 {
-"cmd": "sudo  /usr/local/mesos-dns/mesos-dns -config=/usr/local/mesos-dns/config.json",
-"cpus": 1.0, 
-"mem": 1024,
-"id": "mesos-dns",
-"instances": 1,
-"constraints": [["hostname", "CLUSTER", "10.181.64.13"]]
+    "cmd": "sudo  /usr/local/mesos-dns/mesos-dns -config=/usr/local/mesos-dns/config.json",
+    "cpus": 1.0,
+    "mem": 1024,
+    "id": "mesos-dns",
+    "instances": 1,
+    "constraints": [["hostname", "CLUSTER", "10.181.64.13"]]
 }
 ```
 Note that the `hostname` field refers to the hostname used by the slave when it registers with Mesos. It may not be an IP address or a valid hostname of any kind. You can inspect the hostnames and attributes of slaves on a Mesos cluster through the master web interface. For instance, you can access the `state` REST endpoint with:

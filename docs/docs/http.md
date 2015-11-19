@@ -17,7 +17,10 @@ Lists in JSON format the Mesos-DNS version and source code URL.
 
 ``` console
 $ curl http://10.190.238.173:8123/v1/version
-{"Service":"Mesos-DNS","URL":"https://github.com/mesosphere/mesos-dns","Version":"0.1.1"}
+{
+	"Service":"Mesos-DNS",
+	"URL":"https://github.com/mesosphere/mesos-dns","Version":"0.1.1"
+}
 ```
  
 ## `GET /v1/config`
@@ -50,9 +53,9 @@ Lists in JSON format the IP address(es) that correspond to a hostname. It is the
 ```console
 $ curl http://10.190.238.173:8123/v1/hosts/nginx.marathon.mesos
 [
-{"host":"nginx.marathon.mesos.","ip":"10.249.219.155"},
-{"host":"nginx.marathon.mesos.","ip":"10.190.238.173"},
-{"host":"nginx.marathon.mesos.","ip":"10.156.230.230"}
+	{"host":"nginx.marathon.mesos.","ip":"10.249.219.155"},
+	{"host":"nginx.marathon.mesos.","ip":"10.190.238.173"},
+	{"host":"nginx.marathon.mesos.","ip":"10.156.230.230"}
 ]
 ```
 
@@ -63,9 +66,9 @@ Lists in JSON format the hostname, IP addres, and ports that correspond to a hos
 ```console
 curl http://10.190.238.173:8123/v1/services/_nginx._tcp.marathon.mesos.
 [
-{"host":"nginx-s2.marathon.mesos.","ip":"10.249.219.155","port":"31644","service":"_nginx._tcp.marathon.mesos."},
-{"host":"nginx-s1.marathon.mesos.","ip":"10.190.238.173","port":"31667","service":"_nginx._tcp.marathon.mesos."},
-{"host":"nginx-s0.marathon.mesos.","ip":"10.156.230.230","port":"31880","service":"_nginx._tcp.marathon.mesos."}
+	{"host":"nginx-s2.marathon.mesos.","ip":"10.249.219.155","port":"31644","service":"_nginx._tcp.marathon.mesos."},
+	{"host":"nginx-s1.marathon.mesos.","ip":"10.190.238.173","port":"31667","service":"_nginx._tcp.marathon.mesos."},
+	{"host":"nginx-s0.marathon.mesos.","ip":"10.156.230.230","port":"31880","service":"_nginx._tcp.marathon.mesos."}
 ]
 ```
 
