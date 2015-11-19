@@ -21,14 +21,16 @@ You can customize all fields in the SOA records for the Mesos domain. See the `S
 
 #### Verbose and very verbose modes
 
-If you start Mesos-DNS in verbose mode using the `-v=1` or `-v=2` arguments, it  prints a variety of messages that are useful for debugging and performance tuning. The `-v=2` option will periodically print every A or SRV record Mesos-DNS generates. 
+If you start Mesos-DNS in verbose mode using the `-v=1` or `-v=2` arguments, it  prints a variety of messages that are useful for debugging and performance tuning. The `-v=2` option will periodically print every A or SRV record Mesos-DNS generates. In large clusters, this can overwhelm log management tools, such as [systemd-journald](http://www.freedesktop.org/software/systemd/man/systemd-journald.service.html), and they will drop messages. This is not a viable method to enumerate the state of a Mesos-DNS server.
 
 ---
 
 
 #### Mesos-DNS fails to launch
 
-Make sure that the port used for Mesos-DNS is available and not in use by another process. To use the recommended port `53`, you must start Mesos-DNS as root. 
+Make sure that the port used for Mesos-DNS is available and not in use by another process. To use the recommended port `53`, you must start Mesos-DNS as root.
+
+Alternatively, if you have an operating system and file system that supports [capabilities](http://manpages.ubuntu.com/manpages/hardy/man7/capabilities.7.html), you can run `sudo setcap 'cap_net_bind_service=+ep' mesos-dns`, which will then allow Mesos-DNS to bind to privileged ports, without requiring it to run as root.
 
 ---
 
@@ -54,7 +56,7 @@ Check the configuration file to make sure that Mesos-DNS is configured with the 
 
 #### Updating the configuration file
 
-When you update the configuration file, you need to restart Mesos-DNS. No state is lost on restart as Mesos-DNS is stateless and retrieves task state from the Mesos master(s). 
+When you update the configuration file, you need to restart Mesos-DNS. No state is lost long-term on restart as Mesos-DNS is stateless and retrieves task state from the Mesos master(s). There is a short inconsistency window where records may be missing while the zone is being generated from the state.json.
 
 ---
 

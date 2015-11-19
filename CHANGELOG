@@ -1,3 +1,12 @@
+2015-11-19: v0.5.0
+  Move repo, CI, and build tools to use Go 1.5
+  resolver: Remove answers to fit 512 byte when truncating (#237, #326)
+  generator: Add Timeout when fetching state.json (#243)
+  generator: Fix hashString to introduce a sha1 hash (#157)
+  Add support for Mesos 0.26 "NetworkInfo"
+    -If you use NetworkInfo, in order to upgrade from Mesos 0.25->Mesos 0.26
+     you must use Mesos-DNS 0.5.0
+
 2015-10-09: v0.4.0
   Smarter leading Mesos master detection timeout logic (#284, #306, #320)
   resolver: Fix data races to RNG and SOASerial (#317)
