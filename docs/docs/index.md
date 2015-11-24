@@ -31,6 +31,11 @@ Note that the `hostname` field refers to the hostname used by the slave when it 
 curl http://master_hostname:5050/master/state.json | python -mjson.tool
 ```
 
+### Mesos-DNS with Docker
+If you choose to use Mesos-DNS with Docker, with a version of Mesos after 0.25, be aware that there are some caveats. By default the Docker executor publishes the IP of the Docker container into the NetworkInfo field. Unfortunately, unless you're running some kind of SDN solution, bridged, or host networking with Docker, this can prove to make the containers unreachable.
+
+The default configuration that Mesos-DNS ships with in config.json.sample omits `netinfo` from the sources. The default options if you omit this field from the configuration includes `netinfo`. If you have trouble with Docker, ensure you check the IPSources field to omit netinfo.
+
 ### Slave Setup
 
 To allow Mesos tasks to use Mesos-DNS as the primary DNS server, you must edit the file `/etc/resolv.conf` in every slave and add a new nameserver. For instance, if `mesos-dns` runs on the server with IP address `10.181.64.13`, you should add the line `nameserver 10.181.64.13` at the ***beginning*** of `/etc/resolv.conf` on every slave node. This can be achieve by running:

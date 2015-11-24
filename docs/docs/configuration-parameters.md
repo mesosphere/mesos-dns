@@ -93,7 +93,7 @@ The configured name will always be converted to a FQDN by ensuring it ends with 
 `enforceRFC952` will enforce an older, more strict set of rules for DNS labels. For details, see the [RFC-952](https://tools.ietf.org/html/rfc952). The default value is `false`.
 
 `IPSources` defines a fallback list of IP sources for task records,
-sorted by priority. The default value is: `["netinfo", "mesos", "host"]`
+sorted by priority. If you use **Docker**, and enable the `netinfo` IPSource, it may cause tasks to become unreachable, because after Mesos 0.25, the Docker executor publishes the container's internal IP in NetworkInfo. The default value is: `["netinfo", "mesos", "host"]`
 
 - `host`: Host IP of the Mesos slave where a task is running.
 - `mesos`: Mesos containerizer IP. **DEPRECATED**
