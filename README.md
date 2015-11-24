@@ -30,6 +30,31 @@ $ go get github.com/tools/godep
 $ godep go build ./...
 ```
 
+### Building for release
+#### To do a build:
+1. Cut a branch
+2. Tag it with the relevant version, and push the tags along with the branch
+3. If the build doesn't trigger automatically, go here: https://circleci.com/gh/mesosphere/mesos-dns, find your branch, and trigger the build.
+
+#### If you choose to do a private build:
+1. Fork the repo on Github to a private repo
+2. Customize that repo
+3. Add it to Circle-CI
+
+    Circle-CI allows for private repositories to be kept, and built in private
+4. Go to the build steps.
+
+#### Releasing
+1. Download the artifacts from the Circle-CI builds
+2. Cut a release based on the tag on Github
+3. Upload the artifacts back to Github. Ensure you upload all the artifacts, including the .asc files.
+
+#### Code signing
+This repo using code signing. There is an armored, encrypted gpg key in the repo at build/private.key. This file includes the Mesos-DNS gpg signing key. The passphrase for the key is stored in Circle-CI's environment. This makes it fairly difficult to leak both components without detectable maliciousness.
+
+There are only very few users with access to the private key, and they also have access to a revocation certificate in case the private key leaks.
+
+
 ## Testing
 ```shell
 $ godep go test -race ./...
