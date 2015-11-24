@@ -173,6 +173,15 @@ func runHandlers() error {
 		{
 			res.HandleMesos,
 			Message(
+				Question("_car-store._udp.marathon.mesos.", dns.TypeA),
+				Header(true, dns.RcodeSuccess),
+				NSs(
+					SOA(RRHeader("_car-store._udp.marathon.mesos.", dns.TypeSOA, 60),
+						"ns1.mesos", "root.ns1.mesos", 60))),
+		},
+		{
+			res.HandleMesos,
+			Message(
 				Question("non-existing.mesos.", dns.TypeSOA),
 				Header(true, dns.RcodeSuccess),
 				NSs(
@@ -209,7 +218,7 @@ func runHandlers() error {
 			res.HandleMesos,
 			Message(
 				Question("missing.mesos.", dns.TypeAAAA),
-				Header(true, dns.RcodeNameError),
+				Header(true, dns.RcodeSuccess),
 				NSs(
 					SOA(RRHeader("missing.mesos.", dns.TypeSOA, 60),
 						"ns1.mesos", "root.ns1.mesos", 60))),
