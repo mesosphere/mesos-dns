@@ -16,7 +16,7 @@ dependencies:
     - go get github.com/alecthomas/gometalinter
     - go get github.com/axw/gocov/gocov # https://github.com/golang/go/issues/6909
     - go get github.com/mattn/goveralls
-    - git describe --tags > VERSION
+    - git describe --tags |tee VERSION
     - gpg --yes --batch --import build/private.key
   post:
     - go install ./...
