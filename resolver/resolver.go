@@ -378,7 +378,22 @@ func (res *Resolver) handleEmpty(rs *records.RecordGenerator, name string, m, r 
 	}
 
 	m.Rcode = dns.RcodeNameError
-	if qType == dns.TypeAAAA && len(rs.SRVs[name])+len(rs.As[name]) > 0 {
+
+	// Because we don't implement AAAA records, AAAA queries will always
+	// go via this path
+	// Unfortunately, we don't implement AAAA queries in Mesos-DNS,
+	// and although the 'Not Implemented' error code seems more suitable,
+	// RFCs do not recommend it: https://tools.ietf.org/html/rfc4074
+	// Therefore we always return success, which is synonymous with NODATA
+	// to get a positive cache on no records AAAA
+	// Further information:
+	// PR: https://github.com/mesosphere/mesos-dns/pull/366
+	// Issue: https://github.com/mesosphere/mesos-dns/issues/363
+
+	// The second component is just a matter of returning NODATA if we have
+	// SRV or A records for the given name, but no neccessarily the given query
+
+	if (qType == dns.TypeAAAA) || (len(rs.SRVs[name])+len(rs.As[name]) > 0) {
 		m.Rcode = dns.RcodeSuccess
 	}
 
