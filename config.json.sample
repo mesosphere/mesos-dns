@@ -20,6 +20,6 @@
   "httpon": true,
   "httpport": 8123,
   "externalon": true,
-  "recurseon": true
+  "recurseon": true,
   "IPSources": ["mesos", "host"]
 }
