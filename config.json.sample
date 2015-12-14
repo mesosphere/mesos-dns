@@ -21,5 +21,6 @@
   "httpport": 8123,
   "externalon": true,
   "recurseon": true,
-  "IPSources": ["mesos", "host"]
+  "IPSources": ["mesos", "host"],
+  "EnforceRFC952": false
 }
