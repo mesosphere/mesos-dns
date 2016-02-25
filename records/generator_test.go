@@ -196,6 +196,7 @@ func TestInsertState(t *testing.T) {
 		name string
 		want []string
 	}{
+		{rg.As, "big-dog.marathon.mesos.", []string{"10.3.0.1"}},
 		{rg.As, "liquor-store.marathon.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
 		{rg.As, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
 		{rg.As, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
@@ -208,6 +209,10 @@ func TestInsertState(t *testing.T) {
 		{rg.As, "slave.mesos.", []string{"1.2.3.10", "1.2.3.11", "1.2.3.12"}},
 		{rg.As, "some-box.chronoswithaspaceandmixe.mesos.", []string{"1.2.3.11"}}, // ensure we translate the framework name as well
 		{rg.As, "marathon.mesos.", []string{"1.2.3.11"}},
+		{rg.SRVs, "_big-dog._tcp.marathon.mesos.", []string{
+			"big-dog-4dfjd-0.marathon.mesos.:80",
+			"big-dog-4dfjd-0.marathon.mesos.:443",
+		}},
 		{rg.SRVs, "_poseidon._tcp.marathon.mesos.", nil},
 		{rg.SRVs, "_leader._tcp.mesos.", []string{"leader.mesos.:5050"}},
 		{rg.SRVs, "_liquor-store._tcp.marathon.mesos.", []string{

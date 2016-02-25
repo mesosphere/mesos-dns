@@ -223,7 +223,7 @@
                     "executor_id": "",
                     "framework_id": "20140703-014514-3041283216-5050-5348-0000",
                     "id": "liquor-store.b8db9f73-562f-11e4-a088-c20493233aa5",
-                    "name": "liquor-store",
+                    "name": "liquor.store",
                     "resources": {
                         "cpus": 1,
                         "disk": 0,
@@ -283,7 +283,102 @@
                     "discovery" : {
                         "version" : "1.0",
                         "visibility" : "CLUSTER",
-                        "name" : "liquor-store",
+                        "name" : "liquor.store",
+                        "ports" : {
+                            "ports" : [
+                                {
+                                    "number" : 80,
+                                    "protocol" : "tcp",
+                                    "name" : "http"
+                                },
+                                {
+                                    "number" : 443,
+                                    "protocol" : "tcp",
+                                    "name" : "https"
+                                }
+                            ]
+                        },
+                        "location" : "europe",
+                        "labels" : {
+                            "labels" : [
+                                {
+                                    "key" : "dc",
+                                    "value" : "de1"
+                                },
+                                {
+                                    "key" : "canary",
+                                    "value" : "Teneriffa"
+                                }
+                            ]
+                        },
+                        "environment" : "prod"
+                    }
+                },
+                {
+                    "executor_id": "",
+                    "framework_id": "20140703-014514-3041283216-5050-5348-0000",
+                    "id": "liquor-store.b8db9f73-562f-11e4-a088-c20493233aa5",
+                    "name": "big.dog2",
+                    "resources": {
+                        "cpus": 1,
+                        "disk": 0,
+                        "mem": 1024,
+                        "ports": "[31354-31354, 31355-31355]"
+                    },
+                    "slave_id": "20140803-125133-3041283216-5050-2410-0",
+                    "state": "TASK_RUNNING",
+                    "statuses": [
+                        {
+                            "state": "TASK_RUNNING",
+                            "timestamp": 1413572371.04321,
+                            "labels": [
+                                {
+                                    "key": "foo",
+                                    "value": "bar"
+                                },
+                                {
+                                    "key": "Docker.NetworkSettings.IPAddress",
+                                    "value": "10.3.0.4"
+                                }
+                            ]
+                        },
+                        {
+                            "state": "TASK_RUNNING",
+                            "timestamp": 1413572390.09275,
+                            "labels": [
+                                {
+                                    "key": "foo",
+                                    "value": "bar"
+                                },
+                                {
+                                    "key": "Docker.NetworkSettings.IPAddress",
+                                    "value": "10.3.0.1"
+                                }
+                            ]
+                        },
+                        {
+                            "state": "TASK_RUNNING",
+                            "timestamp": 1413572381.0123,
+                            "labels": [
+                                {
+                                    "key": "foo",
+                                    "value": "bar"
+                                },
+                                {
+                                    "key": "container-ip",
+                                    "value": ""
+                                }
+                            ]
+                        },
+                        {
+                            "state": "TASK_STARTING",
+                            "timestamp": 1413572380.01234
+                        }
+                    ],
+                    "discovery" : {
+                        "version" : "1.0",
+                        "visibility" : "CLUSTER",
+                        "name" : "big.dog",
                         "ports" : {
                             "ports" : [
                                 {
@@ -346,7 +441,7 @@
                     "discovery" : {
                         "version" : "1.0",
                         "visibility" : "CLUSTER",
-                        "name" : "liquor-store",
+                        "name" : "liquor.store",
                         "ports" : {
                             "ports" : [
                                 {
@@ -381,7 +476,7 @@
                     "executor_id": "",
                     "framework_id": "20140703-014514-3041283216-5050-5348-0000",
                     "id": "car-store.43758382-562f-11e4-a088-c20493233aa5",
-                    "name": "car-store",
+                    "name": "car.store",
                     "resources": {
                         "cpus": 1,
                         "disk": 0,
