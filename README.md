@@ -4,10 +4,6 @@ Mesos-DNS enables [DNS](http://en.wikipedia.org/wiki/Domain_Name_System) based s
 ![Architecture
 Diagram](http://mesosphere.github.io/mesos-dns/img/architecture.png)
 
-## Status
-This project is undergoing heavy refactoring, hardening and testing and
-is considered **alpha**. We have adopted a [semantic versioning](http://semver.org/) scheme which clearly communicates its status and progression over time.
-
 ## Compatibility
 `mesos-N` tags mark the start of support for a specific Mesos version while
 maintaining backwards compatibility with the previous major version.
