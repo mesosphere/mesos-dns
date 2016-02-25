@@ -363,78 +363,101 @@ func (rg *RecordGenerator) listenerRecord(listener string, ns string) {
 
 func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec labels.Func, ipSources []string) {
 	for _, f := range sj.Frameworks {
-		fname := labels.DomainFrag(f.Name, labels.Sep, spec)
 
-		// insert taks records
-		tail := "." + domain + "."
 		for _, task := range f.Tasks {
 			var ok bool
 			task.SlaveIP, ok = rg.SlaveIPs[task.SlaveID]
 
-			// skip not running or not discoverable tasks
-			if !ok || (task.State != "TASK_RUNNING") {
-				continue
-			}
-
-			// define context
-			ctx := struct{ taskName, taskID, slaveID, taskIP, slaveIP string }{
-				spec(task.Name),
-				hashString(task.ID),
-				slaveIDTail(task.SlaveID),
-				task.IP(ipSources...),
-				task.SlaveIP,
-			}
-
-			// use DiscoveryInfo name if defined instead of task name
-			if task.HasDiscoveryInfo() {
-				ctx.taskName = task.DiscoveryInfo.Name
-			}
-
-			// insert canonical A records
-			canonical := ctx.taskName + "-" + ctx.taskID + "-" + ctx.slaveID + "." + fname
-			arec := ctx.taskName + "." + fname
-
-			rg.insertRR(arec+tail, ctx.taskIP, "A")
-			rg.insertRR(canonical+tail, ctx.taskIP, "A")
-
-			rg.insertRR(arec+".slave"+tail, ctx.slaveIP, "A")
-			rg.insertRR(canonical+".slave"+tail, ctx.slaveIP, "A")
-
-			// Add RFC 2782 SRV records
-			slaveHost := canonical + ".slave" + tail
-			tcpName := "_" + ctx.taskName + "._tcp." + fname
-			udpName := "_" + ctx.taskName + "._udp." + fname
-			for _, port := range task.Ports() {
-				slaveTarget := slaveHost + ":" + port
-
-				if !task.HasDiscoveryInfo() {
-					rg.insertRR(tcpName+tail, slaveTarget, "SRV")
-					rg.insertRR(udpName+tail, slaveTarget, "SRV")
-				}
-
-				rg.insertRR(tcpName+".slave"+tail, slaveTarget, "SRV")
-				rg.insertRR(udpName+".slave"+tail, slaveTarget, "SRV")
-			}
-
-			if !task.HasDiscoveryInfo() {
-				continue
-			}
-
-			for _, port := range task.DiscoveryInfo.Ports.DiscoveryPorts {
-				target := canonical + tail + ":" + strconv.Itoa(port.Number)
-
-				// use protocol if defined, fallback to tcp+udp
-				proto := spec(port.Protocol)
-				if proto != "" {
-					name := "_" + ctx.taskName + "._" + proto + "." + fname
-					rg.insertRR(name+tail, target, "SRV")
-				} else {
-					rg.insertRR(tcpName+tail, target, "SRV")
-					rg.insertRR(udpName+tail, target, "SRV")
-				}
+			// only do running and discoverable tasks
+			if ok && (task.State == "TASK_RUNNING") {
+				rg.taskRecord(task, f, domain, spec, ipSources)
 			}
 		}
 	}
+}
+
+type context struct {
+	taskName,
+	taskID,
+	slaveID,
+	taskIP,
+	slaveIP string
+}
+
+func (rg *RecordGenerator) taskRecord(task state.Task, f state.Framework, domain string, spec labels.Func, ipSources []string) {
+
+	// define context
+	ctx := context{
+		spec(task.Name),
+		hashString(task.ID),
+		slaveIDTail(task.SlaveID),
+		task.IP(ipSources...),
+		task.SlaveIP,
+	}
+
+	// use DiscoveryInfo name if defined instead of task name
+	if task.HasDiscoveryInfo() {
+		// LEGACY TODO: REMOVE
+		ctx.taskName = task.DiscoveryInfo.Name
+		rg.taskContextRecord(ctx, task, f, domain, spec)
+		// LEGACY, TODO: REMOVE
+
+		ctx.taskName = spec(task.DiscoveryInfo.Name)
+		rg.taskContextRecord(ctx, task, f, domain, spec)
+	} else {
+		rg.taskContextRecord(ctx, task, f, domain, spec)
+	}
+
+}
+func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f state.Framework, domain string, spec labels.Func) {
+	fname := labels.DomainFrag(f.Name, labels.Sep, spec)
+
+	tail := "." + domain + "."
+
+	// insert canonical A records
+	canonical := ctx.taskName + "-" + ctx.taskID + "-" + ctx.slaveID + "." + fname
+	arec := ctx.taskName + "." + fname
+
+	rg.insertRR(arec+tail, ctx.taskIP, "A")
+	rg.insertRR(canonical+tail, ctx.taskIP, "A")
+
+	rg.insertRR(arec+".slave"+tail, ctx.slaveIP, "A")
+	rg.insertRR(canonical+".slave"+tail, ctx.slaveIP, "A")
+
+	// Add RFC 2782 SRV records
+	slaveHost := canonical + ".slave" + tail
+	tcpName := "_" + ctx.taskName + "._tcp." + fname
+	udpName := "_" + ctx.taskName + "._udp." + fname
+	for _, port := range task.Ports() {
+		slaveTarget := slaveHost + ":" + port
+
+		if !task.HasDiscoveryInfo() {
+			rg.insertRR(tcpName+tail, slaveTarget, "SRV")
+			rg.insertRR(udpName+tail, slaveTarget, "SRV")
+		}
+
+		rg.insertRR(tcpName+".slave"+tail, slaveTarget, "SRV")
+		rg.insertRR(udpName+".slave"+tail, slaveTarget, "SRV")
+	}
+
+	if !task.HasDiscoveryInfo() {
+		return
+	}
+
+	for _, port := range task.DiscoveryInfo.Ports.DiscoveryPorts {
+		target := canonical + tail + ":" + strconv.Itoa(port.Number)
+
+		// use protocol if defined, fallback to tcp+udp
+		proto := spec(port.Protocol)
+		if proto != "" {
+			name := "_" + ctx.taskName + "._" + proto + "." + fname
+			rg.insertRR(name+tail, target, "SRV")
+		} else {
+			rg.insertRR(tcpName+tail, target, "SRV")
+			rg.insertRR(udpName+tail, target, "SRV")
+		}
+	}
+
 }
 
 // A records for each local interface
