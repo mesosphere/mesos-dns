@@ -13,24 +13,6 @@ To run Mesos-DNS, you first need to install the `mesos-dns` binary somewhere on 
 sudo mesos-dns -config=config.json & 
 ```
 
-For fault tolerance, we ***recommend*** that you use [Marathon](https://mesosphere.github.io/marathon) to launch Mesos-DNS on one of the Mesos slaves. If Mesos-DNS fails, Marathon will re-launch it immediately, ensuring nearly uninterrupted service. You can select which slave is used for Mesos-DNS with [Marathon constraints](https://github.com/mesosphere/marathon/blob/master/docs/docs/constraints.md) on the slave hostname or any slave attribute. For example, the following json description instructs Marathon to launch Mesos-DNS on the slave with hostname `10.181.64.13`:
-
-```
-{
-    "cmd": "sudo  /usr/local/mesos-dns/mesos-dns -config=/usr/local/mesos-dns/config.json",
-    "cpus": 1.0,
-    "mem": 1024,
-    "id": "mesos-dns",
-    "instances": 1,
-    "constraints": [["hostname", "CLUSTER", "10.181.64.13"]]
-}
-```
-Note that the `hostname` field refers to the hostname used by the slave when it registers with Mesos. It may not be an IP address or a valid hostname of any kind. You can inspect the hostnames and attributes of slaves on a Mesos cluster through the master web interface. For instance, you can access the `state` REST endpoint with:
-
-```
-curl http://master_hostname:5050/master/state.json | python -mjson.tool
-```
-
 ### Mesos-DNS with Docker
 If you choose to use Mesos-DNS with Docker, with a version of Mesos after 0.25, be aware that there are some caveats. By default the Docker executor publishes the IP of the Docker container into the NetworkInfo field. Unfortunately, unless you're running some kind of SDN solution, bridged, or host networking with Docker, this can prove to make the containers unreachable.
 
