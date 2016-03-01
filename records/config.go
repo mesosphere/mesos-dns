@@ -64,6 +64,8 @@ type Config struct {
 	ExternalOn bool
 	// EnforceRFC952 will enforce an older, more strict set of rules for DNS labels
 	EnforceRFC952 bool
+	// Enumeration enabled via the API enumeration endpoint
+	EnumerationOn bool
 }
 
 // NewConfig return the default config of the resolver
@@ -90,6 +92,7 @@ func NewConfig() Config {
 		ExternalOn:          true,
 		RecurseOn:           true,
 		IPSources:           []string{"netinfo", "mesos", "host"},
+		EnumerationOn:       true,
 	}
 }
 
@@ -157,6 +160,7 @@ func SetConfig(cjson string) Config {
 	logging.Verbose.Println("   - ConfigFile: ", c.File)
 	logging.Verbose.Println("   - EnforceRFC952: ", c.EnforceRFC952)
 	logging.Verbose.Println("   - IPSources: ", c.IPSources)
+	logging.Verbose.Println("   - EnumerationOn", c.EnumerationOn)
 
 	return *c
 }

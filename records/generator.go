@@ -33,7 +33,34 @@ type RecordGenerator struct {
 	As         rrs
 	SRVs       rrs
 	SlaveIPs   map[string]string
+	EnumData   EnumerationData
 	httpClient http.Client
+}
+
+// EnumerableRecord is the lowest level object, and should map 1:1 with DNS records
+type EnumerableRecord struct {
+	Name  string `json:"name"`
+	Host  string `json:"host"`
+	Rtype string `json:"rtype"`
+}
+
+// EnumerableTask consists of the records derived from a task
+type EnumerableTask struct {
+	Name    string             `json:"name"`
+	ID      string             `json:"id"`
+	Records []EnumerableRecord `json:"records"`
+}
+
+// EnumerableFramework is consistent of enumerable tasks, and include the name of the framework
+type EnumerableFramework struct {
+	Tasks []*EnumerableTask `json:"tasks"`
+	Name  string            `json:"name"`
+}
+
+// EnumerationData is the top level container pointing to the
+// enumerable frameworks containing enumerable tasks
+type EnumerationData struct {
+	Frameworks []*EnumerableFramework `json:"frameworks"`
 }
 
 // NewRecordGenerator returns a RecordGenerator that's been configured with a timeout.
@@ -363,6 +390,8 @@ func (rg *RecordGenerator) listenerRecord(listener string, ns string) {
 
 func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec labels.Func, ipSources []string) {
 	for _, f := range sj.Frameworks {
+		enumerableFramework := &EnumerableFramework{Name: f.Name}
+		rg.EnumData.Frameworks = append(rg.EnumData.Frameworks, enumerableFramework)
 
 		for _, task := range f.Tasks {
 			var ok bool
@@ -370,7 +399,7 @@ func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec label
 
 			// only do running and discoverable tasks
 			if ok && (task.State == "TASK_RUNNING") {
-				rg.taskRecord(task, f, domain, spec, ipSources)
+				rg.taskRecord(task, f, domain, spec, ipSources, enumerableFramework)
 			}
 		}
 	}
@@ -384,7 +413,11 @@ type context struct {
 	slaveIP string
 }
 
-func (rg *RecordGenerator) taskRecord(task state.Task, f state.Framework, domain string, spec labels.Func, ipSources []string) {
+func (rg *RecordGenerator) taskRecord(task state.Task, f state.Framework, domain string, spec labels.Func, ipSources []string, enumFW *EnumerableFramework) {
+
+	newTask := &EnumerableTask{ID: task.ID, Name: task.Name}
+
+	enumFW.Tasks = append(enumFW.Tasks, newTask)
 
 	// define context
 	ctx := context{
@@ -399,17 +432,17 @@ func (rg *RecordGenerator) taskRecord(task state.Task, f state.Framework, domain
 	if task.HasDiscoveryInfo() {
 		// LEGACY TODO: REMOVE
 		ctx.taskName = task.DiscoveryInfo.Name
-		rg.taskContextRecord(ctx, task, f, domain, spec)
+		rg.taskContextRecord(ctx, task, f, domain, spec, newTask)
 		// LEGACY, TODO: REMOVE
 
 		ctx.taskName = spec(task.DiscoveryInfo.Name)
-		rg.taskContextRecord(ctx, task, f, domain, spec)
+		rg.taskContextRecord(ctx, task, f, domain, spec, newTask)
 	} else {
-		rg.taskContextRecord(ctx, task, f, domain, spec)
+		rg.taskContextRecord(ctx, task, f, domain, spec, newTask)
 	}
 
 }
-func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f state.Framework, domain string, spec labels.Func) {
+func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f state.Framework, domain string, spec labels.Func, enumTask *EnumerableTask) {
 	fname := labels.DomainFrag(f.Name, labels.Sep, spec)
 
 	tail := "." + domain + "."
@@ -418,11 +451,11 @@ func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f sta
 	canonical := ctx.taskName + "-" + ctx.taskID + "-" + ctx.slaveID + "." + fname
 	arec := ctx.taskName + "." + fname
 
-	rg.insertRR(arec+tail, ctx.taskIP, "A")
-	rg.insertRR(canonical+tail, ctx.taskIP, "A")
+	rg.insertTaskRR(arec+tail, ctx.taskIP, "A", enumTask)
+	rg.insertTaskRR(canonical+tail, ctx.taskIP, "A", enumTask)
 
-	rg.insertRR(arec+".slave"+tail, ctx.slaveIP, "A")
-	rg.insertRR(canonical+".slave"+tail, ctx.slaveIP, "A")
+	rg.insertTaskRR(arec+".slave"+tail, ctx.slaveIP, "A", enumTask)
+	rg.insertTaskRR(canonical+".slave"+tail, ctx.slaveIP, "A", enumTask)
 
 	// Add RFC 2782 SRV records
 	slaveHost := canonical + ".slave" + tail
@@ -432,12 +465,12 @@ func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f sta
 		slaveTarget := slaveHost + ":" + port
 
 		if !task.HasDiscoveryInfo() {
-			rg.insertRR(tcpName+tail, slaveTarget, "SRV")
-			rg.insertRR(udpName+tail, slaveTarget, "SRV")
+			rg.insertTaskRR(tcpName+tail, slaveTarget, "SRV", enumTask)
+			rg.insertTaskRR(udpName+tail, slaveTarget, "SRV", enumTask)
 		}
 
-		rg.insertRR(tcpName+".slave"+tail, slaveTarget, "SRV")
-		rg.insertRR(udpName+".slave"+tail, slaveTarget, "SRV")
+		rg.insertTaskRR(tcpName+".slave"+tail, slaveTarget, "SRV", enumTask)
+		rg.insertTaskRR(udpName+".slave"+tail, slaveTarget, "SRV", enumTask)
 	}
 
 	if !task.HasDiscoveryInfo() {
@@ -451,10 +484,10 @@ func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f sta
 		proto := spec(port.Protocol)
 		if proto != "" {
 			name := "_" + ctx.taskName + "._" + proto + "." + fname
-			rg.insertRR(name+tail, target, "SRV")
+			rg.insertTaskRR(name+tail, target, "SRV", enumTask)
 		} else {
-			rg.insertRR(tcpName+tail, target, "SRV")
-			rg.insertRR(udpName+tail, target, "SRV")
+			rg.insertTaskRR(tcpName+tail, target, "SRV", enumTask)
+			rg.insertTaskRR(udpName+tail, target, "SRV", enumTask)
 		}
 	}
 
@@ -528,6 +561,11 @@ func (rg *RecordGenerator) exists(name, host, rtype string) bool {
 // insertRR adds a record to the appropriate record map for the given name/host pair,
 // but only if the pair is unique. returns true if added, false otherwise.
 // TODO(???): REFACTOR when storage is updated
+func (rg *RecordGenerator) insertTaskRR(name, host, rtype string, enumTask *EnumerableTask) bool {
+	enumRecord := EnumerableRecord{Name: name, Host: host, Rtype: rtype}
+	enumTask.Records = append(enumTask.Records, enumRecord)
+	return rg.insertRR(name, host, rtype)
+}
 func (rg *RecordGenerator) insertRR(name, host, rtype string) bool {
 	if host == "" || rg.exists(name, host, rtype) {
 		return false
