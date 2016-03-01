@@ -466,6 +466,9 @@ func (res *Resolver) configureHTTP() {
 	ws.Route(ws.GET("/v1/hosts/{host}").To(res.RestHost))
 	ws.Route(ws.GET("/v1/hosts/{host}/ports").To(res.RestPorts))
 	ws.Route(ws.GET("/v1/services/{service}").To(res.RestService))
+	if res.config.EnumerationOn {
+		ws.Route(ws.GET("/v1/enumerate").To(res.RestEnumerate))
+	}
 	restful.Add(ws)
 }
 
@@ -494,6 +497,15 @@ func (res *Resolver) LaunchHTTP() <-chan error {
 // RestConfig handles HTTP requests of Resolver configuration.
 func (res *Resolver) RestConfig(req *restful.Request, resp *restful.Response) {
 	if err := resp.WriteAsJson(res.config); err != nil {
+		logging.Error.Println(err)
+	}
+}
+
+// RestEnumerate handles HTTP requests of the enumeration data
+func (res *Resolver) RestEnumerate(req *restful.Request, resp *restful.Response) {
+
+	enumData := res.records().EnumData
+	if err := resp.WriteAsJson(enumData); err != nil {
 		logging.Error.Println(err)
 	}
 }

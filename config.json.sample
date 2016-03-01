@@ -22,5 +22,6 @@
   "externalon": true,
   "recurseon": true,
   "IPSources": ["mesos", "host"],
-  "EnforceRFC952": false
+  "EnforceRFC952": false,
+  "EnumerationOn": true
 }
