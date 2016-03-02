@@ -147,10 +147,6 @@ func runHandlers() error {
 				Extras(
 					A(RRHeader("liquor-store-4dfjd-0.marathon.mesos.", dns.TypeA, 60),
 						net.ParseIP("10.3.0.1")),
-					A(RRHeader("liquor-store-4dfjd-0.marathon.mesos.", dns.TypeA, 60),
-						net.ParseIP("10.3.0.1")),
-					A(RRHeader("liquor-store-zasmd-1.marathon.mesos.", dns.TypeA, 60),
-						net.ParseIP("10.3.0.2")),
 					A(RRHeader("liquor-store-zasmd-1.marathon.mesos.", dns.TypeA, 60),
 						net.ParseIP("10.3.0.2")))),
 		},
@@ -165,8 +161,6 @@ func runHandlers() error {
 					SRV(RRHeader("_car-store._udp.marathon.mesos.", dns.TypeSRV, 60),
 						"car-store-zinaz-0.marathon.slave.mesos.", 31364, 0, 0)),
 				Extras(
-					A(RRHeader("car-store-zinaz-0.marathon.slave.mesos.", dns.TypeA, 60),
-						net.ParseIP("1.2.3.11")),
 					A(RRHeader("car-store-zinaz-0.marathon.slave.mesos.", dns.TypeA, 60),
 						net.ParseIP("1.2.3.11")))),
 		},
@@ -235,11 +229,64 @@ func runHandlers() error {
 	} {
 		var rw ResponseRecorder
 		tt.HandlerFunc(&rw, tt.Msg)
-		if got, want := rw.Msg, tt.Msg; !reflect.DeepEqual(got, want) {
+		if got, want := rw.Msg, tt.Msg; !(Msg{got}).equivalent(Msg{want}) {
 			return fmt.Errorf("Test #%d\n%v\n%s\n", i, pretty.Sprint(tt.Msg.Question), pretty.Compare(got, want))
 		}
 	}
 	return nil
+}
+
+type Msg struct{ *dns.Msg }
+type RRs []dns.RR
+
+func (m Msg) equivalent(other Msg) bool {
+	if m.Msg == nil || other.Msg == nil {
+		return m.Msg == other.Msg
+	}
+	return m.MsgHdr == other.MsgHdr &&
+		m.Compress == other.Compress &&
+		reflect.DeepEqual(m.Question, other.Question) &&
+		RRs(m.Ns).equivalent(RRs(other.Ns)) &&
+		RRs(m.Answer).equivalent(RRs(other.Answer)) &&
+		RRs(m.Extra).equivalent(RRs(other.Extra))
+}
+
+// equivalent RRs have the same records, but not necessarily in the same order
+func (rr RRs) equivalent(other RRs) bool {
+	if rr == nil || other == nil {
+		return rr == nil && other == nil
+	}
+	type key struct {
+		header dns.RR_Header
+		text   string
+	}
+
+	rrhash := make(map[string]struct{}, len(rr))
+	for i := range rr {
+		var k key
+		header := rr[i].Header()
+		if header != nil {
+			k.header = *header
+		}
+		k.text = rr[i].String()
+		s := fmt.Sprintf("%+v", k)
+		rrhash[s] = struct{}{}
+	}
+
+	for i := range other {
+		var k key
+		header := other[i].Header()
+		if header != nil {
+			k.header = *header
+		}
+		k.text = other[i].String()
+		s := fmt.Sprintf("%+v", k)
+		if _, ok := rrhash[s]; !ok {
+			return false
+		}
+		delete(rrhash, s)
+	}
+	return len(rrhash) == 0
 }
 
 func TestHTTP(t *testing.T) {

@@ -322,7 +322,8 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 
 func (res *Resolver) handleSRV(rs *records.RecordGenerator, name string, m, r *dns.Msg) error {
 	var errs multiError
-	for _, srv := range rs.SRVs[name] {
+	added := map[string]struct{}{} // track the A RR's we've already added, avoid dups
+	for srv := range rs.SRVs[name] {
 		srvRR, err := res.formatSRV(r.Question[0].Name, srv)
 		if err != nil {
 			errs.Add(err)
@@ -331,24 +332,30 @@ func (res *Resolver) handleSRV(rs *records.RecordGenerator, name string, m, r *d
 
 		m.Answer = append(m.Answer, srvRR)
 		host := strings.Split(srv, ":")[0]
+		if _, found := added[host]; found {
+			// avoid dups
+			continue
+		}
 		if len(rs.As[host]) == 0 {
 			continue
 		}
 
-		aRR, err := res.formatA(host, rs.As[host][0])
-		if err != nil {
-			errs.Add(err)
-			continue
+		if a, ok := rs.As.First(host); ok {
+			aRR, err := res.formatA(host, a)
+			if err != nil {
+				errs.Add(err)
+				continue
+			}
+			m.Extra = append(m.Extra, aRR)
+			added[host] = struct{}{}
 		}
-
-		m.Extra = append(m.Extra, aRR)
 	}
 	return errs
 }
 
 func (res *Resolver) handleA(rs *records.RecordGenerator, name string, m *dns.Msg) error {
 	var errs multiError
-	for _, a := range rs.As[name] {
+	for a := range rs.As[name] {
 		rr, err := res.formatA(name, a)
 		if err != nil {
 			errs.Add(err)
@@ -539,7 +546,7 @@ func (res *Resolver) RestHost(req *restful.Request, resp *restful.Response) {
 
 	aRRs := rs.As[dom]
 	records := make([]record, 0, len(aRRs))
-	for _, ip := range aRRs {
+	for ip := range aRRs {
 		records = append(records, record{dom, ip})
 	}
 
@@ -595,11 +602,11 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 
 	srvRRs := rs.SRVs[dom]
 	records := make([]record, 0, len(srvRRs))
-	for _, s := range srvRRs {
+	for s := range srvRRs {
 		host, port, _ := net.SplitHostPort(s)
 		var ip string
-		if r := rs.As[host]; len(r) != 0 {
-			ip = r[0]
+		if r, ok := rs.As.First(host); ok {
+			ip = r
 		}
 		records = append(records, record{service, host, ip, port})
 	}
