@@ -235,6 +235,14 @@ func TestInsertState(t *testing.T) {
 		}},
 		{rg.SRVs, "_liquor-store._udp.marathon.mesos.", nil},
 		{rg.SRVs, "_liquor-store.marathon.mesos.", nil},
+		{rg.SRVs, "_https._liquor-store._tcp.marathon.mesos.", []string{
+			"liquor-store-4dfjd-0.marathon.mesos.:443",
+			"liquor-store-zasmd-1.marathon.mesos.:443",
+		}},
+		{rg.SRVs, "_http._liquor-store._tcp.marathon.mesos.", []string{
+			"liquor-store-4dfjd-0.marathon.mesos.:80",
+			"liquor-store-zasmd-1.marathon.mesos.:80",
+		}},
 		{rg.SRVs, "_car-store._tcp.marathon.mesos.", []string{
 			"car-store-zinaz-0.marathon.slave.mesos.:31364",
 			"car-store-zinaz-0.marathon.slave.mesos.:31365",

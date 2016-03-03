@@ -503,20 +503,32 @@ func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f sta
 	rg.insertTaskRR(arec+".slave"+tail, ctx.slaveIP, A, enumTask)
 	rg.insertTaskRR(canonical+".slave"+tail, ctx.slaveIP, A, enumTask)
 
+	// recordName generates records for ctx.taskName, given some generation chain
+	recordName := func(gen chain) { gen("_" + ctx.taskName) }
+
+	// asSRV is always the last link in a chain, it must insert RR's
+	asSRV := func(target string) chain {
+		return func(records ...string) {
+			for i := range records {
+				name := records[i] + tail
+				rg.insertTaskRR(name, target, SRV, enumTask)
+			}
+		}
+	}
+
 	// Add RFC 2782 SRV records
+	var subdomains []string
+	if task.HasDiscoveryInfo() {
+		subdomains = []string{"slave"}
+	} else {
+		subdomains = []string{"slave", domainNone}
+	}
+
 	slaveHost := canonical + ".slave" + tail
-	tcpName := "_" + ctx.taskName + "._tcp." + fname
-	udpName := "_" + ctx.taskName + "._udp." + fname
 	for _, port := range task.Ports() {
 		slaveTarget := slaveHost + ":" + port
-
-		if !task.HasDiscoveryInfo() {
-			rg.insertTaskRR(tcpName+tail, slaveTarget, SRV, enumTask)
-			rg.insertTaskRR(udpName+tail, slaveTarget, SRV, enumTask)
-		}
-
-		rg.insertTaskRR(tcpName+".slave"+tail, slaveTarget, SRV, enumTask)
-		rg.insertTaskRR(udpName+".slave"+tail, slaveTarget, SRV, enumTask)
+		recordName(withProtocol(protocolNone, fname, spec,
+			withSubdomains(subdomains, asSRV(slaveTarget))))
 	}
 
 	if !task.HasDiscoveryInfo() {
@@ -525,31 +537,9 @@ func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f sta
 
 	for _, port := range task.DiscoveryInfo.Ports.DiscoveryPorts {
 		target := canonical + tail + ":" + strconv.Itoa(port.Number)
-
-		// special SRV records if a discovery port has a name
-		if portName := spec(port.Name); portName != "" {
-			// _portName._protocol.taskName.fname.tail
-			protocols := []string{"tcp", "udp"}
-			if customProto := spec(port.Protocol); customProto != "" {
-				protocols = []string{customProto}
-			}
-			for _, proto := range protocols {
-				name := "_" + portName + "._" + proto + "." + ctx.taskName + "." + fname
-				rg.insertTaskRR(name+tail, target, SRV, enumTask)
-			}
-		}
-
-		// use protocol if defined, fallback to tcp+udp
-		proto := spec(port.Protocol)
-		if proto != "" {
-			name := "_" + ctx.taskName + "._" + proto + "." + fname
-			rg.insertTaskRR(name+tail, target, SRV, enumTask)
-		} else {
-			rg.insertTaskRR(tcpName+tail, target, SRV, enumTask)
-			rg.insertTaskRR(udpName+tail, target, SRV, enumTask)
-		}
+		recordName(withProtocol(port.Protocol, fname, spec,
+			withNamedPort(port.Name, spec, asSRV(target))))
 	}
-
 }
 
 // A records for each local interface
