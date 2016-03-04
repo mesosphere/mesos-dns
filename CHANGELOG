@@ -1,3 +1,11 @@
+2016-03-04: v0.5.2
+  Add EnforceRFC952 to sample config
+  Improve performance of record generation
+  Fix bug in DiscoveryInfo to use the same scheme for record creation
+    as normal records (#377)
+  Add enumeration API (#402)
+  Generate additional SRV records if DiscoveryInfo port name is specified
+
 2015-11-25: v0.5.1
   Add code signing to CI portion of repo
   documentation: Try to alleviate issues around IPSources
