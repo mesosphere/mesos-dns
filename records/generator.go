@@ -170,7 +170,7 @@ func (rg *RecordGenerator) ParseState(c Config, masters ...string) error {
 	// find master -- return if error
 	sj, err := rg.findMaster(masters...)
 	if err != nil {
-		logging.Error.Println("no master")
+		logging.Error.Println("Failed to fetch state.json. Error: ", err)
 		return err
 	}
 	if sj.Leader == "" {
@@ -203,36 +203,34 @@ func (rg *RecordGenerator) findMaster(masters ...string) (state.State, error) {
 		ip, port, err := getProto(leader)
 		if err != nil {
 			logging.Error.Println(err)
+		} else {
+			if sj, err = rg.loadWrap(ip, port); err == nil {
+				return sj, nil
+			}
+			logging.Error.Println("Failed to fetch state.json from leader. Error: ", err)
+			if len(masters) == 0 {
+				return sj, errors.New("No more masters to try")
+			}
+			logging.Error.Println("Falling back to remaining masters: ", masters)
 		}
-
-		if sj, err = rg.loadWrap(ip, port); err == nil && sj.Leader != "" {
-			return sj, nil
-		}
-		logging.Verbose.Println("Warning: Zookeeper is wrong about leader, or request failed")
-		if len(masters) == 0 {
-			return sj, errors.New("no master")
-		}
-		logging.Verbose.Println("Warning: falling back to Masters config field: ", masters)
 	}
 
 	// try each listed mesos master before dying
-	for i, master := range masters {
+	for _, master := range masters {
 		ip, port, err := getProto(master)
 		if err != nil {
 			logging.Error.Println(err)
+			continue
 		}
 
-		if sj, err = rg.loadWrap(ip, port); err == nil && sj.Leader == "" {
-			logging.VeryVerbose.Println("Warning: not a leader - trying next one")
-			if len(masters)-1 == i {
-				return sj, errors.New("no master")
-			}
-		} else {
-			return sj, nil
+		if sj, err = rg.loadWrap(ip, port); err != nil {
+			logging.Error.Println("Failed to fetch state.json - trying next one. Error: ", err)
+			continue
 		}
+		return sj, nil
 	}
 
-	return sj, errors.New("no master")
+	return sj, errors.New("No more masters eligible for state.json query")
 }
 
 // Loads state.json from mesos master
@@ -286,12 +284,21 @@ func (rg *RecordGenerator) loadWrap(ip, port string) (state.State, error) {
 	if err != nil {
 		return state.State{}, err
 	}
-	if rip := leaderIP(sj.Leader); rip != ip {
-		logging.VeryVerbose.Println("Warning: master changed to " + ip)
-		sj, err = rg.loadFromMaster(rip, port)
-		return sj, err
+	if sj.Leader != "" {
+		var stateLeaderIP string
+
+		stateLeaderIP, err = leaderIP(sj.Leader)
+		if err != nil {
+			return sj, err
+		}
+		if stateLeaderIP != ip {
+			logging.VeryVerbose.Println("Warning: master changed to " + stateLeaderIP)
+			return rg.loadFromMaster(stateLeaderIP, port)
+		}
+		return sj, nil
 	}
-	return sj, nil
+	err = errors.New("Fetched state.json does not contain leader information")
+	return sj, err
 }
 
 // hashes a given name using a truncated sha1 hash
@@ -653,9 +660,17 @@ func (rg *RecordGenerator) insertRR(name, host string, kind rrsKind) (added bool
 
 // leaderIP returns the ip for the mesos master
 // input format master@ip:port
-func leaderIP(leader string) string {
-	pair := strings.Split(leader, "@")[1]
-	return strings.Split(pair, ":")[0]
+func leaderIP(leader string) (string, error) {
+	nameAddressPair := strings.Split(leader, "@")
+	if len(nameAddressPair) != 2 {
+		return "", errors.New("Invalid leader address: " + leader)
+	}
+	hostPort := nameAddressPair[1]
+	host, _, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return "", err
+	}
+	return host, nil
 }
 
 // return the slave number from a Mesos slave id
