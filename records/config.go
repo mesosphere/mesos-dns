@@ -1,10 +1,12 @@
 package records
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,7 +51,7 @@ type Config struct {
 	IPSources []string // e.g. ["host", "docker", "mesos", "rkt"]
 	// Zookeeper: a single Zk url
 	Zk string
-	//  Domain: name of the domain used (default "mesos", ie .mesos domain)
+	// Domain: name of the domain used (default "mesos", ie .mesos domain)
 	Domain string
 	// File is the location of the config.json file
 	File string
@@ -68,6 +70,28 @@ type Config struct {
 	EnforceRFC952 bool
 	// Enumeration enabled via the API enumeration endpoint
 	EnumerationOn bool
+	// Communicate with Mesos using HTTPS if set to true
+	MesosHTTPSOn bool
+	// CA certificate to use to verify Mesos Master certificate
+	CACertFile string
+	// IAM Config File
+	IAMConfigFile string
+
+	caPool *x509.CertPool
+
+	iamConfig *IAMConfig
+}
+
+type IAMConfig struct {
+	ID string `json:"uid"`
+
+	Secret string `json:"secret"`
+
+	Password string `json:"password"`
+
+	LoginEndpoint string `json:"login_endpoint"`
+
+	loginURL *url.URL
 }
 
 // NewConfig return the default config of the resolver
@@ -135,6 +159,48 @@ func SetConfig(cjson string) Config {
 	c.SOAMname = strings.TrimRight(c.SOAMname, ".") + "."
 	c.SOASerial = uint32(time.Now().Unix())
 
+	if c.CACertFile != "" {
+		f, err := os.Open(c.CACertFile)
+		if err != nil {
+			logging.Error.Fatalf("CACertFile open failed: %v", err)
+		}
+		defer f.Close()
+
+		b, err := ioutil.ReadAll(f)
+		if err != nil {
+			logging.Error.Fatalf("CACertFile read failed: %v", err)
+		}
+
+		caPool := x509.NewCertPool()
+		if !caPool.AppendCertsFromPEM(b) {
+			logging.Error.Fatal("CACertFile parsing failed")
+		}
+		c.caPool = caPool
+	}
+
+	if c.IAMConfigFile != "" {
+		f, err := os.Open(c.IAMConfigFile)
+		if err != nil {
+			logging.Error.Fatalf("IAMConfigFile open failed: %v", err)
+		}
+		defer f.Close()
+
+		dec := json.NewDecoder(f)
+		var iamConfig IAMConfig
+		err = dec.Decode(&iamConfig)
+		if err != nil {
+			logging.Error.Fatalf("IAMConfig decode failed: %v", err)
+		}
+
+		u, err := url.Parse(iamConfig.LoginEndpoint)
+		if err != nil {
+			logging.Error.Fatalf("IAMConfig login endpoint: %v", err)
+		}
+		iamConfig.loginURL = u
+
+		c.iamConfig = &iamConfig
+	}
+
 	// print configuration file
 	logging.Verbose.Println("Mesos-DNS configuration:")
 	logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
@@ -165,6 +231,9 @@ func SetConfig(cjson string) Config {
 	logging.Verbose.Println("   - EnforceRFC952: ", c.EnforceRFC952)
 	logging.Verbose.Println("   - IPSources: ", c.IPSources)
 	logging.Verbose.Println("   - EnumerationOn", c.EnumerationOn)
+	logging.Verbose.Println("   - MesosHTTPSOn", c.MesosHTTPSOn)
+	logging.Verbose.Println("   - CACertFile", c.CACertFile)
+	logging.Verbose.Println("   - IAMConfigFile", c.IAMConfigFile)
 
 	return *c
 }

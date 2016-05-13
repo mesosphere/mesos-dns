@@ -3,7 +3,9 @@
 package records
 
 import (
+	"bytes"
 	"crypto/sha1"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +15,9 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/mesosphere/mesos-dns/errorutil"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/models"
@@ -94,7 +98,8 @@ type RecordGenerator struct {
 	SRVs       rrs
 	SlaveIPs   map[string]string
 	EnumData   EnumerationData
-	httpClient *http.Client
+	httpClient httpClientDoer
+	httpScheme string
 }
 
 // EnumerableRecord is the lowest level object, and should map 1:1 with DNS records
@@ -124,15 +129,110 @@ type EnumerationData struct {
 }
 
 // NewRecordGenerator returns a RecordGenerator that's been configured with a timeout.
-func NewRecordGenerator(httpClient *http.Client) *RecordGenerator {
-	enumData := EnumerationData{
-		Frameworks: []*EnumerableFramework{},
+func NewRecordGenerator(config Config) *RecordGenerator {
+	scheme := "http"
+
+	var tlsClientConfig *tls.Config
+	if config.MesosHTTPSOn {
+		scheme = "https"
+		if config.caPool != nil {
+			tlsClientConfig = &tls.Config{
+				RootCAs: config.caPool,
+			}
+		} else {
+			// do HTTPS without verifying the Mesos master certificate
+			tlsClientConfig = &tls.Config{
+				InsecureSkipVerify: true,
+			}
+		}
 	}
+	tr := &http.Transport{
+		TLSClientConfig: tlsClientConfig,
+	}
+
+	timeout := time.Duration(config.StateTimeoutSeconds) * time.Second
+
+	var httpClient httpClientDoer
+	defaultClient := http.Client{
+		Transport: tr,
+		Timeout:   timeout,
+	}
+	httpClient = &defaultClient
+
+	if config.iamConfig != nil {
+		authClient := &authHttpClient{
+			Client: defaultClient,
+			config: config.iamConfig,
+		}
+		httpClient = authClient
+	}
+
 	rg := &RecordGenerator{
 		httpClient: httpClient,
-		EnumData:   enumData,
+		httpScheme: scheme,
 	}
 	return rg
+}
+
+type httpClientDoer interface {
+	Do(req *http.Request) (resp *http.Response, err error)
+}
+
+type authHttpClient struct {
+	http.Client
+	config *IAMConfig
+}
+
+var errAuthFailed = errors.New("IAM authentication failed")
+
+func (a *authHttpClient) Do(req *http.Request) (*http.Response, error) {
+	// TODO if we still have a valid token, try using it first
+	token := jwt.New(jwt.SigningMethodRS256)
+	token.Claims["uid"] = a.config.ID
+	token.Claims["exp"] = time.Now().Add(time.Hour).Unix()
+	// SignedString will treat secret as PEM-encoded key
+	tokenStr, err := token.SignedString([]byte(a.config.Secret))
+	if err != nil {
+		return nil, err
+	}
+
+	authReq := struct {
+		Uid   string `json:"uid"`
+		Token string `json:"token,omitempty"`
+	}{
+		Uid:   a.config.ID,
+		Token: tokenStr,
+	}
+
+	b, err := json.Marshal(authReq)
+	if err != nil {
+		return nil, err
+	}
+
+	authBody := bytes.NewBuffer(b)
+	resp, err := a.Client.Post(a.config.loginURL.String(), "application/json", authBody)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, errAuthFailed
+	}
+
+	var authResp struct {
+		Token string `json:"token"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&authResp)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Header == nil {
+		req.Header = make(http.Header)
+	}
+	req.Header.Set("Authorization", "token="+authResp.Token)
+
+	return a.Client.Do(req)
 }
 
 // ParseState retrieves and parses the Mesos master /state.json and converts it
@@ -201,19 +301,18 @@ func (rg *RecordGenerator) findMaster(masters ...string) (state.State, error) {
 		} else {
 			return sj, nil
 		}
-
 	}
 
 	return sj, errors.New("no master")
 }
 
 // Loads state.json from mesos master
-func (rg *RecordGenerator) loadFromMaster(ip string, port string) (state.State, error) {
+func (rg *RecordGenerator) loadFromMaster(ip, port string) (state.State, error) {
 	// REFACTOR: state.json security
 
 	var sj state.State
 	u := url.URL{
-		Scheme: "http",
+		Scheme: rg.httpScheme,
 		Host:   net.JoinHostPort(ip, port),
 		Path:   "/master/state.json",
 	}
@@ -253,7 +352,7 @@ func (rg *RecordGenerator) loadFromMaster(ip string, port string) (state.State, 
 // attempts can fail from down server or mesos master secondary
 // it also reloads from a different master if the master it attempted to
 // load from was not the leader
-func (rg *RecordGenerator) loadWrap(ip string, port string) (state.State, error) {
+func (rg *RecordGenerator) loadWrap(ip, port string) (state.State, error) {
 	var err error
 	var sj state.State
 

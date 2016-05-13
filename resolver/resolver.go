@@ -51,12 +51,10 @@ func newHTTPClient(httpTimeout time.Duration) *http.Client {
 
 // New returns a Resolver with the given version and configuration.
 func New(version string, config records.Config) *Resolver {
-	var recordGenerator *records.RecordGenerator
-
 	httpTimeout := time.Duration(config.StateTimeoutSeconds) * time.Second
 	httpClient := newHTTPClient(httpTimeout)
 
-	recordGenerator = records.NewRecordGenerator(httpClient)
+	recordGenerator := records.NewRecordGenerator(config)
 	r := &Resolver{
 		version: version,
 		config:  config,
@@ -163,7 +161,7 @@ func (res *Resolver) SetMasters(masters []string) {
 // Reload triggers a new state load from the configured mesos masters.
 // This method is not goroutine-safe.
 func (res *Resolver) Reload() {
-	t := records.NewRecordGenerator(res.httpClient)
+	t := records.NewRecordGenerator(res.config)
 	err := t.ParseState(res.config, res.masters...)
 
 	if err == nil {

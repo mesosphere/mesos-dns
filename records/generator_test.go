@@ -11,7 +11,6 @@ import (
 	"reflect"
 	"testing"
 	"testing/quick"
-	"time"
 
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/records/labels"
@@ -339,10 +338,7 @@ func TestTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(sleepForeverHandler))
 	defer server.Close()
 
-	httpClient := &http.Client{
-		Timeout: 500 * time.Millisecond,
-	}
-	rg := NewRecordGenerator(httpClient)
+	rg := NewRecordGenerator(Config{StateTimeoutSeconds: 1})
 	host, port, err := net.SplitHostPort(server.Listener.Addr().String())
 	_, err = rg.loadFromMaster(host, port)
 	if err == nil {
