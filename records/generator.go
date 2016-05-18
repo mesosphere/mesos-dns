@@ -111,7 +111,13 @@ type EnumerationData struct {
 
 // NewRecordGenerator returns a RecordGenerator that's been configured with a timeout.
 func NewRecordGenerator(httpTimeout time.Duration) *RecordGenerator {
-	rg := &RecordGenerator{httpClient: http.Client{Timeout: httpTimeout}}
+	enumData := EnumerationData{
+		Frameworks: []*EnumerableFramework{},
+	}
+	rg := &RecordGenerator{
+		httpClient: http.Client{Timeout: httpTimeout},
+		EnumData: enumData,
+	}
 	return rg
 }
 
@@ -436,7 +442,10 @@ func (rg *RecordGenerator) listenerRecord(listener string, ns string) {
 
 func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec labels.Func, ipSources []string) {
 	for _, f := range sj.Frameworks {
-		enumerableFramework := &EnumerableFramework{Name: f.Name}
+		enumerableFramework := &EnumerableFramework{
+			Name: f.Name,
+			Tasks: []*EnumerableTask{},
+		}
 		rg.EnumData.Frameworks = append(rg.EnumData.Frameworks, enumerableFramework)
 
 		for _, task := range f.Tasks {
