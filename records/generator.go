@@ -17,6 +17,7 @@ import (
 
 	"github.com/mesosphere/mesos-dns/errorutil"
 	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/models"
 	"github.com/mesosphere/mesos-dns/records/labels"
 	"github.com/mesosphere/mesos-dns/records/state"
 	"github.com/tv42/zbase32"
@@ -25,6 +26,8 @@ import (
 // Map host/service name to DNS answer
 // REFACTOR - when discoveryinfo is integrated
 // Will likely become map[string][]discoveryinfo
+// Effectively we're (ab)using the map type as a set
+// It used to have the type: rrs map[string][]string
 type rrs map[string]map[string]struct{}
 
 func (r rrs) add(name, host string) bool {
@@ -51,6 +54,18 @@ func (r rrs) First(name string) (string, bool) {
 		return host, true
 	}
 	return "", false
+}
+
+// Transform the record set into something exportable via the REST API
+func (r rrs) ToAXFRResourceRecordSet() models.AXFRResourceRecordSet {
+	ret := make(models.AXFRResourceRecordSet, len(r))
+	for host, values := range r {
+		ret[host] = make([]string, 0, len(values))
+		for record := range values {
+			ret[host] = append(ret[host], record)
+		}
+	}
+	return ret
 }
 
 type rrsKind string
@@ -116,7 +131,7 @@ func NewRecordGenerator(httpTimeout time.Duration) *RecordGenerator {
 	}
 	rg := &RecordGenerator{
 		httpClient: http.Client{Timeout: httpTimeout},
-		EnumData: enumData,
+		EnumData:   enumData,
 	}
 	return rg
 }
@@ -443,7 +458,7 @@ func (rg *RecordGenerator) listenerRecord(listener string, ns string) {
 func (rg *RecordGenerator) taskRecords(sj state.State, domain string, spec labels.Func, ipSources []string) {
 	for _, f := range sj.Frameworks {
 		enumerableFramework := &EnumerableFramework{
-			Name: f.Name,
+			Name:  f.Name,
 			Tasks: []*EnumerableTask{},
 		}
 		rg.EnumData.Frameworks = append(rg.EnumData.Frameworks, enumerableFramework)
