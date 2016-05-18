@@ -17,6 +17,7 @@ import (
 	_ "github.com/mesos/mesos-go/detector/zoo" // Registers the ZK detector
 	"github.com/mesosphere/mesos-dns/exchanger"
 	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/models"
 	"github.com/mesosphere/mesos-dns/records"
 	"github.com/mesosphere/mesos-dns/util"
 	"github.com/miekg/dns"
@@ -475,6 +476,7 @@ func (res *Resolver) configureHTTP() {
 	ws.Route(ws.GET("/v1/services/{service}").To(res.RestService))
 	if res.config.EnumerationOn {
 		ws.Route(ws.GET("/v1/enumerate").To(res.RestEnumerate))
+		ws.Route(ws.GET("/v1/axfr").To(res.RestAXFR))
 	}
 	restful.Add(ws)
 }
@@ -513,6 +515,29 @@ func (res *Resolver) RestEnumerate(req *restful.Request, resp *restful.Response)
 
 	enumData := res.records().EnumData
 	if err := resp.WriteAsJson(enumData); err != nil {
+		logging.Error.Println(err)
+	}
+}
+
+// RestAXFR handles HTTP requests to turn the zone into a transferable format
+func (res *Resolver) RestAXFR(req *restful.Request, resp *restful.Response) {
+	records := res.records()
+
+	AXFRRecords := models.AXFRRecords{
+		SRVs: records.SRVs.ToAXFRResourceRecordSet(),
+		As:   records.As.ToAXFRResourceRecordSet(),
+	}
+	AXFR := models.AXFR{
+		Records:        AXFRRecords,
+		Serial:         atomic.LoadUint32(&res.config.SOASerial),
+		Mname:          res.config.SOAMname,
+		Rname:          res.config.SOARname,
+		TTL:            res.config.TTL,
+		RefreshSeconds: res.config.RefreshSeconds,
+		Domain:         res.config.Domain,
+	}
+
+	if err := resp.WriteAsJson(AXFR); err != nil {
 		logging.Error.Println(err)
 	}
 }
