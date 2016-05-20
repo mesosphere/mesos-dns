@@ -53,8 +53,10 @@ type Config struct {
 	Domain string
 	// File is the location of the config.json file
 	File string
-	// ListenAddr is the server listener address
+	// Listen is the server DNS listener IP address
 	Listener string
+	// HTTPListen is the server HTTP listener IP address
+	HTTPListener string
 	// Value of RecursionAvailable for responses in Mesos domain
 	RecurseOn bool
 	// Enable serving DSN and HTTP requests
@@ -86,6 +88,7 @@ func NewConfig() Config {
 		SOAMinttl:           60,
 		Resolvers:           []string{"8.8.8.8"},
 		Listener:            "0.0.0.0",
+		HTTPListener:        "0.0.0.0",
 		HTTPPort:            8123,
 		DNSOn:               true,
 		HTTPOn:              true,
@@ -140,6 +143,7 @@ func SetConfig(cjson string) Config {
 	logging.Verbose.Println("   - RefreshSeconds: ", c.RefreshSeconds)
 	logging.Verbose.Println("   - Domain: " + c.Domain)
 	logging.Verbose.Println("   - Listener: " + c.Listener)
+	logging.Verbose.Println("   - HTTPListener: " + c.HTTPListener)
 	logging.Verbose.Println("   - Port: ", c.Port)
 	logging.Verbose.Println("   - DnsOn: ", c.DNSOn)
 	logging.Verbose.Println("   - TTL: ", c.TTL)

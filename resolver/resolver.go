@@ -487,14 +487,14 @@ func (res *Resolver) LaunchHTTP() <-chan error {
 	defer util.HandleCrash()
 
 	res.configureHTTP()
-	portString := ":" + strconv.Itoa(res.config.HTTPPort)
+	listenAddress := net.JoinHostPort(res.config.HTTPListener, strconv.Itoa(res.config.HTTPPort))
 
 	errCh := make(chan error, 1)
 	go func() {
 		var err error
 		defer func() { errCh <- err }()
 
-		if err = http.ListenAndServe(portString, nil); err != nil {
+		if err = http.ListenAndServe(listenAddress, nil); err != nil {
 			err = fmt.Errorf("Failed to setup http server: %v", err)
 		} else {
 			logging.Error.Println("Not serving http requests any more.")
