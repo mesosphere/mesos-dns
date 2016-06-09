@@ -31,8 +31,8 @@ type Resolver struct {
 	rs               *records.RecordGenerator
 	rsLock           sync.RWMutex
 	rng              *rand.Rand
-	fwd              exchanger.Forwarder
 	generatorOptions []records.Option
+	fwds             map[string]exchanger.Forwarder
 }
 
 // New returns a Resolver with the given version and configuration.
@@ -57,11 +57,18 @@ func New(version string, config records.Config) *Resolver {
 		timeout = time.Duration(config.Timeout) * time.Second
 	}
 
+	r.fwds = make(map[string]exchanger.Forwarder)
 	rs := config.Resolvers
-	if !config.ExternalOn {
+	if config.ExternalOn {
+		r.fwds[""] = exchanger.NewForwarder(rs, exchangers(timeout, "udp", "tcp"))
+		for zone, resolvers := range config.ZoneResolvers {
+			r.fwds[zone] = exchanger.NewForwarder(resolvers, exchangers(timeout, "udp", "tcp"))
+		}
+
+	} else {
 		rs = rs[:0]
+		r.fwds[""] = exchanger.NewForwarder(rs, exchangers(timeout, "udp", "tcp"))
 	}
-	r.fwd = exchanger.NewForwarder(rs, exchangers(timeout, "udp", "tcp"))
 
 	return r
 }
@@ -100,8 +107,17 @@ func (res *Resolver) records() *records.RecordGenerator {
 func (res *Resolver) LaunchDNS() <-chan error {
 	// Handers for Mesos requests
 	dns.HandleFunc(res.config.Domain+".", panicRecover(res.HandleMesos))
-	// Handler for nonMesos requests
-	dns.HandleFunc(".", panicRecover(res.HandleNonMesos))
+	// Handlers for nonMesos requests
+	for zone, fwd := range res.fwds {
+		if zone != "" {
+			dns.HandleFunc(
+				zone+".",
+				panicRecover(res.HandleNonMesos(fwd)))
+		}
+	}
+	dns.HandleFunc(
+		".",
+		panicRecover(res.HandleNonMesos(res.fwds[""])))
 
 	errCh := make(chan error, 2)
 	_, e1 := res.Serve("tcp")
@@ -257,15 +273,18 @@ func shuffleAnswers(rng *rand.Rand, answers []dns.RR) []dns.RR {
 
 // HandleNonMesos handles non-mesos queries by forwarding to configured
 // external DNS servers.
-func (res *Resolver) HandleNonMesos(w dns.ResponseWriter, r *dns.Msg) {
-	logging.CurLog.NonMesosRequests.Inc()
-	m, err := res.fwd(r, w.RemoteAddr().Network())
-	if err != nil {
-		m = new(dns.Msg).SetRcode(r, rcode(err))
-	} else if len(m.Answer) == 0 {
-		logging.CurLog.NonMesosNXDomain.Inc()
+func (res *Resolver) HandleNonMesos(fwd exchanger.Forwarder) func(
+	dns.ResponseWriter, *dns.Msg) {
+	return func(w dns.ResponseWriter, r *dns.Msg) {
+		logging.CurLog.NonMesosRequests.Inc()
+		m, err := fwd(r, w.RemoteAddr().Network())
+		if err != nil {
+			m = new(dns.Msg).SetRcode(r, rcode(err))
+		} else if len(m.Answer) == 0 {
+			logging.CurLog.NonMesosNXDomain.Inc()
+		}
+		reply(w, m)
 	}
-	reply(w, m)
 }
 
 func rcode(err error) int {

@@ -22,6 +22,9 @@ The configuration file should include the following fields:
   "domain": "mesos",
   "port": 53,
   "resolvers": ["169.254.169.254"],
+  "zoneResolvers": {
+    "weave": ["172.17.0.1"]
+  },
   "timeout": 5, 
   "httpon": true,
   "dnson": true,
@@ -71,7 +74,9 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 `port` is the port number that Mesos-DNS monitors for incoming DNS requests. Requests can be sent over TCP or UDP. We recommend you use port `53` as several applications assume that the DNS server listens to this port. The default value is `53`.
 
 `resolvers` is a comma separated list with the IP addresses of external DNS servers that Mesos-DNS will contact to resolve any DNS requests outside the `domain`. We ***recommend*** that you list the nameservers specified in the `/etc/resolv.conf` on the server Mesos-DNS is running. Alternatively, you can list `8.8.8.8`, which is the [Google public DNS](https://developers.google.com/speed/public-dns/) address. The `resolvers` field is required. 
- 
+
+`zoneResolvers` is a dictionary of zone-specific external DNS servers, where the key is the matching zone (sans leading / trailing .). You can use this configuration option to route a subset of DNS queries to a specific set of DNS servers.
+
 `timeout` is the timeout threshold, in seconds, for connections and requests to external DNS requests. The default value is 5 seconds. 
 
 `listener` is the IP address of Mesos-DNS. In SOA replies, Mesos-DNS identifies hostname `mesos-dns.domain` as the primary nameserver for the domain. It uses this IP address in an A record for `mesos-dns.domain`. The default value is "0.0.0.0", which instructs Mesos-DNS to create an A record for every IP address associated with a network interface on the server that runs the Mesos-DNS process. 
