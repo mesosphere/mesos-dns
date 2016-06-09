@@ -48,6 +48,8 @@ type Config struct {
 	SOARname   string // email of admin esponsible
 	// Mesos master(s): a list of IP:port pairs for one or more Mesos masters
 	Masters []string
+	// DNS server: IP address of the DNS server for forwarded accesses
+	ZoneResolvers map[string][]string
 	// DNS server: a list of IP addresses or IP:port pairs for DNS servers for forwarded accesses
 	Resolvers []string
 	// IPSources is the prioritized list of task IP sources
@@ -105,6 +107,7 @@ func NewConfig() Config {
 		SOARetry:            600,
 		SOAExpire:           86400,
 		SOAMinttl:           60,
+		ZoneResolvers:       map[string][]string{},
 		Resolvers:           []string{"8.8.8.8"},
 		Listener:            "0.0.0.0",
 		HTTPListener:        "0.0.0.0",
@@ -146,6 +149,11 @@ func SetConfig(cjson string) Config {
 	}
 
 	c.Domain = strings.ToLower(c.Domain)
+
+	err = validateDomainName(c.Domain)
+	if err != nil {
+		logging.Error.Fatalf("%s is not a valid domain name", c.Domain)
+	}
 
 	c.initSOA()
 
@@ -190,6 +198,9 @@ func (c *Config) initResolvers() {
 		if err := validateResolvers(c.Resolvers); err != nil {
 			logging.Error.Fatal(err)
 		}
+		if err := validateZoneResolvers(c.ZoneResolvers, c.Domain); err != nil {
+			logging.Error.Fatal(err)
+		}
 	}
 }
 
@@ -202,6 +213,10 @@ func (c *Config) initSOA() {
 
 func (c Config) log() {
 	// print configuration file
+	zoneResolversJSON, err := json.Marshal(c.ZoneResolvers)
+	if err != nil {
+		zoneResolversJSON = []byte(fmt.Sprintf("error: %v", err))
+	}
 	logging.Verbose.Println("Mesos-DNS configuration:")
 	logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
 	logging.Verbose.Println("   - Zookeeper: ", c.Zk)
@@ -215,6 +230,8 @@ func (c Config) log() {
 	logging.Verbose.Println("   - TTL: ", c.TTL)
 	logging.Verbose.Println("   - Timeout: ", c.Timeout)
 	logging.Verbose.Println("   - StateTimeoutSeconds: ", c.StateTimeoutSeconds)
+
+	logging.Verbose.Println("   - ZoneResolvers: " + string(zoneResolversJSON))
 	logging.Verbose.Println("   - Resolvers: " + strings.Join(c.Resolvers, ", "))
 	logging.Verbose.Println("   - ExternalOn: ", c.ExternalOn)
 	logging.Verbose.Println("   - SOAMname: " + c.SOAMname)
