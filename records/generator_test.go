@@ -339,7 +339,10 @@ func TestTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(sleepForeverHandler))
 	defer server.Close()
 
-	rg := NewRecordGenerator(500 * time.Millisecond)
+	httpClient := &http.Client{
+		Timeout: 500 * time.Millisecond,
+	}
+	rg := NewRecordGenerator(httpClient)
 	host, port, err := net.SplitHostPort(server.Listener.Addr().String())
 	_, err = rg.loadFromMaster(host, port)
 	if err == nil {

@@ -25,27 +25,47 @@ import (
 
 // Resolver holds configuration state and the resource records
 type Resolver struct {
-	masters []string
-	version string
-	config  records.Config
-	rs      *records.RecordGenerator
-	rsLock  sync.RWMutex
-	rng     *rand.Rand
-	fwd     exchanger.Forwarder
+	masters    []string
+	version    string
+	config     records.Config
+	rs         *records.RecordGenerator
+	rsLock     sync.RWMutex
+	rng        *rand.Rand
+	fwd        exchanger.Forwarder
+	httpClient *http.Client
+}
+
+func newHTTPClient(httpTimeout time.Duration) *http.Client {
+	if httpTimeout <= 0 {
+		logging.Error.Fatal("Invalid HTTP Timeout: ", httpTimeout)
+	}
+	tr := &http.Transport{
+		DisableKeepAlives:   true, // Mesos master doesn't implement defensive HTTP
+		MaxIdleConnsPerHost: 2,
+	}
+	return &http.Client{
+		Transport: tr,
+		Timeout:   httpTimeout,
+	}
 }
 
 // New returns a Resolver with the given version and configuration.
 func New(version string, config records.Config) *Resolver {
 	var recordGenerator *records.RecordGenerator
-	recordGenerator = records.NewRecordGenerator(time.Duration(config.StateTimeoutSeconds) * time.Second)
+
+	httpTimeout := time.Duration(config.StateTimeoutSeconds) * time.Second
+	httpClient := newHTTPClient(httpTimeout)
+
+	recordGenerator = records.NewRecordGenerator(httpClient)
 	r := &Resolver{
 		version: version,
 		config:  config,
 		rs:      recordGenerator,
 		// rand.Sources aren't safe for concurrent use, except the global one.
 		// See: https://github.com/golang/go/issues/3611
-		rng:     rand.New(&lockedSource{src: rand.NewSource(time.Now().UnixNano())}),
-		masters: append([]string{""}, config.Masters...),
+		rng:        rand.New(&lockedSource{src: rand.NewSource(time.Now().UnixNano())}),
+		masters:    append([]string{""}, config.Masters...),
+		httpClient: httpClient,
 	}
 
 	timeout := 5 * time.Second
@@ -143,7 +163,7 @@ func (res *Resolver) SetMasters(masters []string) {
 // Reload triggers a new state load from the configured mesos masters.
 // This method is not goroutine-safe.
 func (res *Resolver) Reload() {
-	t := records.NewRecordGenerator(time.Duration(res.config.StateTimeoutSeconds) * time.Second)
+	t := records.NewRecordGenerator(res.httpClient)
 	err := t.ParseState(res.config, res.masters...)
 
 	if err == nil {

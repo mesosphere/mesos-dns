@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mesosphere/mesos-dns/errorutil"
 	"github.com/mesosphere/mesos-dns/logging"
@@ -95,7 +94,7 @@ type RecordGenerator struct {
 	SRVs       rrs
 	SlaveIPs   map[string]string
 	EnumData   EnumerationData
-	httpClient http.Client
+	httpClient *http.Client
 }
 
 // EnumerableRecord is the lowest level object, and should map 1:1 with DNS records
@@ -125,12 +124,12 @@ type EnumerationData struct {
 }
 
 // NewRecordGenerator returns a RecordGenerator that's been configured with a timeout.
-func NewRecordGenerator(httpTimeout time.Duration) *RecordGenerator {
+func NewRecordGenerator(httpClient *http.Client) *RecordGenerator {
 	enumData := EnumerationData{
 		Frameworks: []*EnumerableFramework{},
 	}
 	rg := &RecordGenerator{
-		httpClient: http.Client{Timeout: httpTimeout},
+		httpClient: httpClient,
 		EnumData:   enumData,
 	}
 	return rg
@@ -226,6 +225,7 @@ func (rg *RecordGenerator) loadFromMaster(ip string, port string) (state.State, 
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "Mesos-DNS")
 
 	resp, err := rg.httpClient.Do(req)
 	if err != nil {
