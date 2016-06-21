@@ -388,10 +388,10 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 		logging.Error.Println(err)
 		return
 	}
-	arec := "leader." + domain + "."
-	rg.insertRR(arec, ip, A)
-	arec = "master." + domain + "."
-	rg.insertRR(arec, ip, A)
+	leaderRecord := "leader." + domain + "."
+	rg.insertRR(leaderRecord, ip, A)
+	allMasterRecord := "master." + domain + "."
+	rg.insertRR(allMasterRecord, ip, A)
 
 	// SRV records
 	tcp := "_leader._tcp." + domain + "."
@@ -412,8 +412,7 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 
 		// A records (master and masterN)
 		if master != leaderAddress {
-			arec := "master." + domain + "."
-			added := rg.insertRR(arec, masterIP, A)
+			added := rg.insertRR(allMasterRecord, masterIP, A)
 			if !added {
 				// duplicate master?!
 				continue
@@ -425,8 +424,8 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 			continue
 		}
 
-		arec := "master" + strconv.Itoa(idx) + "." + domain + "."
-		rg.insertRR(arec, masterIP, A)
+		perMasterRecord := "master" + strconv.Itoa(idx) + "." + domain + "."
+		rg.insertRR(perMasterRecord, masterIP, A)
 		idx++
 
 		if master == leaderAddress {
@@ -439,8 +438,8 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 		if len(masters) > 0 {
 			logging.Error.Printf("warning: leader %q is not in master list", leader)
 		}
-		arec = "master" + strconv.Itoa(idx) + "." + domain + "."
-		rg.insertRR(arec, ip, A)
+		extraMasterRecord := "master" + strconv.Itoa(idx) + "." + domain + "."
+		rg.insertRR(extraMasterRecord, ip, A)
 	}
 }
 
@@ -620,8 +619,8 @@ func (rg *RecordGenerator) insertTaskRR(name, host string, kind rrsKind, enumTas
 }
 
 func (rg *RecordGenerator) insertRR(name, host string, kind rrsKind) (added bool) {
-	if rrs := kind.rrs(rg); rrs != nil {
-		if added = rrs.add(name, host); added {
+	if rrsByKind := kind.rrs(rg); rrsByKind != nil {
+		if added = rrsByKind.add(name, host); added {
 			logging.VeryVerbose.Println("[" + string(kind) + "]\t" + name + ": " + host)
 		}
 	}
