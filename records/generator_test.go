@@ -25,8 +25,8 @@ func init() {
 }
 
 func (rg *RecordGenerator) exists(name, host string, kind rrsKind) bool {
-	rrs := kind.rrs(rg)
-	if val, ok := rrs[name]; ok {
+	rrsByKind := kind.rrs(rg)
+	if val, ok := rrsByKind[name]; ok {
 		_, ok := val[host]
 		return ok
 	}
