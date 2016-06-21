@@ -1,0 +1,115 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "qarGFRYOxZ8w9ApCR1kE0gkZUbI=",
+			"path": "github.com/emicklei/go-restful",
+			"revision": "892402ba11a2e2fd5e1295dd633481f27365f14d",
+			"revisionTime": "2015-09-04T10:15:54Z"
+		},
+		{
+			"checksumSHA1": "DKN26fcZhDsYGw/lA1kY5Cy2/Hc=",
+			"path": "github.com/emicklei/go-restful/log",
+			"revision": "892402ba11a2e2fd5e1295dd633481f27365f14d",
+			"revisionTime": "2015-09-04T10:15:54Z"
+		},
+		{
+			"checksumSHA1": "hyS3vR96CWcq5guGQXKUWVrlvGA=",
+			"path": "github.com/gogo/protobuf/proto",
+			"revision": "43ab7f0ec7b6d072e0368bd537ffefe74ed30198",
+			"revisionTime": "2015-09-14T15:32:05Z"
+		},
+		{
+			"checksumSHA1": "tKMSOCOue78dHOP9PY0aSI79+vw=",
+			"path": "github.com/golang/glog",
+			"revision": "fca8c8854093a154ff1eb580aae10276ad6b1b5f",
+			"revisionTime": "2015-07-31T22:52:21Z"
+		},
+		{
+			"checksumSHA1": "0utJAePiKZZzPG3SxPA+xWQ3JAw=",
+			"path": "github.com/kylelemons/godebug/diff",
+			"revision": "21cb3784d9bda523911b96719efba02b7e983256",
+			"revisionTime": "2015-05-19T15:45:55Z"
+		},
+		{
+			"checksumSHA1": "Uthn0hZZxDP9xFOBAD0Vzxz3XFg=",
+			"path": "github.com/kylelemons/godebug/pretty",
+			"revision": "21cb3784d9bda523911b96719efba02b7e983256",
+			"revisionTime": "2015-05-19T15:45:55Z"
+		},
+		{
+			"checksumSHA1": "bDwlNvgweUqFZhLWKqJ8KmpYrSw=",
+			"path": "github.com/mesos/mesos-go/detector",
+			"revision": "068d5470506e3780189fe607af40892814197c5e",
+			"revisionTime": "2015-09-30T14:48:02Z"
+		},
+		{
+			"checksumSHA1": "7Of701v4iOc8SOUacRqPrN06Fzc=",
+			"path": "github.com/mesos/mesos-go/detector/zoo",
+			"revision": "657252ec6fc27975cd86da9f708acd6f4bb1f9ac",
+			"revisionTime": "2015-11-09T17:20:27Z"
+		},
+		{
+			"checksumSHA1": "Ybu42tjeJACX1sb+hb5JAgn0sWE=",
+			"path": "github.com/mesos/mesos-go/mesosproto",
+			"revision": "068d5470506e3780189fe607af40892814197c5e",
+			"revisionTime": "2015-09-30T14:48:02Z"
+		},
+		{
+			"checksumSHA1": "lBSpOtyhd0EX8GwymGhIkKi9/fo=",
+			"path": "github.com/mesos/mesos-go/mesosutil",
+			"revision": "068d5470506e3780189fe607af40892814197c5e",
+			"revisionTime": "2015-09-30T14:48:02Z"
+		},
+		{
+			"checksumSHA1": "i0pNgzWTPQcO0KLKyQMMza6KXI8=",
+			"path": "github.com/mesos/mesos-go/upid",
+			"revision": "068d5470506e3780189fe607af40892814197c5e",
+			"revisionTime": "2015-09-30T14:48:02Z"
+		},
+		{
+			"checksumSHA1": "5fDLs5/nDypYdthNCVVYDnsrLcc=",
+			"path": "github.com/miekg/dns",
+			"revision": "d4ee3f8757f79c17405846965b8a620de7ca9073",
+			"revisionTime": "2015-09-14T15:22:54Z"
+		},
+		{
+			"checksumSHA1": "+49Vr4Me28p3cR+gxX5SUQHbbas=",
+			"path": "github.com/samuel/go-zookeeper/zk",
+			"revision": "177002e16a0061912f02377e2dd8951a8b3551bc",
+			"revisionTime": "2015-08-17T17:50:50Z"
+		},
+		{
+			"checksumSHA1": "EO+jcRet/AJ6IY3lBO8l8BLsZWg=",
+			"path": "github.com/stretchr/objx",
+			"revision": "cbeaeb16a013161a98496fad62933b1d21786672",
+			"revisionTime": "2014-05-26T18:09:21Z"
+		},
+		{
+			"checksumSHA1": "wUispLGoj9YTcOXzCemtsKHTLeQ=",
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "b8dc1cecf15bdaf1988d9e87aa7cd98d899a06d6",
+			"revisionTime": "2015-09-14T09:32:55Z"
+		},
+		{
+			"checksumSHA1": "wNTnzk1i0kl5VR7VGYuMmDxB504=",
+			"path": "github.com/stretchr/testify/mock",
+			"revision": "b8dc1cecf15bdaf1988d9e87aa7cd98d899a06d6",
+			"revisionTime": "2015-09-14T09:32:55Z"
+		},
+		{
+			"checksumSHA1": "aCsqtJqfBMm9aA64lF2Kj/gni6M=",
+			"path": "github.com/tv42/zbase32",
+			"revision": "03389da7e0bf9844767f82690f4d68fc097a1306",
+			"revisionTime": "2015-09-11T22:55:13Z"
+		},
+		{
+			"checksumSHA1": "hKZGpbFuCrkE4s1vxubKK1aFlfI=",
+			"path": "golang.org/x/net/context",
+			"revision": "db8e4de5b2d6653f66aea53094624468caad15d2",
+			"revisionTime": "2015-08-24T16:07:02Z"
+		}
+	],
+	"rootPath": "github.com/mesosphere/mesos-dns"
+}
