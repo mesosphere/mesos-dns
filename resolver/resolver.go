@@ -25,26 +25,31 @@ import (
 
 // Resolver holds configuration state and the resource records
 type Resolver struct {
-	masters []string
-	version string
-	config  records.Config
-	rs      *records.RecordGenerator
-	rsLock  sync.RWMutex
-	rng     *rand.Rand
-	fwd     exchanger.Forwarder
+	masters          []string
+	version          string
+	config           records.Config
+	rs               *records.RecordGenerator
+	rsLock           sync.RWMutex
+	rng              *rand.Rand
+	fwd              exchanger.Forwarder
+	generatorOptions []records.Option
 }
 
 // New returns a Resolver with the given version and configuration.
 func New(version string, config records.Config) *Resolver {
-	recordGenerator := records.NewRecordGenerator(config)
+	generatorOptions := []records.Option{
+		records.WithConfig(config),
+	}
+	recordGenerator := records.NewRecordGenerator(generatorOptions...)
 	r := &Resolver{
 		version: version,
 		config:  config,
 		rs:      recordGenerator,
 		// rand.Sources aren't safe for concurrent use, except the global one.
 		// See: https://github.com/golang/go/issues/3611
-		rng:     rand.New(&lockedSource{src: rand.NewSource(time.Now().UnixNano())}),
-		masters: append([]string{""}, config.Masters...),
+		rng:              rand.New(&lockedSource{src: rand.NewSource(time.Now().UnixNano())}),
+		masters:          append([]string{""}, config.Masters...),
+		generatorOptions: generatorOptions,
 	}
 
 	timeout := 5 * time.Second
@@ -142,7 +147,7 @@ func (res *Resolver) SetMasters(masters []string) {
 // Reload triggers a new state load from the configured mesos masters.
 // This method is not goroutine-safe.
 func (res *Resolver) Reload() {
-	t := records.NewRecordGenerator(res.config)
+	t := records.NewRecordGenerator(res.generatorOptions...)
 	err := t.ParseState(res.config, res.masters...)
 
 	if err == nil {

@@ -338,7 +338,7 @@ func TestTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(sleepForeverHandler))
 	defer server.Close()
 
-	rg := NewRecordGenerator(Config{StateTimeoutSeconds: 1})
+	rg := NewRecordGenerator(WithConfig(Config{StateTimeoutSeconds: 1}))
 	host, port, err := net.SplitHostPort(server.Listener.Addr().String())
 	_, err = rg.loadFromMaster(host, port)
 	if err == nil {
