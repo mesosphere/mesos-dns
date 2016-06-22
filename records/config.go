@@ -1,6 +1,7 @@
 package records
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mesosphere/mesos-dns/errorutil"
+	"github.com/mesosphere/mesos-dns/httpcli/iam"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/miekg/dns"
 )
@@ -49,7 +52,7 @@ type Config struct {
 	IPSources []string // e.g. ["host", "docker", "mesos", "rkt"]
 	// Zookeeper: a single Zk url
 	Zk string
-	//  Domain: name of the domain used (default "mesos", ie .mesos domain)
+	// Domain: name of the domain used (default "mesos", ie .mesos domain)
 	Domain string
 	// File is the location of the config.json file
 	File string
@@ -68,6 +71,16 @@ type Config struct {
 	EnforceRFC952 bool
 	// Enumeration enabled via the API enumeration endpoint
 	EnumerationOn bool
+	// Communicate with Mesos using HTTPS if set to true
+	MesosHTTPSOn bool
+	// CA certificate to use to verify Mesos Master certificate
+	CACertFile string
+	// IAM Config File
+	IAMConfigFile string
+
+	caPool *x509.CertPool
+
+	iamConfig *iam.Config
 }
 
 // NewConfig return the default config of the resolver
@@ -115,26 +128,59 @@ func SetConfig(cjson string) Config {
 		logging.Error.Fatalf("Masters validation failed: %v", err)
 	}
 
-	if c.ExternalOn {
-		if len(c.Resolvers) == 0 {
-			c.Resolvers = GetLocalDNS()
-		}
-		if err = validateResolvers(c.Resolvers); err != nil {
-			logging.Error.Fatalf("Resolvers validation failed: %v", err)
-		}
-	}
+	c.initResolvers()
 
 	if err = validateIPSources(c.IPSources); err != nil {
 		logging.Error.Fatalf("IPSources validation failed: %v", err)
 	}
 
+	if c.StateTimeoutSeconds <= 0 {
+		logging.Error.Fatal("Invalid HTTP Timeout: ", c.StateTimeoutSeconds)
+	}
+
 	c.Domain = strings.ToLower(c.Domain)
 
+	c.initSOA()
+
+	if c.CACertFile != "" {
+		pool, err := readCACertFile(c.CACertFile)
+		if err != nil {
+			logging.Error.Fatal(err.Error())
+		}
+		c.caPool = pool
+	}
+
+	if c.IAMConfigFile != "" {
+		iamConfig, err := iam.LoadFromFile(c.IAMConfigFile)
+		if err != nil {
+			logging.Error.Fatal(err.Error())
+		}
+		c.iamConfig = &iamConfig
+	}
+
+	c.log()
+	return *c
+}
+
+func (c *Config) initResolvers() {
+	if c.ExternalOn {
+		if len(c.Resolvers) == 0 {
+			c.Resolvers = GetLocalDNS()
+		}
+		if err := validateResolvers(c.Resolvers); err != nil {
+			logging.Error.Fatalf("Resolvers validation failed: %v", err)
+		}
+	}
+}
+
+func (c *Config) initSOA() {
 	// SOA record fields
 	c.SOARname = strings.TrimRight(strings.Replace(c.SOARname, "@", ".", -1), ".") + "."
 	c.SOAMname = strings.TrimRight(c.SOAMname, ".") + "."
 	c.SOASerial = uint32(time.Now().Unix())
+}
 
+func (c Config) log() {
 	// print configuration file
 	logging.Verbose.Println("Mesos-DNS configuration:")
 	logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
@@ -165,8 +211,32 @@ func SetConfig(cjson string) Config {
 	logging.Verbose.Println("   - EnforceRFC952: ", c.EnforceRFC952)
 	logging.Verbose.Println("   - IPSources: ", c.IPSources)
 	logging.Verbose.Println("   - EnumerationOn", c.EnumerationOn)
+	logging.Verbose.Println("   - MesosHTTPSOn", c.MesosHTTPSOn)
+	logging.Verbose.Println("   - CACertFile", c.CACertFile)
+	logging.Verbose.Println("   - IAMConfigFile", c.IAMConfigFile)
+}
 
-	return *c
+func readCACertFile(caCertFile string) (caPool *x509.CertPool, err error) {
+	var f *os.File
+	if f, err = os.Open(caCertFile); err != nil {
+		err = fmt.Errorf("CACertFile open failed: %v", err)
+		return
+	}
+	defer errorutil.Ignore(f.Close)
+
+	var b []byte
+	if b, err = ioutil.ReadAll(f); err != nil {
+		err = fmt.Errorf("CACertFile read failed: %v", err)
+		return
+	}
+
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(b) {
+		err = fmt.Errorf("CACertFile parsing failed: %v", err)
+	} else {
+		caPool = pool
+	}
+	return
 }
 
 func readConfig(file string) (*Config, error) {

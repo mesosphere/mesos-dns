@@ -13,12 +13,15 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mesosphere/mesos-dns/errorutil"
+	"github.com/mesosphere/mesos-dns/httpcli"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/models"
 	"github.com/mesosphere/mesos-dns/records/labels"
 	"github.com/mesosphere/mesos-dns/records/state"
+	"github.com/mesosphere/mesos-dns/urls"
 	"github.com/tv42/zbase32"
 )
 
@@ -90,11 +93,12 @@ func (kind rrsKind) rrs(rg *RecordGenerator) rrs {
 // RecordGenerator contains DNS records and methods to access and manipulate
 // them. TODO(kozyraki): Refactor when discovery id is available.
 type RecordGenerator struct {
-	As         rrs
-	SRVs       rrs
-	SlaveIPs   map[string]string
-	EnumData   EnumerationData
-	httpClient *http.Client
+	As            rrs
+	SRVs          rrs
+	SlaveIPs      map[string]string
+	EnumData      EnumerationData
+	httpClient    httpcli.Doer
+	stateEndpoint urls.Builder
 }
 
 // EnumerableRecord is the lowest level object, and should map 1:1 with DNS records
@@ -123,14 +127,41 @@ type EnumerationData struct {
 	Frameworks []*EnumerableFramework `json:"frameworks"`
 }
 
-// NewRecordGenerator returns a RecordGenerator that's been configured with a timeout.
-func NewRecordGenerator(httpClient *http.Client) *RecordGenerator {
-	enumData := EnumerationData{
-		Frameworks: []*EnumerableFramework{},
+// Option is a functional configuration type that mutates a RecordGenerator
+type Option func(*RecordGenerator)
+
+// WithConfig generates and returns an option that applies some configuration to a RecordGenerator.
+// The internal HTTP transport/client is generated upon invocation of this func so that the returned
+// Option may be reused by generators that want to share the same transport/client.
+func WithConfig(config Config) Option {
+	var (
+		opt, tlsClientConfig = httpcli.TLSConfig(config.MesosHTTPSOn, config.caPool)
+		httpClient           = httpcli.New(
+			config.iamConfig,
+			httpcli.Transport(&http.Transport{
+				DisableKeepAlives:   true, // Mesos master doesn't implement defensive HTTP
+				MaxIdleConnsPerHost: 2,
+				TLSClientConfig:     tlsClientConfig,
+			}),
+			httpcli.Timeout(time.Duration(config.StateTimeoutSeconds)*time.Second),
+		)
+	)
+	return func(rg *RecordGenerator) {
+		rg.httpClient = httpClient
+		rg.stateEndpoint = rg.stateEndpoint.With(
+			urls.Path("/master/state.json"),
+			opt,
+		)
 	}
-	rg := &RecordGenerator{
-		httpClient: httpClient,
-		EnumData:   enumData,
+}
+
+// NewRecordGenerator returns a RecordGenerator that's been configured with a timeout.
+func NewRecordGenerator(options ...Option) *RecordGenerator {
+	rg := &RecordGenerator{}
+	for i := range options {
+		if options[i] != nil {
+			options[i](rg)
+		}
 	}
 	return rg
 }
@@ -201,22 +232,17 @@ func (rg *RecordGenerator) findMaster(masters ...string) (state.State, error) {
 		} else {
 			return sj, nil
 		}
-
 	}
 
 	return sj, errors.New("no master")
 }
 
 // Loads state.json from mesos master
-func (rg *RecordGenerator) loadFromMaster(ip string, port string) (state.State, error) {
+func (rg *RecordGenerator) loadFromMaster(ip, port string) (state.State, error) {
 	// REFACTOR: state.json security
 
 	var sj state.State
-	u := url.URL{
-		Scheme: "http",
-		Host:   net.JoinHostPort(ip, port),
-		Path:   "/master/state.json",
-	}
+	u := url.URL(rg.stateEndpoint.With(urls.Host(net.JoinHostPort(ip, port))))
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
@@ -253,7 +279,7 @@ func (rg *RecordGenerator) loadFromMaster(ip string, port string) (state.State, 
 // attempts can fail from down server or mesos master secondary
 // it also reloads from a different master if the master it attempted to
 // load from was not the leader
-func (rg *RecordGenerator) loadWrap(ip string, port string) (state.State, error) {
+func (rg *RecordGenerator) loadWrap(ip, port string) (state.State, error) {
 	var err error
 	var sj state.State
 
