@@ -12,6 +12,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/mesosphere/mesos-dns/errorutil"
 	"github.com/mesosphere/mesos-dns/httpcli/iam"
+	"github.com/mesosphere/mesos-dns/urls"
 )
 
 // ErrAuthFailed is returned for any type of IAM authentication failure
@@ -115,11 +116,11 @@ func (a *authClient) Do(req *http.Request) (*http.Response, error) {
 	return a.client.Do(req)
 }
 
-// TLSConfig generates and returns a recommended protocol scheme ("http" or "https") and TLS configuration.
-func TLSConfig(enabled bool, caPool *x509.CertPool) (scheme string, config *tls.Config) {
-	scheme = "http"
+// TLSConfig generates and returns a recommended URL generation option and TLS configuration.
+func TLSConfig(enabled bool, caPool *x509.CertPool) (opt urls.Option, config *tls.Config) {
+	opt = urls.Scheme("http")
 	if enabled {
-		scheme = "https"
+		opt = urls.Scheme("https")
 		if caPool != nil {
 			config = &tls.Config{
 				RootCAs: caPool,
