@@ -3,9 +3,7 @@
 package records
 
 import (
-	"bytes"
 	"crypto/sha1"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/mesosphere/mesos-dns/errorutil"
+	"github.com/mesosphere/mesos-dns/httpcli"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/models"
 	"github.com/mesosphere/mesos-dns/records/labels"
@@ -98,7 +96,7 @@ type RecordGenerator struct {
 	SRVs       rrs
 	SlaveIPs   map[string]string
 	EnumData   EnumerationData
-	httpClient httpClientDoer
+	httpClient httpcli.Doer
 	httpScheme string
 }
 
@@ -130,109 +128,18 @@ type EnumerationData struct {
 
 // NewRecordGenerator returns a RecordGenerator that's been configured with a timeout.
 func NewRecordGenerator(config Config) *RecordGenerator {
-	scheme := "http"
-
-	var tlsClientConfig *tls.Config
-	if config.MesosHTTPSOn {
-		scheme = "https"
-		if config.caPool != nil {
-			tlsClientConfig = &tls.Config{
-				RootCAs: config.caPool,
-			}
-		} else {
-			// do HTTPS without verifying the Mesos master certificate
-			tlsClientConfig = &tls.Config{
-				InsecureSkipVerify: true,
-			}
-		}
-	}
-	tr := &http.Transport{
-		TLSClientConfig: tlsClientConfig,
-	}
-
-	timeout := time.Duration(config.StateTimeoutSeconds) * time.Second
-
-	var httpClient httpClientDoer
-	defaultClient := http.Client{
-		Transport: tr,
-		Timeout:   timeout,
-	}
-	httpClient = &defaultClient
-
-	if config.iamConfig != nil {
-		authClient := &authHttpClient{
-			Client: defaultClient,
-			config: config.iamConfig,
-		}
-		httpClient = authClient
-	}
-
-	rg := &RecordGenerator{
-		httpClient: httpClient,
+	scheme, tlsClientConfig := httpcli.TLSConfig(config.MesosHTTPSOn, config.caPool)
+	return &RecordGenerator{
+		httpClient: httpcli.New(
+			config.iamConfig,
+			httpcli.Transport(&http.Transport{
+				DisableKeepAlives:   true, // Mesos master doesn't implement defensive HTTP
+				MaxIdleConnsPerHost: 2,
+				TLSClientConfig:     tlsClientConfig,
+			}),
+			httpcli.Timeout(time.Duration(config.StateTimeoutSeconds)*time.Second)),
 		httpScheme: scheme,
 	}
-	return rg
-}
-
-type httpClientDoer interface {
-	Do(req *http.Request) (resp *http.Response, err error)
-}
-
-type authHttpClient struct {
-	http.Client
-	config *IAMConfig
-}
-
-var errAuthFailed = errors.New("IAM authentication failed")
-
-func (a *authHttpClient) Do(req *http.Request) (*http.Response, error) {
-	// TODO if we still have a valid token, try using it first
-	token := jwt.New(jwt.SigningMethodRS256)
-	token.Claims["uid"] = a.config.ID
-	token.Claims["exp"] = time.Now().Add(time.Hour).Unix()
-	// SignedString will treat secret as PEM-encoded key
-	tokenStr, err := token.SignedString([]byte(a.config.Secret))
-	if err != nil {
-		return nil, err
-	}
-
-	authReq := struct {
-		Uid   string `json:"uid"`
-		Token string `json:"token,omitempty"`
-	}{
-		Uid:   a.config.ID,
-		Token: tokenStr,
-	}
-
-	b, err := json.Marshal(authReq)
-	if err != nil {
-		return nil, err
-	}
-
-	authBody := bytes.NewBuffer(b)
-	resp, err := a.Client.Post(a.config.loginURL.String(), "application/json", authBody)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, errAuthFailed
-	}
-
-	var authResp struct {
-		Token string `json:"token"`
-	}
-	err = json.NewDecoder(resp.Body).Decode(&authResp)
-	if err != nil {
-		return nil, err
-	}
-
-	if req.Header == nil {
-		req.Header = make(http.Header)
-	}
-	req.Header.Set("Authorization", "token="+authResp.Token)
-
-	return a.Client.Do(req)
 }
 
 // ParseState retrieves and parses the Mesos master /state.json and converts it

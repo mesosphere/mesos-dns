@@ -25,35 +25,17 @@ import (
 
 // Resolver holds configuration state and the resource records
 type Resolver struct {
-	masters    []string
-	version    string
-	config     records.Config
-	rs         *records.RecordGenerator
-	rsLock     sync.RWMutex
-	rng        *rand.Rand
-	fwd        exchanger.Forwarder
-	httpClient *http.Client
-}
-
-func newHTTPClient(httpTimeout time.Duration) *http.Client {
-	if httpTimeout <= 0 {
-		logging.Error.Fatal("Invalid HTTP Timeout: ", httpTimeout)
-	}
-	tr := &http.Transport{
-		DisableKeepAlives:   true, // Mesos master doesn't implement defensive HTTP
-		MaxIdleConnsPerHost: 2,
-	}
-	return &http.Client{
-		Transport: tr,
-		Timeout:   httpTimeout,
-	}
+	masters []string
+	version string
+	config  records.Config
+	rs      *records.RecordGenerator
+	rsLock  sync.RWMutex
+	rng     *rand.Rand
+	fwd     exchanger.Forwarder
 }
 
 // New returns a Resolver with the given version and configuration.
 func New(version string, config records.Config) *Resolver {
-	httpTimeout := time.Duration(config.StateTimeoutSeconds) * time.Second
-	httpClient := newHTTPClient(httpTimeout)
-
 	recordGenerator := records.NewRecordGenerator(config)
 	r := &Resolver{
 		version: version,
@@ -61,9 +43,8 @@ func New(version string, config records.Config) *Resolver {
 		rs:      recordGenerator,
 		// rand.Sources aren't safe for concurrent use, except the global one.
 		// See: https://github.com/golang/go/issues/3611
-		rng:        rand.New(&lockedSource{src: rand.NewSource(time.Now().UnixNano())}),
-		masters:    append([]string{""}, config.Masters...),
-		httpClient: httpClient,
+		rng:     rand.New(&lockedSource{src: rand.NewSource(time.Now().UnixNano())}),
+		masters: append([]string{""}, config.Masters...),
 	}
 
 	timeout := 5 * time.Second
