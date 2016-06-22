@@ -126,20 +126,40 @@ type EnumerationData struct {
 	Frameworks []*EnumerableFramework `json:"frameworks"`
 }
 
-// NewRecordGenerator returns a RecordGenerator that's been configured with a timeout.
-func NewRecordGenerator(config Config) *RecordGenerator {
-	scheme, tlsClientConfig := httpcli.TLSConfig(config.MesosHTTPSOn, config.caPool)
-	return &RecordGenerator{
-		httpClient: httpcli.New(
+// Option is a functional configuration type that mutates a RecordGenerator
+type Option func(*RecordGenerator)
+
+// WithConfig generates and returns an option that applies some configuration to a RecordGenerator.
+// The internal HTTP transport/client is generated upon invocation of this func so that the returned
+// Option may be reused by generators that want to share the same transport/client.
+func WithConfig(config Config) Option {
+	var (
+		scheme, tlsClientConfig = httpcli.TLSConfig(config.MesosHTTPSOn, config.caPool)
+		httpClient              = httpcli.New(
 			config.iamConfig,
 			httpcli.Transport(&http.Transport{
 				DisableKeepAlives:   true, // Mesos master doesn't implement defensive HTTP
 				MaxIdleConnsPerHost: 2,
 				TLSClientConfig:     tlsClientConfig,
 			}),
-			httpcli.Timeout(time.Duration(config.StateTimeoutSeconds)*time.Second)),
-		httpScheme: scheme,
+			httpcli.Timeout(time.Duration(config.StateTimeoutSeconds)*time.Second),
+		)
+	)
+	return func(rg *RecordGenerator) {
+		rg.httpClient = httpClient
+		rg.httpScheme = scheme
 	}
+}
+
+// NewRecordGenerator returns a RecordGenerator that's been configured with a timeout.
+func NewRecordGenerator(options ...Option) *RecordGenerator {
+	rg := &RecordGenerator{}
+	for i := range options {
+		if options[i] != nil {
+			options[i](rg)
+		}
+	}
+	return rg
 }
 
 // ParseState retrieves and parses the Mesos master /state.json and converts it
