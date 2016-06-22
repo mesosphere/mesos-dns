@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/mesosphere/mesos-dns/errorutil"
+	"github.com/mesosphere/mesos-dns/httpcli/iam"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/miekg/dns"
 )
@@ -79,19 +80,7 @@ type Config struct {
 
 	caPool *x509.CertPool
 
-	iamConfig *IAMConfig
-}
-
-type IAMConfig struct {
-	ID string `json:"uid"`
-
-	Secret string `json:"secret"`
-
-	Password string `json:"password"`
-
-	LoginEndpoint string `json:"login_endpoint"`
-
-	loginURL *url.URL
+	iamConfig *iam.Config
 }
 
 // NewConfig return the default config of the resolver
@@ -139,68 +128,59 @@ func SetConfig(cjson string) Config {
 		logging.Error.Fatalf("Masters validation failed: %v", err)
 	}
 
-	if c.ExternalOn {
-		if len(c.Resolvers) == 0 {
-			c.Resolvers = GetLocalDNS()
-		}
-		if err = validateResolvers(c.Resolvers); err != nil {
-			logging.Error.Fatalf("Resolvers validation failed: %v", err)
-		}
-	}
+	c.initResolvers()
 
 	if err = validateIPSources(c.IPSources); err != nil {
 		logging.Error.Fatalf("IPSources validation failed: %v", err)
 	}
 
+	if c.StateTimeoutSeconds <= 0 {
+		logging.Error.Fatal("Invalid HTTP Timeout: ", c.StateTimeoutSeconds)
+	}
+
 	c.Domain = strings.ToLower(c.Domain)
 
+	c.initSOA()
+
+	if c.CACertFile != "" {
+		pool, err := readCACertFile(c.CACertFile)
+		if err != nil {
+			logging.Error.Fatal(err.Error())
+		}
+		c.caPool = pool
+	}
+
+	if c.IAMConfigFile != "" {
+		iamConfig, err := iam.LoadFromFile(c.IAMConfigFile)
+		if err != nil {
+			logging.Error.Fatal(err.Error())
+		}
+		c.iamConfig = &iamConfig
+	}
+
+	c.log()
+	return *c
+}
+
+func (c *Config) initResolvers() {
+	if c.ExternalOn {
+		if len(c.Resolvers) == 0 {
+			c.Resolvers = GetLocalDNS()
+		}
+		if err := validateResolvers(c.Resolvers); err != nil {
+			logging.Error.Fatalf("Resolvers validation failed: %v", err)
+		}
+	}
+}
+
+func (c *Config) initSOA() {
 	// SOA record fields
 	c.SOARname = strings.TrimRight(strings.Replace(c.SOARname, "@", ".", -1), ".") + "."
 	c.SOAMname = strings.TrimRight(c.SOAMname, ".") + "."
 	c.SOASerial = uint32(time.Now().Unix())
+}
 
-	if c.CACertFile != "" {
-		f, err := os.Open(c.CACertFile)
-		if err != nil {
-			logging.Error.Fatalf("CACertFile open failed: %v", err)
-		}
-		defer f.Close()
-
-		b, err := ioutil.ReadAll(f)
-		if err != nil {
-			logging.Error.Fatalf("CACertFile read failed: %v", err)
-		}
-
-		caPool := x509.NewCertPool()
-		if !caPool.AppendCertsFromPEM(b) {
-			logging.Error.Fatal("CACertFile parsing failed")
-		}
-		c.caPool = caPool
-	}
-
-	if c.IAMConfigFile != "" {
-		f, err := os.Open(c.IAMConfigFile)
-		if err != nil {
-			logging.Error.Fatalf("IAMConfigFile open failed: %v", err)
-		}
-		defer f.Close()
-
-		dec := json.NewDecoder(f)
-		var iamConfig IAMConfig
-		err = dec.Decode(&iamConfig)
-		if err != nil {
-			logging.Error.Fatalf("IAMConfig decode failed: %v", err)
-		}
-
-		u, err := url.Parse(iamConfig.LoginEndpoint)
-		if err != nil {
-			logging.Error.Fatalf("IAMConfig login endpoint: %v", err)
-		}
-		iamConfig.loginURL = u
-
-		c.iamConfig = &iamConfig
-	}
-
+func (c Config) log() {
 	// print configuration file
 	logging.Verbose.Println("Mesos-DNS configuration:")
 	logging.Verbose.Println("   - Masters: " + strings.Join(c.Masters, ", "))
@@ -234,8 +214,29 @@ func SetConfig(cjson string) Config {
 	logging.Verbose.Println("   - MesosHTTPSOn", c.MesosHTTPSOn)
 	logging.Verbose.Println("   - CACertFile", c.CACertFile)
 	logging.Verbose.Println("   - IAMConfigFile", c.IAMConfigFile)
+}
 
-	return *c
+func readCACertFile(caCertFile string) (caPool *x509.CertPool, err error) {
+	var f *os.File
+	if f, err = os.Open(caCertFile); err != nil {
+		err = fmt.Errorf("CACertFile open failed: %v", err)
+		return
+	}
+	defer errorutil.Ignore(f.Close)
+
+	var b []byte
+	if b, err = ioutil.ReadAll(f); err != nil {
+		err = fmt.Errorf("CACertFile read failed: %v", err)
+		return
+	}
+
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(b) {
+		err = fmt.Errorf("CACertFile parsing failed: %v", err)
+	} else {
+		caPool = pool
+	}
+	return
 }
 
 func readConfig(file string) (*Config, error) {
