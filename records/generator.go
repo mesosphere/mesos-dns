@@ -21,6 +21,7 @@ import (
 	"github.com/mesosphere/mesos-dns/models"
 	"github.com/mesosphere/mesos-dns/records/labels"
 	"github.com/mesosphere/mesos-dns/records/state"
+	"github.com/mesosphere/mesos-dns/urls"
 	"github.com/tv42/zbase32"
 )
 
@@ -92,12 +93,12 @@ func (kind rrsKind) rrs(rg *RecordGenerator) rrs {
 // RecordGenerator contains DNS records and methods to access and manipulate
 // them. TODO(kozyraki): Refactor when discovery id is available.
 type RecordGenerator struct {
-	As         rrs
-	SRVs       rrs
-	SlaveIPs   map[string]string
-	EnumData   EnumerationData
-	httpClient httpcli.Doer
-	httpScheme string
+	As            rrs
+	SRVs          rrs
+	SlaveIPs      map[string]string
+	EnumData      EnumerationData
+	httpClient    httpcli.Doer
+	stateEndpoint urls.Builder
 }
 
 // EnumerableRecord is the lowest level object, and should map 1:1 with DNS records
@@ -134,8 +135,8 @@ type Option func(*RecordGenerator)
 // Option may be reused by generators that want to share the same transport/client.
 func WithConfig(config Config) Option {
 	var (
-		scheme, tlsClientConfig = httpcli.TLSConfig(config.MesosHTTPSOn, config.caPool)
-		httpClient              = httpcli.New(
+		opt, tlsClientConfig = httpcli.TLSConfig(config.MesosHTTPSOn, config.caPool)
+		httpClient           = httpcli.New(
 			config.iamConfig,
 			httpcli.Transport(&http.Transport{
 				DisableKeepAlives:   true, // Mesos master doesn't implement defensive HTTP
@@ -147,7 +148,10 @@ func WithConfig(config Config) Option {
 	)
 	return func(rg *RecordGenerator) {
 		rg.httpClient = httpClient
-		rg.httpScheme = scheme
+		rg.stateEndpoint = rg.stateEndpoint.With(
+			urls.Path("/master/state.json"),
+			opt,
+		)
 	}
 }
 
@@ -238,11 +242,7 @@ func (rg *RecordGenerator) loadFromMaster(ip, port string) (state.State, error) 
 	// REFACTOR: state.json security
 
 	var sj state.State
-	u := url.URL{
-		Scheme: rg.httpScheme,
-		Host:   net.JoinHostPort(ip, port),
-		Path:   "/master/state.json",
-	}
+	u := url.URL(rg.stateEndpoint.With(urls.Host(net.JoinHostPort(ip, port))))
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
