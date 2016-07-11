@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/mesosphere/mesos-dns/errorutil"
+	"github.com/mesosphere/mesos-dns/httpcli"
+	"github.com/mesosphere/mesos-dns/httpcli/basic"
 	"github.com/mesosphere/mesos-dns/httpcli/iam"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/miekg/dns"
@@ -75,12 +77,16 @@ type Config struct {
 	MesosHTTPSOn bool
 	// CA certificate to use to verify Mesos Master certificate
 	CACertFile string
+
+	MesosCredentials basic.Credentials
 	// IAM Config File
 	IAMConfigFile string
 
 	caPool *x509.CertPool
 
 	iamConfig *iam.Config
+
+	MesosAuthentication httpcli.AuthMechanism
 }
 
 // NewConfig return the default config of the resolver
@@ -109,6 +115,7 @@ func NewConfig() Config {
 		RecurseOn:           true,
 		IPSources:           []string{"netinfo", "mesos", "host"},
 		EnumerationOn:       true,
+		MesosAuthentication: httpcli.AuthNone,
 	}
 }
 
@@ -213,7 +220,22 @@ func (c Config) log() {
 	logging.Verbose.Println("   - EnumerationOn", c.EnumerationOn)
 	logging.Verbose.Println("   - MesosHTTPSOn", c.MesosHTTPSOn)
 	logging.Verbose.Println("   - CACertFile", c.CACertFile)
-	logging.Verbose.Println("   - IAMConfigFile", c.IAMConfigFile)
+	logging.Verbose.Println("   - MesosAuthentication", c.MesosAuthentication)
+	switch c.MesosAuthentication {
+	case httpcli.AuthBasic:
+		logging.Verbose.Println("   - MesosCredentials: ", c.MesosCredentials.Principal+":******")
+	case httpcli.AuthIAM:
+		logging.Verbose.Println("   - IAMConfigFile", c.IAMConfigFile)
+	case httpcli.AuthNone:
+		if c.MesosCredentials.Principal != "" {
+			logging.Error.Println("Warning! MesosCredentials is configured, but " +
+				"MesosAuthentication is set to none. This is probably not intentional")
+		}
+		if c.IAMConfigFile != "" {
+			logging.Error.Println("Warning! IAMConfigFile is set, but " +
+				"MesosAuthentication is set to none. This is probably not intentional")
+		}
+	}
 }
 
 func readCACertFile(caCertFile string) (caPool *x509.CertPool, err error) {

@@ -136,18 +136,32 @@ type Option func(*RecordGenerator)
 func WithConfig(config Config) Option {
 	var (
 		opt, tlsClientConfig = httpcli.TLSConfig(config.MesosHTTPSOn, config.caPool)
-		httpClient           = httpcli.New(
-			config.iamConfig,
-			httpcli.Transport(&http.Transport{
-				DisableKeepAlives:   true, // Mesos master doesn't implement defensive HTTP
-				MaxIdleConnsPerHost: 2,
-				TLSClientConfig:     tlsClientConfig,
-			}),
-			httpcli.Timeout(time.Duration(config.StateTimeoutSeconds)*time.Second),
-		)
+		transport            = httpcli.Transport(&http.Transport{
+			DisableKeepAlives:   true, // Mesos master doesn't implement defensive HTTP
+			MaxIdleConnsPerHost: 2,
+			TLSClientConfig:     tlsClientConfig,
+		})
+		timeout       = httpcli.Timeout(time.Duration(config.StateTimeoutSeconds) * time.Second)
+		defaultClient = &http.Client{}
+		doer          httpcli.Doer
 	)
+
+	transport(defaultClient)
+	timeout(defaultClient)
+
+	switch config.MesosAuthentication {
+	case httpcli.AuthNone, "":
+		doer = defaultClient
+	case httpcli.AuthBasic:
+		doer = httpcli.NewBasic(defaultClient, config.MesosCredentials)
+	case httpcli.AuthIAM:
+		doer = httpcli.NewIAM(defaultClient, config.iamConfig)
+	default:
+		panic("I don't know about " + config.MesosAuthentication)
+	}
+
 	return func(rg *RecordGenerator) {
-		rg.httpClient = httpClient
+		rg.httpClient = doer
 		rg.stateEndpoint = rg.stateEndpoint.With(
 			urls.Path("/master/state.json"),
 			opt,
@@ -210,7 +224,7 @@ func (rg *RecordGenerator) findMaster(masters ...string) (state.State, error) {
 		if sj, err = rg.loadWrap(ip, port); err == nil && sj.Leader != "" {
 			return sj, nil
 		}
-		logging.Verbose.Println("Warning: Zookeeper is wrong about leader")
+		logging.Verbose.Println("Warning: Zookeeper is wrong about leader, or request failed")
 		if len(masters) == 0 {
 			return sj, errors.New("no master")
 		}
