@@ -4,12 +4,12 @@ package httpcli
 type AuthMechanism string
 
 const (
-	// No authentication mechanism
+	// AuthNone specifies no authentication mechanism
 	AuthNone AuthMechanism = "none"
 
-	// Use HTTP basic
+	// AuthBasic specifies to use HTTP Basic
 	AuthBasic AuthMechanism = "basic"
 
-	// Use IAM / JWT authentication
+	// AuthIAM specifies to use IAM / JDK authentication
 	AuthIAM AuthMechanism = "iam"
 )
