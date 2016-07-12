@@ -4,9 +4,11 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"github.com/mesosphere/mesos-dns/urls"
+	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/mesosphere/mesos-dns/urls"
 )
 
 // ErrAuthFailed is returned for any type of IAM authentication failure
@@ -18,8 +20,34 @@ type Doer interface {
 	Do(req *http.Request) (resp *http.Response, err error)
 }
 
+// DoerFunc is the functional adaptation of Doer
+type DoerFunc func(req *http.Request) (resp *http.Response, err error)
+
+// Do implements Doer for DoerFunc
+func (df DoerFunc) Do(req *http.Request) (*http.Response, error) { return df(req) }
+
+// DoerFactory generates a Doer
+type DoerFactory func(ConfigMap, *http.Client) Doer
+
 // Option is a functional option type
 type Option func(*http.Client)
+
+// New generates and returns an HTTP transactor given an optional IAM configuration and some set of
+// functional options.
+func New(am AuthMechanism, cm ConfigMap, options ...Option) Doer {
+	defaultClient := &http.Client{}
+	for i := range options {
+		if options[i] != nil {
+			options[i](defaultClient)
+		}
+	}
+
+	df, ok := factoryFor(am)
+	if !ok {
+		panic(fmt.Sprintf("unregistered auth mechanism %q", am))
+	}
+	return df(cm, defaultClient)
+}
 
 // Timeout returns an Option that configures client timeout
 func Timeout(timeout time.Duration) Option {
