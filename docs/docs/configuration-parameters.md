@@ -56,7 +56,7 @@ Defaults to `30` seconds.
 
 It is sufficient to specify just one of the `zk` or `masters` field. If both are defined, Mesos-DNS will first attempt to detect the leading master through Zookeeper. If Zookeeper is not responding, it will fall back to using the `masters` field. Both `zk` and `master` fields are static. To update them you need to restart Mesos-DNS. We recommend you use the `zk` field since this allows the dynamic addition to Mesos masters. 
 
-`mesosAuthentication` configures the authentication mechanism for talking to the Mesos cluster. Valid values are 'none', 'basic' (see `mesosCredentials`), and 'iam'. Default is 'none'.
+`mesosAuthentication` configures the authentication mechanism for talking to the Mesos cluster. Valid values are '', 'basic' (see `mesosCredentials`), and 'iam'. Default is ''.
 
 `mesosCredentials` is a dictionary containing a `principal` and a `secret`, corresponding to a configured authentication principal for the Mesos masters. Starting with Mesos `1.0.0`, if the masters have `http_authentication` enabled, then Mesos-DNS must authenticate. You must specify `mesosAuthentication`: `basic` to use this configuration.
 
