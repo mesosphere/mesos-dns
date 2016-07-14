@@ -26,7 +26,8 @@ type DoerFunc func(req *http.Request) (resp *http.Response, err error)
 // Do implements Doer for DoerFunc
 func (df DoerFunc) Do(req *http.Request) (*http.Response, error) { return df(req) }
 
-// DoerFactory generates a Doer
+// DoerFactory generates a Doer. If the given Client is nil then the returned Doer must also be nil.
+// Specifying a nil Client is useful for asking the factory to ONLY validate the provided ConfigMap.
 type DoerFactory func(ConfigMap, *http.Client) Doer
 
 // Option is a functional option type
