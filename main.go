@@ -36,6 +36,7 @@ func main() {
 
 	// initialize logging
 	logging.SetupLogs()
+	initAuth()
 
 	// initialize resolver
 	config := records.SetConfig(*cjson)
