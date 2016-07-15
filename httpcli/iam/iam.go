@@ -14,14 +14,24 @@ import (
 
 // Register registers a DoerFactory for IAM (JWT-based) authentication
 func Register() {
-	httpcli.Register(httpcli.AuthIAM, httpcli.DoerFactory(func(cm httpcli.ConfigMap, c *http.Client) httpcli.Doer {
+	httpcli.Register(httpcli.AuthIAM, httpcli.DoerFactory(func(cm httpcli.ConfigMap, c *http.Client) (doer httpcli.Doer) {
 		obj := cm.FindOrPanic(httpcli.AuthIAM)
 		config, ok := obj.(Config)
 		if !ok {
-			panic(fmt.Sprintf("expected Config instead of %#+v", obj))
+			panic(fmt.Errorf("expected Config instead of %#+v", obj))
 		}
-		return Doer(c, config)
+		validate(config)
+		if c != nil {
+			doer = Doer(c, config)
+		}
+		return
 	}))
+}
+
+func validate(c Config) {
+	if c.ID == "" || c.Secret == "" || c.LoginEndpoint == "" {
+		panic(ErrInvalidConfiguration)
+	}
 }
 
 // Doer wraps an HTTP transactor given an IAM configuration

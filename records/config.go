@@ -84,7 +84,7 @@ type Config struct {
 
 	caPool *x509.CertPool
 
-	iamConfig *iam.Config
+	httpConfigMap httpcli.ConfigMap
 
 	MesosAuthentication httpcli.AuthMechanism
 }
@@ -157,16 +157,29 @@ func SetConfig(cjson string) Config {
 		c.caPool = pool
 	}
 
+	c.initMesosAuthentication()
+	c.log()
+
+	return *c
+}
+
+func (c *Config) initMesosAuthentication() {
+	configMapOpts := httpcli.ConfigMapOptions{
+		basic.Configuration(c.MesosCredentials),
+	}
 	if c.IAMConfigFile != "" {
 		iamConfig, err := iam.LoadFromFile(c.IAMConfigFile)
 		if err != nil {
 			logging.Error.Fatal(err.Error())
 		}
-		c.iamConfig = &iamConfig
+		configMapOpts = append(configMapOpts, iam.Configuration(iamConfig))
 	}
 
-	c.log()
-	return *c
+	c.httpConfigMap = configMapOpts.ToConfigMap()
+	err := httpcli.Validate(c.MesosAuthentication, c.httpConfigMap)
+	if err != nil {
+		logging.Error.Fatal(err.Error())
+	}
 }
 
 func (c *Config) initResolvers() {
@@ -220,7 +233,7 @@ func (c Config) log() {
 	logging.Verbose.Println("   - EnumerationOn", c.EnumerationOn)
 	logging.Verbose.Println("   - MesosHTTPSOn", c.MesosHTTPSOn)
 	logging.Verbose.Println("   - CACertFile", c.CACertFile)
-	logging.Verbose.Println("   - MesosAuthentication", c.MesosAuthentication)
+	logging.Verbose.Println("   - MesosAuthentication: ", c.MesosAuthentication)
 	switch c.MesosAuthentication {
 	case httpcli.AuthBasic:
 		logging.Verbose.Println("   - MesosCredentials: ", c.MesosCredentials.Principal+":******")

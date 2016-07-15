@@ -141,12 +141,8 @@ func WithConfig(config Config) Option {
 			MaxIdleConnsPerHost: 2,
 			TLSClientConfig:     tlsClientConfig,
 		})
-		timeout   = httpcli.Timeout(time.Duration(config.StateTimeoutSeconds) * time.Second)
-		configMap = httpcli.ConfigMap(map[httpcli.AuthMechanism]interface{}{
-			httpcli.AuthBasic: config.MesosCredentials,
-			httpcli.AuthIAM:   config.MesosAuthentication,
-		})
-		doer = httpcli.New(config.MesosAuthentication, configMap, transport, timeout)
+		timeout = httpcli.Timeout(time.Duration(config.StateTimeoutSeconds) * time.Second)
+		doer    = httpcli.New(config.MesosAuthentication, config.httpConfigMap, transport, timeout)
 	)
 	return func(rg *RecordGenerator) {
 		rg.httpClient = doer
