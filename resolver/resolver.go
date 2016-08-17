@@ -83,6 +83,7 @@ func exchangers(timeout time.Duration, protos ...string) map[string]exchanger.Ex
 				ReadTimeout:  timeout,
 				WriteTimeout: timeout,
 			},
+			exchanger.IgnoreErrTruncated,
 			exchanger.ErrorLogging(logging.Error),
 			exchanger.Instrumentation(
 				logging.CurLog.NonMesosForwarded,
