@@ -69,7 +69,7 @@ func trimCut(label []byte, maxlen int, left, right string) []byte {
 	}
 	tail := bytes.TrimLeft(trim[size:], right)
 	if len(tail) > 0 {
-		return append(head, tail[:size-len(head)]...)
+		return append(head, tail[:min(len(tail), size-len(head))]...)
 	}
 	return head
 }
