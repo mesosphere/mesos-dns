@@ -8,5 +8,8 @@ type ErrorFunction func() error
 // This allows us to be more explicit when there is no error
 // handling to be done, for example in defers
 func Ignore(f ErrorFunction) {
-	_ = f()
+	if err := f(); err != nil {
+		return
+	}
+	return
 }

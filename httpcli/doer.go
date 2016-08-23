@@ -69,15 +69,9 @@ func TLSConfig(enabled bool, caPool *x509.CertPool) (opt urls.Option, config *tl
 	opt = urls.Scheme("http")
 	if enabled {
 		opt = urls.Scheme("https")
-		if caPool != nil {
-			config = &tls.Config{
-				RootCAs: caPool,
-			}
-		} else {
-			// do HTTPS without verifying the Mesos master certificate
-			config = &tls.Config{
-				InsecureSkipVerify: true,
-			}
+		config = &tls.Config{
+			RootCAs:            caPool,
+			InsecureSkipVerify: caPool == nil,
 		}
 	}
 	return
