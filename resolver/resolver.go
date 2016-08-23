@@ -172,7 +172,10 @@ func (res *Resolver) formatSRV(name string, target string) (*dns.SRV, error) {
 	if err != nil {
 		return nil, errors.New("invalid target")
 	}
-	p, _ := strconv.Atoi(port)
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		return nil, errors.New("invalid target port")
+	}
 
 	return &dns.SRV{
 		Hdr: dns.RR_Header{
@@ -632,7 +635,11 @@ func (res *Resolver) RestService(req *restful.Request, resp *restful.Response) {
 	srvRRs := rs.SRVs[dom]
 	records := make([]record, 0, len(srvRRs))
 	for s := range srvRRs {
-		host, port, _ := net.SplitHostPort(s)
+		host, port, err := net.SplitHostPort(s)
+		if err != nil {
+			logging.Error.Println(err)
+			continue
+		}
 		var ip string
 		if r, ok := rs.As.First(host); ok {
 			ip = r
