@@ -34,7 +34,7 @@ func TestValidate(t *testing.T) {
 			am: AuthIAM,
 			cm: ConfigMapOptions{iam.Configuration(iam.Config{
 				ID:            "foo",
-				Secret:        "bar",
+				PrivateKey:    "bar",
 				LoginEndpoint: "blah",
 			})}.ToConfigMap(),
 		},

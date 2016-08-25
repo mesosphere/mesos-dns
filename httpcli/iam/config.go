@@ -13,7 +13,7 @@ var ErrInvalidConfiguration = errors.New("invalid HTTP IAM configuration")
 // IAM endpoint.
 type Config struct {
 	ID            string `json:"uid"`            // ID
-	Secret        string `json:"secret"`         // Secret
+	PrivateKey    string `json:"private_key"`    // PrivateKey
 	LoginEndpoint string `json:"login_endpoint"` // LoginEndpoint
 }
 
