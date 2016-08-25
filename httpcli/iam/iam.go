@@ -29,7 +29,7 @@ func Register() {
 }
 
 func validate(c Config) {
-	if c.ID == "" || c.Secret == "" || c.LoginEndpoint == "" {
+	if c.ID == "" || c.PrivateKey == "" || c.LoginEndpoint == "" {
 		panic(ErrInvalidConfiguration)
 	}
 }
@@ -42,7 +42,7 @@ func Doer(client *http.Client, config Config) httpcli.Doer {
 		token.Claims["uid"] = config.ID
 		token.Claims["exp"] = time.Now().Add(time.Hour).Unix()
 		// SignedString will treat secret as PEM-encoded key
-		tokenStr, err := token.SignedString([]byte(config.Secret))
+		tokenStr, err := token.SignedString([]byte(config.PrivateKey))
 		if err != nil {
 			return nil, err
 		}
