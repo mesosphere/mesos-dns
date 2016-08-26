@@ -448,8 +448,10 @@ func truncate(m *dns.Msg, udp bool) *dns.Msg {
 		max = int(opt.UDPSize())
 	}
 
-	m.Truncated = m.Len() > max
-	if !m.Truncated {
+	furtherTruncation := m.Len() > max
+	m.Truncated = m.Truncated || furtherTruncation
+
+	if !furtherTruncation {
 		return m
 	}
 
