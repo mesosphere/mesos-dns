@@ -76,6 +76,7 @@ func exchangers(timeout time.Duration, protos ...string) map[string]exchanger.Ex
 				ReadTimeout:  timeout,
 				WriteTimeout: timeout,
 			},
+			exchanger.IgnoreErrTruncated,
 			exchanger.ErrorLogging(logging.Error),
 			exchanger.Instrumentation(
 				logging.CurLog.NonMesosForwarded,
@@ -447,8 +448,10 @@ func truncate(m *dns.Msg, udp bool) *dns.Msg {
 		max = int(opt.UDPSize())
 	}
 
-	m.Truncated = m.Len() > max
-	if !m.Truncated {
+	furtherTruncation := m.Len() > max
+	m.Truncated = m.Truncated || furtherTruncation
+
+	if !furtherTruncation {
 		return m
 	}
 
