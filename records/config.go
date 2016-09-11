@@ -48,7 +48,7 @@ type Config struct {
 	SOARname   string // email of admin esponsible
 	// Mesos master(s): a list of IP:port pairs for one or more Mesos masters
 	Masters []string
-	// DNS server: IP address of the DNS server for forwarded accesses
+	// DNS server: a list of IP addresses or IP:port pairs for DNS servers for forwarded accesses
 	Resolvers []string
 	// IPSources is the prioritized list of task IP sources
 	IPSources []string // e.g. ["host", "docker", "mesos", "rkt"]
@@ -132,7 +132,7 @@ func SetConfig(cjson string) Config {
 		logging.Error.Fatalf("service validation failed: %v", err)
 	}
 	if err = validateMasters(c.Masters); err != nil {
-		logging.Error.Fatalf("Masters validation failed: %v", err)
+		logging.Error.Fatal(err)
 	}
 
 	c.initResolvers()
@@ -188,7 +188,7 @@ func (c *Config) initResolvers() {
 			c.Resolvers = GetLocalDNS()
 		}
 		if err := validateResolvers(c.Resolvers); err != nil {
-			logging.Error.Fatalf("Resolvers validation failed: %v", err)
+			logging.Error.Fatal(err)
 		}
 	}
 }
