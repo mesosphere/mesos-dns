@@ -18,12 +18,13 @@ the same stability and compatibility guarantees as releases.
 All branches and pull requests are tested by [Circle-CI](https://circleci.com/gh/mesosphere/mesos-dns), which also
 outputs artifacts for Mac OS X, Windows, and Linux via cross-compilation.
 
-You will need [Go](https://golang.org/) *1.5* or later to build the project.
-All dependencies are vendored using `Godeps`. You must first install it in order to build from source.
+You will need [Go](https://golang.org/) *1.6* or later to build the project.
+All dependencies are vendored using `Govendor`. You must first install it in order to build from source.
 
 ```shell
-$ go get github.com/tools/godep
-$ godep go build ./...
+$ go get github.com/kardianos/govendor
+$ govendor sync
+$ go build ./...
 ```
 
 ### Building for release
@@ -53,7 +54,7 @@ There are only very few users with access to the private key, and they also have
 
 ## Testing
 ```shell
-$ godep go test -race ./...
+$ go test -race ./...
 ```
 
 ## Documentation

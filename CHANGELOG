@@ -1,3 +1,19 @@
+2016-09-14: v0.6.0
+  Added some benchmarks for RecordGenerator.insertRR
+  Make minor fixes to enumeration API, where it would return null, as
+    as opposed to an empty list
+  Add the AXFR (record listing) HTTP API endpoint
+  Make HTTP listener address configurable
+  General improvements to the HTTP client
+    -Pool HTTP connections, preventing connection leakage
+    -Set the User Agent
+  Switch the project to Go Vendor as opposed to Godeps
+  Add HTTPS Client support to Mesos-DNS (for state.json)
+  Add Mesos authentication support
+  Fix tasks from more than 63 dashes and a non - character from
+    crashing Mesos-DNS
+  Don't treat truncated records as an error.
+
 2016-03-04: v0.5.2
   Add EnforceRFC952 to sample config
   Improve performance of record generation
