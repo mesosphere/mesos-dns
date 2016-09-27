@@ -94,7 +94,7 @@ func runHandlers() error {
 	if err != nil {
 		return err
 	}
-	res.fwd = func(m *dns.Msg, net string) (*dns.Msg, error) {
+	fwd := func(m *dns.Msg, net string) (*dns.Msg, error) {
 		rr1, err := res.formatA("google.com.", "1.1.1.1")
 		if err != nil {
 			return nil, err
@@ -218,7 +218,7 @@ func runHandlers() error {
 						"ns1.mesos", "root.ns1.mesos", 60))),
 		},
 		{
-			res.HandleNonMesos,
+			res.HandleNonMesos(fwd),
 			Message(
 				Question("google.com.", dns.TypeA),
 				Header(false, dns.RcodeSuccess),

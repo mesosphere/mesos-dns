@@ -3,8 +3,12 @@ package records
 import (
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
+	"strings"
 )
+
+var dnsValidationRegex = regexp.MustCompile(`^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*$`)
 
 func validateEnabledServices(c *Config) error {
 	if !c.DNSOn && !c.HTTPOn {
@@ -49,6 +53,50 @@ func validateResolvers(rs []string) error {
 		return fmt.Errorf("Error validating resolvers: %v", err)
 	}
 	return nil
+}
+
+func validateDomainName(domain string) error {
+	if !dnsValidationRegex.MatchString(domain) {
+		return fmt.Errorf("Invalid domain name: %s", domain)
+	}
+	return nil
+}
+
+func validateZoneResolvers(zrs map[string][]string, mesosDomain string) (
+	err error) {
+
+	allDomains := make([]string, 0, len(zrs)+1)
+
+	for domain, rs := range zrs {
+		if len(rs) == 0 {
+			return fmt.Errorf("ZoneResolver %v is empty", domain)
+		}
+		err = validateDomainName(domain)
+		if err != nil {
+			return err
+		}
+
+		err = validateResolvers(rs)
+		if err != nil {
+			return
+		}
+		if domain == mesosDomain {
+			return fmt.Errorf("Can't specify ZoneResolver for Mesos domain (%v)",
+				mesosDomain)
+		}
+		allDomains = append(allDomains, "."+domain)
+	}
+	allDomains = append(allDomains, "."+mesosDomain)
+	for _, a := range allDomains {
+		for _, b := range allDomains {
+			if (a != b) &&
+				strings.HasSuffix(a, b) {
+				return fmt.Errorf("Ambiguous zone resolvers: %v is masked by %v",
+					a, b)
+			}
+		}
+	}
+	return
 }
 
 func normalizeResolver(hostPort string) (string, error) {

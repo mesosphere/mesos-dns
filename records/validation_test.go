@@ -4,6 +4,25 @@ import (
 	"testing"
 )
 
+func TestValidateDomain(t *testing.T) {
+	testDomain := func(domain string, shouldSucceed bool) {
+		err := validateDomainName(domain)
+		if shouldSucceed && err != nil {
+			t.Errorf("validation should have succeeded for %s", domain)
+		}
+		if !shouldSucceed && err == nil {
+			t.Errorf("validation should have failed for %s", domain)
+		}
+	}
+
+	testDomain("", false)
+	testDomain("1-awesome.domain.e", true)
+	testDomain(".invalid.com", false)
+	testDomain("invalid.com.", false)
+	testDomain("single-name", true)
+	testDomain("name", true)
+}
+
 func TestValidateMasters(t *testing.T) {
 	for i, tc := range []validationTest{
 		{nil, true},
@@ -72,5 +91,47 @@ func validate(t *testing.T, i int, tc validationTest, f func([]string) error) {
 		t.Fatalf("test %d failed, unexpected error validating resolvers %v: %v", i, tc.in, err)
 	default:
 		t.Fatalf("test %d failed, expected validation error for resolvers(%d) %v", i, len(tc.in), tc.in)
+	}
+}
+
+func TestValidateZoneResolvers(t *testing.T) {
+	ips := []string{"8.8.8.8"}
+
+	fn := func(zrs map[string][]string) error {
+		return validateZoneResolvers(zrs, "dc.mesos")
+	}
+
+	for i, tc := range []zoneValidationTest{
+		{nil, true},
+		{map[string][]string{"": ips}, false},
+		{map[string][]string{"weave": ips}, true},
+		{map[string][]string{"weave": []string{}}, false},
+		{map[string][]string{"mesos": ips}, false},
+		{map[string][]string{"dc.mesos": ips}, false},
+		{map[string][]string{"acdc.mesos": ips}, true},
+		{map[string][]string{"site.dc.mesos": ips}, false},
+		{map[string][]string{"abc.com": ips, "com": ips}, false},
+		{map[string][]string{"abc.com": ips, "bc.com": ips}, true},
+	} {
+		validateZone(t, i+1, tc, fn)
+	}
+}
+
+type zoneValidationTest struct {
+	in    map[string][]string
+	valid bool
+}
+
+func validateZone(t *testing.T, i int, tc zoneValidationTest,
+	f func(map[string][]string) error) {
+	switch err := f(tc.in); {
+	case (err == nil && tc.valid) || (err != nil && !tc.valid):
+		return // valid
+	case tc.valid:
+		t.Fatalf("test %d failed, unexpected error validating zone resolvers "+
+			"%v: %v", i, tc.in, err)
+	default:
+		t.Fatalf("test %d failed, expected validation error for zone resolvers(%d)"+
+			" %v", i, len(tc.in), tc.in)
 	}
 }
