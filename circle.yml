@@ -15,7 +15,6 @@ dependencies:
   pre:
     - mkdir -p ${GOPATH}/src/github.com/mesosphere/mesos-dns
     - go version
-    - go get github.com/kardianos/govendor
     - go get github.com/mitchellh/gox
     - go get github.com/alecthomas/gometalinter
     - go get github.com/axw/gocov/gocov # https://github.com/golang/go/issues/6909
@@ -25,7 +24,6 @@ dependencies:
     - git describe --tags |tee VERSION
     - gpg --yes --batch --import build/private.key
   override:
-    - cd $GOPATH/src/github.com/mesosphere/mesos-dns && govendor sync
     - cd $GOPATH/src/github.com/mesosphere/mesos-dns && go install ./...
     - cd $GOPATH/src/github.com/mesosphere/mesos-dns && go test -i ./...
     - gometalinter --install
