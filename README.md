@@ -19,11 +19,16 @@ All branches and pull requests are tested by [Circle-CI](https://circleci.com/gh
 outputs artifacts for Mac OS X, Windows, and Linux via cross-compilation.
 
 You will need [Go](https://golang.org/) *1.6* or later to build the project.
-All dependencies are vendored using `Govendor`. You must first install it in order to build from source.
+All dependencies are tracked using `godep`.
 
 ```shell
-$ go get github.com/kardianos/govendor
-$ govendor sync
+# Install godep
+$ go get github.com/tools/godep
+
+# Save new dependencies
+$ godep save ./...
+
+# Build
 $ go build ./...
 ```
 
