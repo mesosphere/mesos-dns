@@ -10,6 +10,7 @@ Mesos-DNS implements a simple REST API for service discovery over HTTP:
 * `GET /v1/config`: lists the Mesos-DNS configuration info
 * `GET /v1/hosts/{host}`: lists the IP address of a host
 * `GET /v1/services/{service}`: lists the host, IP address, and port for a service
+* `GET /v1/enumerate`: lists all DNS information
 
 ## `GET /v1/version`
 
@@ -72,3 +73,69 @@ curl http://10.190.238.173:8123/v1/services/_nginx._tcp.marathon.mesos.
 ]
 ```
 
+## `GET /v1/enumerate`
+
+Lists in JSON format all DNS information.
+
+```console
+curl http://127.0.0.1:8123/v1/enumerate
+{
+    "frameworks": [
+     {
+        "tasks": [],
+        "name": "metronome"
+     },
+     {
+        "tasks": [
+         {
+            "name": "nginx",
+            "id": "nginx.48dccce7-90bc-11e6-ae70-70b3d5800001",
+            "records": [
+             {
+                "name": "nginx.marathon.mesos.",
+                "host": "10.10.0.93",
+                "rtype": "A"
+             },
+             {
+                "name": "nginx-jhy6r-s1.marathon.mesos.",
+                "host": "10.10.0.93",
+                "rtype": "A"
+             },
+             {
+                "name": "nginx.marathon.slave.mesos.",
+                "host": "10.10.0.93",
+                "rtype": "A"
+             },
+             {
+                "name": "nginx-jhy6r-s1.marathon.slave.mesos.",
+                "host": "10.10.0.93",
+                "rtype": "A"
+             },
+             {
+                "name": "_nginx._tcp.marathon.slave.mesos.",
+                "host": "nginx-jhy6r-s1.marathon.slave.mesos.:7564",
+                "rtype": "SRV"
+             },
+             {
+                "name": "_nginx._udp.marathon.slave.mesos.",
+                "host": "nginx-jhy6r-s1.marathon.slave.mesos.:7564",
+                "rtype": "SRV"
+             },
+             {
+                "name": "_nginx._tcp.marathon.mesos.",
+                "host": "nginx-jhy6r-s1.marathon.mesos.:7564",
+                "rtype": "SRV"
+             },
+             {
+                "name": "_nginx._nginx._tcp.marathon.mesos.",
+                "host": "nginx-jhy6r-s1.marathon.mesos.:7564",
+                "rtype": "SRV"
+             }
+            ]
+         }
+        ],
+        "name": "marathon"
+     }
+    ]
+}
+```
