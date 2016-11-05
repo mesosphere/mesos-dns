@@ -135,7 +135,7 @@ type Option func(*RecordGenerator)
 // Option may be reused by generators that want to share the same transport/client.
 func WithConfig(config Config) Option {
 	var (
-		opt, tlsClientConfig = httpcli.TLSConfig(config.MesosHTTPSOn, config.caPool)
+		opt, tlsClientConfig = httpcli.TLSConfig(config.MesosHTTPSOn, config.caPool, config.cert)
 		transport            = httpcli.Transport(&http.Transport{
 			DisableKeepAlives:   true, // Mesos master doesn't implement defensive HTTP
 			MaxIdleConnsPerHost: 2,

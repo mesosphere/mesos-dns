@@ -65,11 +65,12 @@ func Transport(tr http.RoundTripper) Option {
 }
 
 // TLSConfig generates and returns a recommended URL generation option and TLS configuration.
-func TLSConfig(enabled bool, caPool *x509.CertPool) (opt urls.Option, config *tls.Config) {
+func TLSConfig(enabled bool, caPool *x509.CertPool, cert tls.Certificate) (opt urls.Option, config *tls.Config) {
 	opt = urls.Scheme("http")
 	if enabled {
 		opt = urls.Scheme("https")
 		config = &tls.Config{
+			Certificates: 		[]tls.Certificate{cert},
 			RootCAs:            caPool,
 			InsecureSkipVerify: caPool == nil,
 		}
