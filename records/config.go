@@ -164,7 +164,14 @@ func SetConfig(cjson string) Config {
 	}
 
 	c.initSOA()
+	c.initCertificates()
+	c.initMesosAuthentication()
+	c.log()
 
+	return *c
+}
+
+func (c *Config) initCertificates() {
 	if c.CACertFile != "" {
 		pool, err := readCACertFile(c.CACertFile)
 		if err != nil {
@@ -188,11 +195,6 @@ func SetConfig(cjson string) Config {
 		}
 		c.cert = cert
 	}
-
-	c.initMesosAuthentication()
-	c.log()
-
-	return *c
 }
 
 func (c *Config) initMesosAuthentication() {
