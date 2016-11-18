@@ -87,10 +87,11 @@ func ordered(leader string, masters []string) []string {
 // Mesos-DNS and hence same byte order. If this isn't the case, the address
 // returned will be wrong. This only affects Mesos versions < 0.24.0
 func masterAddr(info *mesos.MasterInfo) string {
+	var ip string
+	var port int64
 	if info == nil {
 		return ""
 	}
-	ip, port := "", int64(0)
 	if addr := info.GetAddress(); addr != nil { // Mesos >= 0.24.0
 		ip, port = addr.GetIp(), int64(addr.GetPort())
 	} else { // Mesos < 0.24.0
