@@ -7,13 +7,14 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	_ "github.com/mesos/mesos-go/detector/zoo" // Registers the ZK detector
 	"github.com/mesosphere/mesos-dns/exchanger"
 	"github.com/mesosphere/mesos-dns/logging"
@@ -285,7 +286,7 @@ func (res *Resolver) HandleNonMesos(fwd exchanger.Forwarder) func(
 		} else if len(m.Answer) == 0 {
 			logging.CurLog.NonMesosNXDomain.Inc()
 		}
-		reply(w, m)
+		reply(w, m, res.config.SetTruncateBit)
 	}
 }
 
@@ -343,7 +344,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 		logging.CurLog.MesosFailed.Inc()
 	}
 
-	reply(w, m)
+	reply(w, m, res.config.SetTruncateBit)
 }
 
 func (res *Resolver) handleSRV(rs *records.RecordGenerator, name string, m, r *dns.Msg) error {
@@ -441,10 +442,9 @@ func (res *Resolver) handleEmpty(rs *records.RecordGenerator, name string, m, r 
 
 // reply writes the given dns.Msg out to the given dns.ResponseWriter,
 // compressing the message first and truncating it accordingly.
-func reply(w dns.ResponseWriter, m *dns.Msg) {
+func reply(w dns.ResponseWriter, m *dns.Msg, setTruncateBit bool) {
 	m.Compress = true // https://github.com/mesosphere/mesos-dns/issues/{170,173,174}
-
-	if err := w.WriteMsg(truncate(m, isUDP(w))); err != nil {
+	if err := w.WriteMsg(truncate(m, isUDP(w), setTruncateBit)); err != nil {
 		logging.Error.Println(err)
 	}
 }
@@ -457,7 +457,12 @@ func isUDP(w dns.ResponseWriter) bool {
 // truncate removes answers until the given dns.Msg fits the permitted
 // length of the given transmission channel and sets the TC bit.
 // See https://tools.ietf.org/html/rfc1035#section-4.2.1
-func truncate(m *dns.Msg, udp bool) *dns.Msg {
+// If `setTruncateBit` is true, the Truncate bit will be set if the message
+// has been truncated already or gets truncated here.
+// If `setTruncateBit` is false, the message will have its Truncate bit
+// cleared if it is already set, and won't set it even if it does get
+// truncated.
+func truncate(m *dns.Msg, udp bool, setTruncateBit bool) *dns.Msg {
 	max := dns.MinMsgSize
 	if !udp {
 		max = dns.MaxMsgSize
@@ -467,28 +472,29 @@ func truncate(m *dns.Msg, udp bool) *dns.Msg {
 
 	furtherTruncation := m.Len() > max
 	m.Truncated = m.Truncated || furtherTruncation
-
+	if !setTruncateBit {
+		// Clear the Truncate bit regardless of whether this message used
+		// to have it set set or whether we are going to truncate it here.
+		m.Truncated = false
+	}
 	if !furtherTruncation {
 		return m
 	}
-
 	m.Extra = nil // Drop all extra records first
 	if m.Len() < max {
+		// Dropping the extra records shrunk the message down sufficiently.
 		return m
 	}
 	answers := m.Answer[:]
-	left, right := 0, len(m.Answer)
-	for {
-		if left == right {
-			break
-		}
-		mid := (left + right) / 2
-		m.Answer = answers[:mid]
-		if m.Len() < max {
-			left = mid + 1
-			continue
-		}
-		right = mid
+	search := func(n int) bool {
+		m.Answer = answers[:n]
+		return m.Len() > max
+	}
+	limit := sort.Search(len(answers), search)
+	if limit > 0 {
+		m.Answer = answers[:limit-1]
+	} else {
+		m.Answer = answers[:0]
 	}
 	return m
 }

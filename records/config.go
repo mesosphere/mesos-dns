@@ -74,6 +74,10 @@ type Config struct {
 	ExternalOn bool
 	// EnforceRFC952 will enforce an older, more strict set of rules for DNS labels
 	EnforceRFC952 bool
+	// SetTruncateBit when `false` ensures responses never have the Truncate bit set even
+	// if they were truncated. When `true` any message that gets truncated will have the
+	// Truncate bit set.
+	SetTruncateBit bool
 	// Enumeration enabled via the API enumeration endpoint
 	EnumerationOn bool
 	// Communicate with Mesos using HTTPS if set to true
@@ -123,6 +127,7 @@ func NewConfig() Config {
 		DNSOn:               true,
 		HTTPOn:              true,
 		ExternalOn:          true,
+		SetTruncateBit:      true,
 		RecurseOn:           true,
 		IPSources:           []string{"netinfo", "mesos", "host"},
 		EnumerationOn:       true,
@@ -272,6 +277,7 @@ func (c Config) log() {
 	logging.Verbose.Println("   - HttpOn: ", c.HTTPOn)
 	logging.Verbose.Println("   - ConfigFile: ", c.File)
 	logging.Verbose.Println("   - EnforceRFC952: ", c.EnforceRFC952)
+	logging.Verbose.Println("   - SetTruncateBit: ", c.SetTruncateBit)
 	logging.Verbose.Println("   - IPSources: ", c.IPSources)
 	logging.Verbose.Println("   - EnumerationOn", c.EnumerationOn)
 	logging.Verbose.Println("   - MesosHTTPSOn", c.MesosHTTPSOn)
