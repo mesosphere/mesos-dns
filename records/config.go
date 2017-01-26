@@ -77,6 +77,11 @@ type Config struct {
 	// SetTruncateBit when `false` ensures responses never have the Truncate bit set even
 	// if they were truncated. When `true` any message that gets truncated will have the
 	// Truncate bit set.
+	// Compliant clients that receive truncated responses will retry the request
+	// over TCP. Some non-compliant clients simply cannot handle truncated responses at all.
+	// Disabling this option causes mesos-dns to behave in a non-compliant way. It exists
+	// only as a workaround for non-compliant clients and users who cannot tolerate the
+	// latency added by the standard TCP fallback.
 	SetTruncateBit bool
 	// Enumeration enabled via the API enumeration endpoint
 	EnumerationOn bool
