@@ -485,17 +485,15 @@ func truncate(m *dns.Msg, udp bool, setTruncateBit bool) *dns.Msg {
 		// Dropping the extra records shrunk the message down sufficiently.
 		return m
 	}
-	answers := m.Answer[:]
+	answers := m.Answer
 	search := func(n int) bool {
-		m.Answer = answers[:n]
-		return m.Len() > max
+		// we shave answers from the back of the slice
+		// until we find the point where m.Len is < max.
+		m.Answer = answers[:len(answers)-n]
+		return m.Len() < max
 	}
-	limit := sort.Search(len(answers), search)
-	if limit > 0 {
-		m.Answer = answers[:limit-1]
-	} else {
-		m.Answer = answers[:0]
-	}
+	drop := sort.Search(len(answers), search)
+	m.Answer = answers[:len(answers)-drop]
 	return m
 }
 
