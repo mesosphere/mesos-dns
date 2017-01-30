@@ -28,6 +28,7 @@ type Resolver struct {
 	masters          []string
 	version          string
 	config           records.Config
+	ready            chan struct{}
 	rs               *records.RecordGenerator
 	rsLock           sync.RWMutex
 	rng              *rand.Rand
@@ -45,6 +46,7 @@ func New(version string, config records.Config) *Resolver {
 	r := &Resolver{
 		version: version,
 		config:  config,
+		ready:   make(chan struct{}),
 		rs:      recordGenerator,
 		// rand.Sources aren't safe for concurrent use, except the global one.
 		// See: https://github.com/golang/go/issues/3611
@@ -93,6 +95,12 @@ func exchangers(timeout time.Duration, protos ...string) map[string]exchanger.Ex
 		)
 	}
 	return exs
+}
+
+// Ready blocks until the resolver has had a chance to reload at least
+// once.
+func (res *Resolver) Ready() <-chan struct{} {
+	return res.ready
 }
 
 // return the current (read-only) record set. attempts to write to the returned
@@ -172,6 +180,12 @@ func (res *Resolver) Reload() {
 		defer res.rsLock.Unlock()
 		atomic.StoreUint32(&res.config.SOASerial, timestamp)
 		res.rs = t
+		select {
+		case <-res.ready:
+			// noop because channel is already closed
+		default:
+			close(res.ready)
+		}
 	} else {
 		logging.Error.Printf("Warning: Error generating records: %v; keeping old DNS state", err)
 	}

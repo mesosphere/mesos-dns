@@ -45,12 +45,22 @@ func main() {
 
 	// launch DNS server
 	if config.DNSOn {
-		go func() { errch <- <-res.LaunchDNS() }()
+		go func() {
+			logging.Verbose.Println("waiting for a reload before serving DNS")
+			<-res.Ready()
+			logging.Verbose.Println("reload occurred, serving DNS")
+			errch <- <-res.LaunchDNS()
+		}()
 	}
 
 	// launch HTTP server
 	if config.HTTPOn {
-		go func() { errch <- <-res.LaunchHTTP() }()
+		go func() {
+			logging.Verbose.Println("waiting for a reload before serving HTTP")
+			<-res.Ready()
+			logging.Verbose.Println("reload occurred, serving HTTP")
+			errch <- <-res.LaunchHTTP()
+		}()
 	}
 
 	changed := detectMasters(config.Zk, config.Masters)
