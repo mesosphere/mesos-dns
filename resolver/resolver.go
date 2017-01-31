@@ -7,13 +7,14 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 	_ "github.com/mesos/mesos-go/detector/zoo" // Registers the ZK detector
 	"github.com/mesosphere/mesos-dns/exchanger"
 	"github.com/mesosphere/mesos-dns/logging"
@@ -299,7 +300,7 @@ func (res *Resolver) HandleNonMesos(fwd exchanger.Forwarder) func(
 		} else if len(m.Answer) == 0 {
 			logging.CurLog.NonMesosNXDomain.Inc()
 		}
-		reply(w, m)
+		reply(w, m, res.config.SetTruncateBit)
 	}
 }
 
@@ -357,7 +358,7 @@ func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 		logging.CurLog.MesosFailed.Inc()
 	}
 
-	reply(w, m)
+	reply(w, m, res.config.SetTruncateBit)
 }
 
 func (res *Resolver) handleSRV(rs *records.RecordGenerator, name string, m, r *dns.Msg) error {
@@ -455,10 +456,11 @@ func (res *Resolver) handleEmpty(rs *records.RecordGenerator, name string, m, r 
 
 // reply writes the given dns.Msg out to the given dns.ResponseWriter,
 // compressing the message first and truncating it accordingly.
-func reply(w dns.ResponseWriter, m *dns.Msg) {
+func reply(w dns.ResponseWriter, m *dns.Msg, setTruncateBit bool) {
 	m.Compress = true // https://github.com/mesosphere/mesos-dns/issues/{170,173,174}
-
-	if err := w.WriteMsg(truncate(m, isUDP(w))); err != nil {
+	maxsize := maxMsgSize(isUDP(w), m.IsEdns0())
+	truncate(m, maxsize, setTruncateBit)
+	if err := w.WriteMsg(m); err != nil {
 		logging.Error.Println(err)
 	}
 }
@@ -468,43 +470,79 @@ func isUDP(w dns.ResponseWriter) bool {
 	return strings.HasPrefix(w.RemoteAddr().Network(), "udp")
 }
 
+// maxMsgSize calculates the maximum size of a DNS message.
+// It takes into account whether or not the transport is UDP or TCP.
+// In the case of UDP it also checks for the presence of an EDNS0 (OPT)
+// record and if found, uses the maximum message size defined by that message.
+func maxMsgSize(udp bool, edns *dns.OPT) (size uint16) {
+	if !udp {
+		// The transport is TCP so we return the maximum message size
+		// valid for DNS messages sent over TCP.
+		return dns.MaxMsgSize
+	}
+	// The transport is UDP. By default the maximum message size for DNS
+	// messages over UDP is 512 bytes. This is defined by dns.MinMsgSize
+	// See 2.3.4 in https://tools.ietf.org/html/rfc1035
+	if edns == nil {
+		// This message does not specify EDNS0 (OPT) so we use the default
+		// maximum size
+		return dns.MinMsgSize
+	}
+	// The EDNS0 (OPT) record is specified in the request and specifies the
+	// message maximum size that the requestor can receive.
+	return edns.UDPSize()
+}
+
 // truncate removes answers until the given dns.Msg fits the permitted
 // length of the given transmission channel and sets the TC bit.
 // See https://tools.ietf.org/html/rfc1035#section-4.2.1
-func truncate(m *dns.Msg, udp bool) *dns.Msg {
-	max := dns.MinMsgSize
-	if !udp {
-		max = dns.MaxMsgSize
-	} else if opt := m.IsEdns0(); opt != nil {
-		max = int(opt.UDPSize())
-	}
-
-	furtherTruncation := m.Len() > max
+// If `setTruncateBit` is true, the Truncate bit will be set if the message
+// has been truncated already or gets truncated here.
+// If `setTruncateBit` is false, the message will have its Truncate bit
+// cleared if it is already set, and won't set it even if it does get
+// truncated.
+func truncate(m *dns.Msg, max uint16, setTruncateBit bool) {
+	// truncate() mutates the input to avoid allocating new message objects
+	// and incurring the related performance cost.
+	furtherTruncation := m.Len() > int(max)
 	m.Truncated = m.Truncated || furtherTruncation
-
+	if !setTruncateBit {
+		// Clear the Truncate bit regardless of whether this message used
+		// to have it set set or whether we are going to truncate it here.
+		m.Truncated = false
+	}
 	if !furtherTruncation {
-		return m
+		return
 	}
+	// Drop all extra records first
+	m.Extra = nil
+	if m.Len() < int(max) {
+		// Now that the extra records have been dropped, the message size
+		// is under the maximum message size limit, so we return it without
+		// further modification.
+		return
+	}
+	// The message is still too large. We now truncate the list of answers
+	// the message size is smaller than max.
+	truncateAnswers(m, max)
+}
 
-	m.Extra = nil // Drop all extra records first
-	if m.Len() < max {
-		return m
+func truncateAnswers(m *dns.Msg, max uint16) {
+	// Store the original list of answers.
+	answers := m.Answer
+	// Search for the maximum number of answers that can be sent to the
+	// client without the DNS message exceeding its maximum allowed size.
+	search := func(n int) bool {
+		// We shave answers from the back of the slice
+		// until we find the point where m.Len is < max.
+		// Whatever n is at that point will be returned.
+		m.Answer = answers[:len(answers)-n]
+		return m.Len() < int(max)
 	}
-	answers := m.Answer[:]
-	left, right := 0, len(m.Answer)
-	for {
-		if left == right {
-			break
-		}
-		mid := (left + right) / 2
-		m.Answer = answers[:mid]
-		if m.Len() < max {
-			left = mid + 1
-			continue
-		}
-		right = mid
-	}
-	return m
+	drop := sort.Search(len(answers), search)
+	// drop is the least number of answers that can be removed from the
+	// back of the answers slice in order to have m.Len() < max.
+	m.Answer = answers[:len(answers)-drop]
 }
 
 func (res *Resolver) configureHTTP() {

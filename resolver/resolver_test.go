@@ -417,27 +417,161 @@ func TestMultiError(t *testing.T) {
 	}
 }
 
-func TestTruncate(t *testing.T) {
-	tm := *newTruncated()
-	if !tm.Truncated {
+func TestTruncateSetTruncateBit(t *testing.T) {
+	testTruncateSetTruncateBit(t, dns.MinMsgSize)
+}
+
+func TestTruncateEdns0SetTruncateBit(t *testing.T) {
+	testTruncateSetTruncateBit(t, 4096)
+}
+
+func TestTruncateNoSetTruncateBit(t *testing.T) {
+	testTruncateNoSetTruncateBit(t, dns.MinMsgSize)
+}
+
+func TestTruncateEdns0NoSetTruncateBit(t *testing.T) {
+	testTruncateNoSetTruncateBit(t, 4096)
+}
+
+func testTruncateSetTruncateBit(t *testing.T, max uint16) {
+	msg := newMessage(max)
+	truncate(msg, max, true)
+	if !msg.Truncated {
 		t.Fatal("Message not truncated")
 	}
-	if l := tm.Len(); l > 512 {
+	if l := msg.Len(); l > int(max) {
 		t.Fatalf("Message too large: %d bytes", l)
 	}
-	tm2 := *truncate(&tm, true)
-	if !tm2.Truncated {
-		t.Fatal("Original truncation status was not preseved")
+	before := msg.Len()
+	// test double truncate
+	truncate(msg, max, true)
+	if !msg.Truncated {
+		t.Fatal("Original truncation status was not preserved")
 	}
-	if tm2.Len() != tm.Len() {
+	if msg.Len() != before {
 		t.Fatal("Further modification to already truncated message")
 	}
-
-	tm.Answer = append(tm.Answer, genA(1)...)
-	if l := tm.Len(); l < 512 {
+	// Add another answer to a truncated message and test that it is then
+	// too large.
+	msg.Answer = append(msg.Answer, genA(1)...)
+	if l := msg.Len(); l < int(max) {
 		t.Fatalf("Message to small after adding answers: %d bytes", l)
 	}
+}
 
+func testTruncateNoSetTruncateBit(t *testing.T, max uint16) {
+	msg := newMessage(max)
+	size := msg.Len()
+	truncate(msg, max, false)
+	if msg.Len() == size {
+		t.Fatal("truncating a large message did not diminish its size")
+	}
+	if msg.Len() > int(max) {
+		t.Fatal("message not truncated")
+	}
+	if msg.Truncated {
+		t.Fatal("Truncate bit set even though setTruncateBit was false")
+	}
+	before := msg.Len()
+	// We set the Truncate bit on the message and confirm that the bit is
+	// cleared even though the message did not need to be truncated.
+	// This asserts that no matter the message or its size, truncate() will
+	// clear the Truncate bit if setTruncateBit=false is passed to truncate().
+	msg.Truncated = true
+	truncate(msg, max, false)
+	if msg.Truncated {
+		t.Fatal("Truncate bit not cleared")
+	}
+	if msg.Len() != before {
+		t.Fatal("Message truncated further")
+	}
+	msg.Answer = append(msg.Answer, genA(1)...)
+	if l := msg.Len(); l < int(max) {
+		t.Fatalf("Message too small after adding answers: %d bytes", l)
+	}
+}
+
+func TestTruncateAnswers(t *testing.T) {
+	// Test truncating messages by starting with empty answers and increasing
+	// the number of answers until twice the maximum size is reached and test
+	// that certain invariants are maintained at all times.
+	// Testing boundary conditions only would be typical if the problem space
+	// was large, however in this case since the maximum size is so small
+	// we test the space exhaustively.
+	max := uint16(4096)
+	for nn := 0; ; nn++ {
+		msg := Message(
+			Question("example.com.", dns.TypeA),
+			Header(false, dns.RcodeSuccess),
+			Answers(genA(nn)...))
+		before := msg.Len()
+		if before > int(max)*7 {
+			// We've really exhausted the problem space by creating
+			// messages that have minimal size, all the way too messages
+			// that are way bigger they are allowed to be.
+			return
+		}
+		if before <= int(max) {
+			// This message is not too large.
+			// Assert that we don't truncate messages that
+			// don't need to be truncated
+			truncateAnswers(msg, max)
+			if msg.Len() != before {
+				t.Fatal("small message truncated further")
+			}
+			// Add another answer to check for the case where adding another
+			// answer pushes the message size over the max limit. We expect
+			// truncateAnswers to drop the last answer.
+			msg.Answer = append(msg.Answer, genA(1)...)
+			if msg.Len() > int(max) {
+				truncateAnswers(msg, max)
+				if msg.Len() != before {
+					t.Fatal("truncateAnswers did not drop the last answer.")
+				}
+			}
+			continue
+		}
+		// This message is too large, we truncate its list of answers and
+		// check that it narrowly fits afterwards.
+		truncateAnswers(msg, max)
+		if msg.Len() > int(max) {
+			t.Fatal("truncateAnswers did not truncate enough")
+		}
+		msg.Answer = append(msg.Answer, genA(1)...)
+		if msg.Len() <= int(max) {
+			t.Fatal("truncateAnswers truncated the message too much")
+		}
+	}
+}
+
+func TestMaxMsgSizeTCP(t *testing.T) {
+	msg := newTruncated()
+	msg.SetEdns0(4096, false)
+	edns0 := msg.IsEdns0()
+	if edns0 == nil {
+		t.Fatal("(*dns.Msg).SetEdns0() is broken")
+	}
+	if v := maxMsgSize(false, nil); v != dns.MaxMsgSize {
+		t.Fatalf("Wrong max message size: %d", v)
+	}
+	if v := maxMsgSize(false, edns0); v != dns.MaxMsgSize {
+		t.Fatalf("Wrong max message size: %d", v)
+	}
+}
+
+func TestMaxMsgSizeUDP(t *testing.T) {
+	msg := newTruncated()
+	msg.SetEdns0(4096, false)
+	edns0 := msg.IsEdns0()
+	if edns0 == nil {
+		t.Fatal("(*dns.Msg).SetEdns0() is broken")
+	}
+	if v := maxMsgSize(true, nil); v != dns.MinMsgSize {
+		t.Fatalf("Wrong max message size: %d", v)
+	}
+	if v := maxMsgSize(true, edns0); v != 4096 {
+		t.Fatalf("Wrong max message size: %d", v)
+	}
 }
 
 func BenchmarkTruncate(b *testing.B) {
@@ -447,12 +581,41 @@ func BenchmarkTruncate(b *testing.B) {
 }
 
 func newTruncated() *dns.Msg {
-	m := Message(
-		Question("example.com.", dns.TypeA),
-		Header(false, dns.RcodeSuccess),
-		Answers(genA(50)...))
+	msg := newMessage(dns.MinMsgSize)
+	truncate(msg, dns.MinMsgSize, true)
+	return msg
+}
 
-	return truncate(m, true)
+// newMessage creates a message that is strictly larger the given minimum size
+func newMessage(minsize uint16) (msg *dns.Msg) {
+	for ii := 1; ii <= int(minsize); ii++ {
+		msg = Message(
+			Question("example.com.", dns.TypeA),
+			Header(false, dns.RcodeSuccess),
+			Answers(genA(50*ii)...))
+		if msg.Len() > int(minsize) {
+			break
+		}
+	}
+	if minsize > dns.MinMsgSize {
+		// This is a large response so we set the EDNS0 record.
+		msg.SetEdns0(minsize, false)
+	}
+	return msg
+}
+
+// TestNewMessage checks that newMessage returns messages that are larger
+// than specified. We do so in its own test so we don't need have this
+// assertion in the individual testTruncate* functions.
+func TestNewMessage(t *testing.T) {
+	msg := newMessage(dns.MinMsgSize)
+	if msg.Len() <= dns.MinMsgSize {
+		t.Fatal("newMessage result too small")
+	}
+	msg = newMessage(4096)
+	if msg.Len() <= 4096 {
+		t.Fatal("newMessage result too small")
+	}
 }
 
 func genA(n int) []dns.RR {
