@@ -444,9 +444,7 @@ func (res *Resolver) handleEmpty(rs *records.RecordGenerator, name string, m, r 
 // compressing the message first and truncating it accordingly.
 func reply(w dns.ResponseWriter, m *dns.Msg, setTruncateBit bool) {
 	m.Compress = true // https://github.com/mesosphere/mesos-dns/issues/{170,173,174}
-	// Get the maximum allowed message size.
 	maxsize := maxMsgSize(isUDP(w), m.IsEdns0())
-	// Truncate the message by discarding records until it fits.
 	truncate(m, maxsize, setTruncateBit)
 	if err := w.WriteMsg(m); err != nil {
 		logging.Error.Println(err)

@@ -472,22 +472,22 @@ func testTruncateNoSetTruncateBit(t *testing.T, max uint16) {
 	if msg.Truncated {
 		t.Fatal("Truncate bit set even though setTruncateBit was false")
 	}
+	before := msg.Len()
 	// We set the Truncate bit on the message and confirm that the bit is
 	// cleared even though the message did not need to be truncated.
 	// This asserts that no matter the message or its size, truncate() will
 	// clear the Truncate bit if setTruncateBit=false is passed to truncate().
-	before := msg.Len()
 	msg.Truncated = true
 	truncate(msg, max, false)
 	if msg.Truncated {
 		t.Fatal("Truncate bit not cleared")
 	}
 	if msg.Len() != before {
-		t.Fatal("message truncated further")
+		t.Fatal("Message truncated further")
 	}
 	msg.Answer = append(msg.Answer, genA(1)...)
 	if l := msg.Len(); l < int(max) {
-		t.Fatalf("Message to small after adding answers: %d bytes", l)
+		t.Fatalf("Message too small after adding answers: %d bytes", l)
 	}
 }
 
@@ -505,7 +505,7 @@ func TestTruncateAnswers(t *testing.T) {
 			Header(false, dns.RcodeSuccess),
 			Answers(genA(nn)...))
 		before := msg.Len()
-		if before > int(max)*2 {
+		if before > int(max)*7 {
 			// We've really exhausted the problem space by creating
 			// messages that have minimal size, all the way too messages
 			// that are way bigger they are allowed to be.
@@ -549,7 +549,7 @@ func TestMaxMsgSizeTCP(t *testing.T) {
 	msg.SetEdns0(4096, false)
 	edns0 := msg.IsEdns0()
 	if edns0 == nil {
-		panic("SetEdns0 did not set the EDNS0 (OPT) record")
+		t.Fatal("(*dns.Msg).SetEdns0() is broken")
 	}
 	if v := maxMsgSize(false, nil); v != dns.MaxMsgSize {
 		t.Fatalf("Wrong max message size: %d", v)
@@ -564,7 +564,7 @@ func TestMaxMsgSizeUDP(t *testing.T) {
 	msg.SetEdns0(4096, false)
 	edns0 := msg.IsEdns0()
 	if edns0 == nil {
-		panic("SetEdns0 did not set the EDNS0 (OPT) record")
+		t.Fatal("(*dns.Msg).SetEdns0() is broken")
 	}
 	if v := maxMsgSize(true, nil); v != dns.MinMsgSize {
 		t.Fatalf("Wrong max message size: %d", v)
