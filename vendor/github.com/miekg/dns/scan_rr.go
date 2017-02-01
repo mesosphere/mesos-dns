@@ -64,74 +64,63 @@ func endingToString(c chan lex, errstr, f string) (string, *ParseError, string) 
 	return s, nil, l.comment
 }
 
-// A remainder of the rdata with embedded spaces, return the parsed string slice (sans the spaces)
-// or an error
+// A remainder of the rdata with embedded spaces, split on unquoted whitespace
+// and return the parsed string slice or an error
 func endingToTxtSlice(c chan lex, errstr, f string) ([]string, *ParseError, string) {
 	// Get the remaining data until we see a zNewline
-	quote := false
 	l := <-c
-	var s []string
 	if l.err {
-		return s, &ParseError{f, errstr, l}, ""
+		return nil, &ParseError{f, errstr, l}, ""
 	}
-	switch l.value == zQuote {
-	case true: // A number of quoted string
-		s = make([]string, 0)
-		empty := true
-		for l.value != zNewline && l.value != zEOF {
-			if l.err {
-				return nil, &ParseError{f, errstr, l}, ""
-			}
-			switch l.value {
-			case zString:
-				empty = false
-				if len(l.token) > 255 {
-					// split up tokens that are larger than 255 into 255-chunks
-					sx := []string{}
-					p, i := 0, 255
-					for {
-						if i <= len(l.token) {
-							sx = append(sx, l.token[p:i])
-						} else {
-							sx = append(sx, l.token[p:])
-							break
 
-						}
-						p, i = p+255, i+255
-					}
-					s = append(s, sx...)
-					break
-				}
-
-				s = append(s, l.token)
-			case zBlank:
-				if quote {
-					// zBlank can only be seen in between txt parts.
-					return nil, &ParseError{f, errstr, l}, ""
-				}
-			case zQuote:
-				if empty && quote {
-					s = append(s, "")
-				}
-				quote = !quote
-				empty = true
-			default:
-				return nil, &ParseError{f, errstr, l}, ""
-			}
-			l = <-c
-		}
-		if quote {
+	// Build the slice
+	s := make([]string, 0)
+	quote := false
+	empty := false
+	for l.value != zNewline && l.value != zEOF {
+		if l.err {
 			return nil, &ParseError{f, errstr, l}, ""
 		}
-	case false: // Unquoted text record
-		s = make([]string, 1)
-		for l.value != zNewline && l.value != zEOF {
-			if l.err {
-				return s, &ParseError{f, errstr, l}, ""
+		switch l.value {
+		case zString:
+			empty = false
+			if len(l.token) > 255 {
+				// split up tokens that are larger than 255 into 255-chunks
+				sx := []string{}
+				p, i := 0, 255
+				for {
+					if i <= len(l.token) {
+						sx = append(sx, l.token[p:i])
+					} else {
+						sx = append(sx, l.token[p:])
+						break
+
+					}
+					p, i = p+255, i+255
+				}
+				s = append(s, sx...)
+				break
 			}
-			s[0] += l.token
-			l = <-c
+
+			s = append(s, l.token)
+		case zBlank:
+			if quote {
+				// zBlank can only be seen in between txt parts.
+				return nil, &ParseError{f, errstr, l}, ""
+			}
+		case zQuote:
+			if empty && quote {
+				s = append(s, "")
+			}
+			quote = !quote
+			empty = true
+		default:
+			return nil, &ParseError{f, errstr, l}, ""
 		}
+		l = <-c
+	}
+	if quote {
+		return nil, &ParseError{f, errstr, l}, ""
 	}
 	return s, nil, l.comment
 }
@@ -1746,6 +1735,41 @@ func setTLSA(h RR_Header, c chan lex, o, f string) (RR, *ParseError, string) {
 	return rr, nil, c1
 }
 
+func setSMIMEA(h RR_Header, c chan lex, o, f string) (RR, *ParseError, string) {
+	rr := new(SMIMEA)
+	rr.Hdr = h
+	l := <-c
+	if l.length == 0 {
+		return rr, nil, l.comment
+	}
+	i, e := strconv.Atoi(l.token)
+	if e != nil || l.err {
+		return nil, &ParseError{f, "bad SMIMEA Usage", l}, ""
+	}
+	rr.Usage = uint8(i)
+	<-c // zBlank
+	l = <-c
+	i, e = strconv.Atoi(l.token)
+	if e != nil || l.err {
+		return nil, &ParseError{f, "bad SMIMEA Selector", l}, ""
+	}
+	rr.Selector = uint8(i)
+	<-c // zBlank
+	l = <-c
+	i, e = strconv.Atoi(l.token)
+	if e != nil || l.err {
+		return nil, &ParseError{f, "bad SMIMEA MatchingType", l}, ""
+	}
+	rr.MatchingType = uint8(i)
+	// So this needs be e2 (i.e. different than e), because...??t
+	s, e2, c1 := endingToString(c, "bad SMIMEA Certificate", f)
+	if e2 != nil {
+		return nil, e2, c1
+	}
+	rr.Certificate = s
+	return rr, nil, c1
+}
+
 func setRFC3597(h RR_Header, c chan lex, o, f string) (RR, *ParseError, string) {
 	rr := new(RFC3597)
 	rr.Hdr = h
@@ -1992,9 +2016,12 @@ func setUINFO(h RR_Header, c chan lex, o, f string) (RR, *ParseError, string) {
 	rr.Hdr = h
 	s, e, c1 := endingToTxtSlice(c, "bad UINFO Uinfo", f)
 	if e != nil {
-		return nil, e, ""
+		return nil, e, c1
 	}
-	rr.Uinfo = s[0] // silently discard anything above
+	if ln := len(s); ln == 0 {
+		return rr, nil, c1
+	}
+	rr.Uinfo = s[0] // silently discard anything after the first character-string
 	return rr, nil, c1
 }
 
@@ -2128,6 +2155,7 @@ var typeToparserFunc = map[uint16]parserFunc{
 	TypeRP:         {setRP, false},
 	TypeRRSIG:      {setRRSIG, true},
 	TypeRT:         {setRT, false},
+	TypeSMIMEA:     {setSMIMEA, true},
 	TypeSOA:        {setSOA, false},
 	TypeSPF:        {setSPF, true},
 	TypeSRV:        {setSRV, false},
