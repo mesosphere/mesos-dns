@@ -230,7 +230,7 @@ func runHandlers() error {
 		var rw ResponseRecorder
 		tt.HandlerFunc(&rw, tt.Msg)
 		if got, want := rw.Msg, tt.Msg; !(Msg{got}).equivalent(Msg{want}) {
-			return fmt.Errorf("Test #%d\n%v\n%s\n", i, pretty.Sprint(tt.Msg.Question), pretty.Compare(got, want))
+			return fmt.Errorf("test #%d\n%v\n%s", i, pretty.Sprint(tt.Msg.Question), pretty.Compare(got, want))
 		}
 	}
 	return nil
