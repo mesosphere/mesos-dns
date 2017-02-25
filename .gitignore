@@ -2,5 +2,6 @@ tmp/
 config.json
 mesos-dns
 *.gz
+*.bak
 VERSION
 cov.json
