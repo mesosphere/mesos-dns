@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"unsafe"
 
-	"github.com/mesos/mesos-go/detector"
-	mesos "github.com/mesos/mesos-go/mesosproto"
+	"github.com/mesos/mesos-go/api/v0/detector"
+	mesos "github.com/mesos/mesos-go/api/v0/mesosproto"
 
 	"github.com/mesosphere/mesos-dns/logging"
 )

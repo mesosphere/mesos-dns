@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mesos/mesos-go/upid"
+	"github.com/mesos/mesos-go/api/v0/upid"
 	. "github.com/mesosphere/mesos-dns/records/state"
 )
 

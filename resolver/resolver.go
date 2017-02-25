@@ -15,7 +15,7 @@ import (
 	"time"
 
 	restful "github.com/emicklei/go-restful"
-	_ "github.com/mesos/mesos-go/detector/zoo" // Registers the ZK detector
+	_ "github.com/mesos/mesos-go/api/v0/detector/zoo" // Registers the ZK detector
 	"github.com/mesosphere/mesos-dns/exchanger"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/models"
