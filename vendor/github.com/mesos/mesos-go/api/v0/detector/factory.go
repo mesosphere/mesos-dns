@@ -12,9 +12,9 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	log "github.com/golang/glog"
-	mesos "github.com/mesos/mesos-go/mesosproto"
-	util "github.com/mesos/mesos-go/mesosutil"
-	"github.com/mesos/mesos-go/upid"
+	mesos "github.com/mesos/mesos-go/api/v0/mesosproto"
+	util "github.com/mesos/mesos-go/api/v0/mesosutil"
+	"github.com/mesos/mesos-go/api/v0/upid"
 )
 
 var (
@@ -22,7 +22,7 @@ var (
 	plugins        = map[string]PluginFactory{}
 	EmptySpecError = errors.New("empty master specification")
 
-	defaultFactory = PluginFactory(func(spec string) (Master, error) {
+	defaultFactory = PluginFactory(func(spec string, _ ...Option) (Master, error) {
 		if len(spec) == 0 {
 			return nil, EmptySpecError
 		}
@@ -37,7 +37,7 @@ var (
 	})
 )
 
-type PluginFactory func(string) (Master, error)
+type PluginFactory func(string, ...Option) (Master, error)
 
 // associates a plugin implementation with a Master specification prefix.
 // packages that provide plugins are expected to invoke this func within
@@ -76,7 +76,7 @@ func Register(prefix string, f PluginFactory) error {
 // are not yet running and will only begin to spawn requisite background
 // processing upon, or some time after, the first invocation of their Detect.
 //
-func New(spec string) (m Master, err error) {
+func New(spec string, options ...Option) (m Master, err error) {
 	if strings.HasPrefix(spec, "file://") {
 		var body []byte
 		path := spec[7:]
@@ -84,12 +84,12 @@ func New(spec string) (m Master, err error) {
 		if err != nil {
 			log.V(1).Infof("failed to read from file at '%s'", path)
 		} else {
-			m, err = New(string(body))
+			m, err = New(string(body), options...)
 		}
 	} else if f, ok := MatchingPlugin(spec); ok {
-		m, err = f(spec)
+		m, err = f(spec, options...)
 	} else {
-		m, err = defaultFactory(spec)
+		m, err = defaultFactory(spec, options...)
 	}
 
 	return
@@ -129,7 +129,7 @@ func CreateMasterInfo(pid *upid.UPID) *mesos.MasterInfo {
 	if ipv4 = net.ParseIP(pid.Host); ipv4 != nil {
 		// This is needed for the people cross-compiling from macos to linux.
 		// The cross-compiled version of net.LookupIP() fails to handle plain IPs.
-		// See https://github.com/mesos/mesos-go/pull/117
+		// See https://github.com/mesos/mesos-go/api/v0/pull/117
 	} else if addrs, err := net.LookupIP(pid.Host); err == nil {
 		for _, ip := range addrs {
 			if ip = ip.To4(); ip != nil {

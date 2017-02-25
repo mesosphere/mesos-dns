@@ -20,7 +20,7 @@ package mesosutil
 
 import (
 	"github.com/gogo/protobuf/proto"
-	mesos "github.com/mesos/mesos-go/mesosproto"
+	mesos "github.com/mesos/mesos-go/api/v0/mesosproto"
 )
 
 func NewValueRange(begin, end uint64) *mesos.Value_Range {
@@ -34,6 +34,37 @@ func FilterResources(resources []*mesos.Resource, filter func(*mesos.Resource) b
 		}
 	}
 	return result
+}
+
+func AddResourceRevocable(resource *mesos.Resource) *mesos.Resource {
+	resource.Revocable = &mesos.Resource_RevocableInfo{}
+	return resource
+}
+
+func NewScalarResourceWithRevocable(name string, value float64) *mesos.Resource {
+	return AddResourceRevocable(NewScalarResource(name, value))
+}
+
+func AddResourceReservation(resource *mesos.Resource, principal string, role string) *mesos.Resource {
+	resource.Reservation = &mesos.Resource_ReservationInfo{Principal: proto.String(principal)}
+	resource.Role = proto.String(role)
+	return resource
+}
+
+func NewScalarResourceWithReservation(name string, value float64, principal string, role string) *mesos.Resource {
+	return AddResourceReservation(NewScalarResource(name, value), principal, role)
+}
+
+func NewRangesResourceWithReservation(name string, ranges []*mesos.Value_Range, principal string, role string) *mesos.Resource {
+	return AddResourceReservation(NewRangesResource(name, ranges), principal, role)
+}
+
+func NewSetResourceWithReservation(name string, items []string, principal string, role string) *mesos.Resource {
+	return AddResourceReservation(NewSetResource(name, items), principal, role)
+}
+
+func NewVolumeResourceWithReservation(val float64, containerPath string, persistenceId string, mode *mesos.Volume_Mode, principal string, role string) *mesos.Resource {
+	return AddResourceReservation(NewVolumeResource(val, containerPath, persistenceId, mode), principal, role)
 }
 
 func NewScalarResource(name string, val float64) *mesos.Resource {
@@ -58,7 +89,15 @@ func NewSetResource(name string, items []string) *mesos.Resource {
 		Type: mesos.Value_SET.Enum(),
 		Set:  &mesos.Value_Set{Item: items},
 	}
+}
 
+func NewVolumeResource(val float64, containerPath string, persistenceId string, mode *mesos.Volume_Mode) *mesos.Resource {
+	resource := NewScalarResource("disk", val)
+	resource.Disk = &mesos.Resource_DiskInfo{
+		Persistence: &mesos.Resource_DiskInfo_Persistence{Id: proto.String(persistenceId)},
+		Volume:      &mesos.Volume{ContainerPath: proto.String(containerPath), Mode: mode},
+	}
+	return resource
 }
 
 func NewFrameworkID(id string) *mesos.FrameworkID {
@@ -151,5 +190,40 @@ func NewExecutorInfo(execId *mesos.ExecutorID, command *mesos.CommandInfo) *meso
 	return &mesos.ExecutorInfo{
 		ExecutorId: execId,
 		Command:    command,
+	}
+}
+
+func NewCreateOperation(volumes []*mesos.Resource) *mesos.Offer_Operation {
+	return &mesos.Offer_Operation{
+		Type:   mesos.Offer_Operation_CREATE.Enum(),
+		Create: &mesos.Offer_Operation_Create{Volumes: volumes},
+	}
+}
+
+func NewDestroyOperation(volumes []*mesos.Resource) *mesos.Offer_Operation {
+	return &mesos.Offer_Operation{
+		Type:    mesos.Offer_Operation_DESTROY.Enum(),
+		Destroy: &mesos.Offer_Operation_Destroy{Volumes: volumes},
+	}
+}
+
+func NewReserveOperation(resources []*mesos.Resource) *mesos.Offer_Operation {
+	return &mesos.Offer_Operation{
+		Type:    mesos.Offer_Operation_RESERVE.Enum(),
+		Reserve: &mesos.Offer_Operation_Reserve{Resources: resources},
+	}
+}
+
+func NewUnreserveOperation(resources []*mesos.Resource) *mesos.Offer_Operation {
+	return &mesos.Offer_Operation{
+		Type:      mesos.Offer_Operation_UNRESERVE.Enum(),
+		Unreserve: &mesos.Offer_Operation_Unreserve{Resources: resources},
+	}
+}
+
+func NewLaunchOperation(tasks []*mesos.TaskInfo) *mesos.Offer_Operation {
+	return &mesos.Offer_Operation{
+		Type:   mesos.Offer_Operation_LAUNCH.Enum(),
+		Launch: &mesos.Offer_Operation_Launch{TaskInfos: tasks},
 	}
 }

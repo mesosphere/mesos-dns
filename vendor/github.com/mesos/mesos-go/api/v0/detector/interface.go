@@ -19,7 +19,7 @@
 package detector
 
 import (
-	mesos "github.com/mesos/mesos-go/mesosproto"
+	mesos "github.com/mesos/mesos-go/api/v0/mesosproto"
 )
 
 type MasterChanged interface {
@@ -66,3 +66,6 @@ type Master interface {
 	// Detect() hasn't been invoked yet.
 	Cancel()
 }
+
+// functional option type for detectors
+type Option func(interface{}) Option
