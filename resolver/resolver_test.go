@@ -351,6 +351,37 @@ func TestHTTP(t *testing.T) {
 	}
 }
 
+// TestHTTPAcceptApplicationJson tests that valid requests that specify
+// 'Accept: application/json' succeed. This used to fail with
+// 406 Not Acceptable.
+// See https://jira.mesosphere.com/browse/DCOS_OSS-611
+func TestHTTPAcceptApplicationJson(t *testing.T) {
+	// setup DNS server (just http)
+	res, err := fakeDNS()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res.configureHTTP()
+	srv := httptest.NewServer(http.DefaultServeMux)
+	defer srv.Close()
+
+	path := "/v1/services/_leader._tcp.mesos."
+	req, err := http.NewRequest("GET", srv.URL+path, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	req.Header.Add("Accept", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Error(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("GET %s: StatusCode: got %d, want %d", path, resp.StatusCode, http.StatusOK)
+	}
+}
+
 func fakeDNS() (*Resolver, error) {
 	config := records.NewConfig()
 	config.Masters = []string{"144.76.157.37:5050"}
