@@ -548,6 +548,9 @@ func truncateAnswers(m *dns.Msg, max uint16) {
 func (res *Resolver) configureHTTP() {
 	// webserver + available routes
 	ws := new(restful.WebService)
+	ws.Consumes(restful.MIME_JSON)
+	ws.Produces(restful.MIME_JSON)
+
 	ws.Route(ws.GET("/v1/version").To(res.RestVersion))
 	ws.Route(ws.GET("/v1/config").To(res.RestConfig))
 	ws.Route(ws.GET("/v1/hosts/{host}").To(res.RestHost))
