@@ -362,7 +362,7 @@ func (rg *RecordGenerator) frameworkRecords(sj state.State, domain string, spec 
 
 // slaveRecords injects A and SRV records into the generator store:
 //     slave.domain.      // resolves to IPs of all slaves
-//     _slave._tc.domain. // resolves to the driver port and IP of all slaves
+//     _slave._tcp.domain. // resolves to the driver port and IP of all slaves
 func (rg *RecordGenerator) slaveRecords(sj state.State, domain string, spec labels.Func) {
 	for _, slave := range sj.Slaves {
 		address, ok := hostToIP4(slave.PID.Host)
