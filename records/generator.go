@@ -99,6 +99,7 @@ type RecordGenerator struct {
 	EnumData      EnumerationData
 	httpClient    httpcli.Doer
 	stateEndpoint urls.Builder
+	autoIP        bool
 }
 
 // EnumerableRecord is the lowest level object, and should map 1:1 with DNS records
@@ -145,6 +146,7 @@ func WithConfig(config Config) Option {
 		doer    = httpcli.New(config.MesosAuthentication, config.httpConfigMap, transport, timeout)
 	)
 	return func(rg *RecordGenerator) {
+		rg.autoIP = config.AutoIP
 		rg.httpClient = doer
 		rg.stateEndpoint = rg.stateEndpoint.With(
 			urls.Path("/master/state.json"),
@@ -511,6 +513,7 @@ type context struct {
 	slaveID,
 	taskIP,
 	slaveIP string
+	taskIPs map[state.Scope][]*state.ScopedIP
 }
 
 func (rg *RecordGenerator) taskRecord(task state.Task, f state.Framework, domain string, spec labels.Func, ipSources []string, enumFW *EnumerableFramework) {
@@ -520,12 +523,29 @@ func (rg *RecordGenerator) taskRecord(task state.Task, f state.Framework, domain
 	enumFW.Tasks = append(enumFW.Tasks, newTask)
 
 	// define context
+	var (
+		ips     = task.IPs(ipSources...)
+		taskIP  = ""
+		taskIPs = make(map[state.Scope][]*state.ScopedIP)
+	)
+	// first reported taskIP is used for the primary A records of the task.
+	if len(ips) > 0 {
+		taskIP = ips[0].IP
+	}
+	// index task IPs by Scope
+	for i := range ips {
+		s := ips[i].Scope
+		v := taskIPs[s]
+		v = append(v, ips[i])
+		taskIPs[s] = v
+	}
 	ctx := context{
 		spec(task.Name),
 		hashString(task.ID),
 		slaveIDTail(task.SlaveID),
-		task.IP(ipSources...),
+		taskIP,
 		task.SlaveIP,
+		taskIPs,
 	}
 
 	// use DiscoveryInfo name if defined instead of task name
@@ -542,43 +562,63 @@ func (rg *RecordGenerator) taskRecord(task state.Task, f state.Framework, domain
 	}
 
 }
-func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f state.Framework, domain string, spec labels.Func, enumTask *EnumerableTask) {
-	fname := labels.DomainFrag(f.Name, labels.Sep, spec)
 
-	tail := "." + domain + "."
+func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f state.Framework, domain string, spec labels.Func, enumTask *EnumerableTask) {
+
+	var (
+		fname     = labels.DomainFrag(f.Name, labels.Sep, spec)
+		canonical = ctx.taskName + "-" + ctx.taskID + "-" + ctx.slaveID + "." + fname
+		arec      = ctx.taskName + "." + fname
+
+		tail          = "." + domain + "."
+		slaveHost     = canonical + ".slave" + tail
+		canonicalHost = canonical + tail
+
+		scopedHost = make(map[state.Scope]string, len(ctx.taskIPs))
+	)
 
 	// insert canonical A records
-	canonical := ctx.taskName + "-" + ctx.taskID + "-" + ctx.slaveID + "." + fname
-	arec := ctx.taskName + "." + fname
-
 	rg.insertTaskRR(arec+tail, ctx.taskIP, A, enumTask)
-	rg.insertTaskRR(canonical+tail, ctx.taskIP, A, enumTask)
+	rg.insertTaskRR(canonicalHost, ctx.taskIP, A, enumTask)
 
 	rg.insertTaskRR(arec+".slave"+tail, ctx.slaveIP, A, enumTask)
-	rg.insertTaskRR(canonical+".slave"+tail, ctx.slaveIP, A, enumTask)
+	rg.insertTaskRR(slaveHost, ctx.slaveIP, A, enumTask)
 
-	// recordName generates records for ctx.taskName, given some generation chain
-	recordName := func(gen chain) { gen("_" + ctx.taskName) }
+	// generate "scoped" canonical A records for each unique network scope; use them with DI ports later
+	if rg.autoIP && task.HasDiscoveryInfo() {
+		for s, ips := range ctx.taskIPs {
+			hash := hashString(ctx.taskID + string(s.NetworkScope) + s.NetworkName)
+			scopedHost[s] = ctx.taskName + "-" + hash + "-" + ctx.slaveID + "." + fname + tail
 
-	// asSRV is always the last link in a chain, it must insert RR's
-	asSRV := func(target string) chain {
-		return func(records ...string) {
-			for i := range records {
-				name := records[i] + tail
-				rg.insertTaskRR(name, target, SRV, enumTask)
+			for i := range ips {
+				rg.insertTaskRR(scopedHost[s], ips[i].IP, A, enumTask)
 			}
 		}
 	}
 
-	// Add RFC 2782 SRV records
-	var subdomains []string
+	var (
+		// recordName generates records for ctx.taskName, given some generation chain
+		recordName = func(gen chain) { gen("_" + ctx.taskName) }
+
+		// asSRV is always the last link in a chain, it must insert RR's
+		asSRV = func(target string) chain {
+			return func(records ...string) {
+				for i := range records {
+					name := records[i] + tail
+					rg.insertTaskRR(name, target, SRV, enumTask)
+				}
+			}
+		}
+
+		// Add RFC 2782 SRV records
+		subdomains []string
+	)
 	if task.HasDiscoveryInfo() {
 		subdomains = []string{"slave"}
 	} else {
 		subdomains = []string{"slave", domainNone}
 	}
 
-	slaveHost := canonical + ".slave" + tail
 	for _, port := range task.Ports() {
 		slaveTarget := slaveHost + ":" + port
 		recordName(withProtocol(protocolNone, fname, spec,
@@ -589,10 +629,22 @@ func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f sta
 		return
 	}
 
-	for _, port := range task.DiscoveryInfo.Ports.DiscoveryPorts {
-		target := canonical + tail + ":" + strconv.Itoa(port.Number)
-		recordName(withProtocol(port.Protocol, fname, spec,
-			withNamedPort(port.Name, spec, asSRV(target))))
+	for i := range task.DiscoveryInfo.Ports.DiscoveryPorts {
+		port := &task.DiscoveryInfo.Ports.DiscoveryPorts[i]
+		if rg.autoIP {
+			scope := state.ScopeFrom(state.ExtractAutoIPLabels(port.Labels.Labels))
+			if scope != nil {
+				if host := scopedHost[*scope]; host != "" {
+					target := net.JoinHostPort(host, strconv.Itoa(port.Number))
+					recordName(withProtocol(port.Protocol, fname, spec,
+						withNamedPort(port.Name, spec, asSRV(target))))
+				}
+			}
+		} else {
+			target := canonicalHost + ":" + strconv.Itoa(port.Number)
+			recordName(withProtocol(port.Protocol, fname, spec,
+				withNamedPort(port.Name, spec, asSRV(target))))
+		}
 	}
 }
 

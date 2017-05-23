@@ -106,6 +106,8 @@ type Config struct {
 	httpConfigMap httpcli.ConfigMap
 
 	MesosAuthentication httpcli.AuthMechanism
+
+	AutoIP bool
 }
 
 // NewConfig return the default config of the resolver
@@ -160,6 +162,12 @@ func SetConfig(cjson string) Config {
 
 	if err = validateIPSources(c.IPSources); err != nil {
 		logging.Error.Fatalf("IPSources validation failed: %v", err)
+	}
+
+	// order is important: validatation above fails if a user specifies "autoip" in the
+	// IPSources: we want total control over the ordering of sources when AutoIP is enabled.
+	if c.AutoIP {
+		c.IPSources = append([]string{"autoip"}, c.IPSources...)
 	}
 
 	if c.StateTimeoutSeconds <= 0 {
