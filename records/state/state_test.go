@@ -1,6 +1,7 @@
 package state_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"net"
 	"reflect"
@@ -45,7 +46,7 @@ func TestTask_IPs(t *testing.T) {
 	for i, tt := range []struct {
 		*Task
 		srcs []string
-		want []net.IP
+		want []*ScopedIP
 	}{
 		{nil, nil, nil},
 		{nil, []string{}, nil},
@@ -58,32 +59,32 @@ func TestTask_IPs(t *testing.T) {
 		{ // unknown IP sources are ignored
 			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4"))))),
 			srcs: []string{"foo", "netinfo", "bar"},
-			want: ips("1.2.3.4"),
+			want: ips(containerScope(""), "1.2.3.4"),
 		},
 		{ // multiple IPs on a NetworkInfo
 			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4"), netinfo("2.3.4.5"))))),
 			srcs: []string{"netinfo"},
-			want: ips("1.2.3.4", "2.3.4.5"),
+			want: ips(containerScope(""), "1.2.3.4", "2.3.4.5"),
 		},
 		{ // multiple NetworkInfos each with one IP
 			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4", "2.3.4.5"))))),
 			srcs: []string{"netinfo"},
-			want: ips("1.2.3.4", "2.3.4.5"),
+			want: ips(containerScope(""), "1.2.3.4", "2.3.4.5"),
 		},
 		{ // back-compat with 0.25 IPAddress format
 			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(oldnetinfo("1.2.3.4"))))),
 			srcs: []string{"netinfo"},
-			want: ips("1.2.3.4"),
+			want: ips(containerScope(""), "1.2.3.4"),
 		},
 		{ // check back-compat doesn't break multi-netinfo case
 			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(oldnetinfo(""), netinfo("1.2.3.4"))))),
 			srcs: []string{"netinfo"},
-			want: ips("1.2.3.4"),
+			want: ips(containerScope(""), "1.2.3.4"),
 		},
 		{ // check that we prefer 0.26 IPAddresses over 0.25 IPAddress
 			Task: task(statuses(status(state("TASK_RUNNING"), netinfos(oldnewnetinfo("1.2.3.4", "1.2.4.8"))))),
 			srcs: []string{"netinfo"},
-			want: ips("1.2.4.8"),
+			want: ips(containerScope(""), "1.2.4.8"),
 		},
 		{ // source order
 			Task: task(
@@ -91,7 +92,69 @@ func TestTask_IPs(t *testing.T) {
 				statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4")))),
 			),
 			srcs: []string{"host", "netinfo"},
-			want: ips("2.3.4.5", "1.2.3.4"),
+			want: append(ips(hostScope(), "2.3.4.5"), ips(containerScope(""), "1.2.3.4")...),
+		},
+		{ // autoip only, w/o port discovery
+			Task: task(
+				slaveIP("2.3.4.5"),
+				statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4")))),
+			),
+			srcs: []string{"autoip"},
+			want: ips(hostScope()),
+		},
+		{ // autoip only, host scope
+			Task: task(
+				slaveIP("2.3.4.5"),
+				statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4")))),
+				discovery("task1", hostPort(80, "web")),
+			),
+			srcs: []string{"autoip"},
+			want: ips(hostScope(), "2.3.4.5"),
+		},
+		{ // autoip only, network scope (unnamed), single network
+			Task: task(
+				slaveIP("2.3.4.5"),
+				statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4")))),
+				discovery("task1", containerPort(80, "web", "")),
+			),
+			srcs: []string{"autoip"},
+			want: ips(containerScope(""), "1.2.3.4"),
+		},
+		{ // autoip only, network scope (unnamed), multi network
+			Task: task(
+				slaveIP("2.3.4.5"),
+				statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4"), netinfo("4.5.6.7")))),
+				discovery("task1", containerPort(80, "web", "")),
+			),
+			srcs: []string{"autoip"},
+			want: ips(containerScope(""), "1.2.3.4", "4.5.6.7"),
+		},
+		{ // autoip only, network scope (unnamed), multi network (1 named)
+			Task: task(
+				slaveIP("2.3.4.5"),
+				statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4"), namedNetinfo("net1", "4.5.6.7")))),
+				discovery("task1", containerPort(80, "web", "")),
+			),
+			srcs: []string{"autoip"},
+			want: ips(containerScope(""), "1.2.3.4", "4.5.6.7"),
+		},
+		{ // autoip only, network scope (named), multi network (1 named)
+			Task: task(
+				slaveIP("2.3.4.5"),
+				statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4"), namedNetinfo("net1", "4.5.6.7")))),
+				discovery("task1", containerPort(80, "web", "net1")),
+			),
+			srcs: []string{"autoip"},
+			want: ips(containerScope("net1"), "4.5.6.7"),
+		},
+		{ // autoip only, network scope (named + unnamed), multi network (1 named)
+			Task: task(
+				slaveIP("2.3.4.5"),
+				statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4"), namedNetinfo("net1", "4.5.6.7")))),
+				discovery("task1", containerPort(80, "web", "net1"), containerPort(443, "tls", "")),
+			),
+			srcs: []string{"autoip"},
+			want: append(ips(containerScope("net1"), "4.5.6.7"), ips(containerScope(""), "1.2.3.4", "4.5.6.7")...),
 		},
 		{ // statuses state
 			Task: task(
@@ -101,7 +164,7 @@ func TestTask_IPs(t *testing.T) {
 				),
 			),
 			srcs: []string{"netinfo"},
-			want: ips("1.2.3.4"),
+			want: ips(containerScope(""), "1.2.3.4"),
 		},
 		{ // statuses ordering
 			Task: task(
@@ -114,7 +177,7 @@ func TestTask_IPs(t *testing.T) {
 				),
 			),
 			srcs: []string{"docker", "netinfo"},
-			want: ips("2.4.6.8"),
+			want: ips(containerScope(""), "2.4.6.8"),
 		},
 		{ // label ordering
 			Task: task(
@@ -126,12 +189,12 @@ func TestTask_IPs(t *testing.T) {
 				),
 			),
 			srcs: []string{"docker"},
-			want: ips("1.2.3.4", "2.3.4.5"),
+			want: ips(containerScope(""), "1.2.3.4", "2.3.4.5"),
 		},
 	} {
 		if got := tt.IPs(tt.srcs...); !reflect.DeepEqual(got, tt.want) {
 			t.Logf("%+v", tt.Task)
-			t.Errorf("test #%d: got %+v, want %+v", i, got, tt.want)
+			t.Errorf("test #%d: got %v, want %v", i, scopedIPs(got), scopedIPs(tt.want))
 		}
 	}
 }
@@ -143,10 +206,37 @@ type (
 	statusOpt func(*Status)
 )
 
-func ips(ss ...string) []net.IP {
-	addrs := make([]net.IP, len(ss))
+func scopedIPs(iplist []*ScopedIP) string {
+	var buf bytes.Buffer
+	for i := range iplist {
+		if i > 0 {
+			buf.WriteString(",")
+		}
+		buf.WriteString("[")
+		buf.WriteString(string(iplist[i].Scope.NetworkScope))
+		buf.WriteString(":")
+		buf.WriteString(iplist[i].Scope.NetworkName)
+		buf.WriteString("]")
+		buf.WriteString(iplist[i].IP)
+	}
+	return buf.String()
+}
+
+func hostScope() Scope {
+	return Scope{NetworkScopeHost, ""}
+}
+
+func containerScope(networkName string) Scope {
+	return Scope{NetworkScopeContainer, networkName}
+}
+
+func ips(scope Scope, ss ...string) []*ScopedIP {
+	if len(ss) == 0 {
+		return nil
+	}
+	addrs := make([]*ScopedIP, len(ss))
 	for i := range ss {
-		addrs[i] = net.ParseIP(ss[i])
+		addrs[i] = &ScopedIP{scope, net.ParseIP(ss[i]).String()}
 	}
 	return addrs
 }
@@ -167,6 +257,40 @@ func statuses(st ...Status) taskOpt {
 
 func slaveIP(ip string) taskOpt {
 	return func(t *Task) { t.SlaveIP = ip }
+}
+
+func discovery(name string, opts ...discoveryOpt) taskOpt {
+	return func(t *Task) {
+		t.DiscoveryInfo = DiscoveryInfo{Name: name}
+		for _, f := range opts {
+			f(&t.DiscoveryInfo)
+		}
+	}
+}
+
+type discoveryOpt func(*DiscoveryInfo)
+
+func hostPort(port int, name string) discoveryOpt {
+	return func(d *DiscoveryInfo) {
+		d.Ports.DiscoveryPorts = append(d.Ports.DiscoveryPorts, DiscoveryPort{Number: port, Name: name})
+	}
+}
+
+func containerPort(port int, name, networkName string) discoveryOpt {
+	return func(d *DiscoveryInfo) {
+		labels := []Label{
+			Label{Key: "network-scope", Value: "container"},
+		}
+		if networkName != "" {
+			labels = append(labels, Label{Key: "network-name", Value: networkName})
+		}
+		d.Ports.DiscoveryPorts = append(d.Ports.DiscoveryPorts,
+			DiscoveryPort{
+				Number: port,
+				Name:   name,
+				Labels: Labels{Labels: labels},
+			})
+	}
 }
 
 func status(opts ...statusOpt) Status {
@@ -200,6 +324,14 @@ func netinfos(netinfos ...NetworkInfo) statusOpt {
 
 func netinfo(ips ...string) NetworkInfo {
 	netinfo := NetworkInfo{}
+	for _, ip := range ips {
+		netinfo.IPAddresses = append(netinfo.IPAddresses, IPAddress{ip})
+	}
+	return netinfo
+}
+
+func namedNetinfo(name string, ips ...string) NetworkInfo {
+	netinfo := NetworkInfo{Name: name}
 	for _, ip := range ips {
 		netinfo.IPAddresses = append(netinfo.IPAddresses, IPAddress{ip})
 	}

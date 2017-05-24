@@ -125,11 +125,14 @@ func (t *Task) IPs(srcs ...string) (ips []*ScopedIP) {
 	}
 	// flatten ips to remove nil's (probably a more efficient way to do this)
 	for i := range ips {
-		for ips[i] == nil {
+		for i < len(ips) && ips[i] == nil {
 			copy(ips[i:], ips[i+1:])
 			ips[len(ips)-1] = nil
 			ips = ips[:len(ips)-1]
 		}
+	}
+	if len(ips) == 0 {
+		return nil
 	}
 	return ips
 }
@@ -283,6 +286,7 @@ func ScopeFrom(networkScope, networkName string) *Scope {
 }
 
 // autoIPs returns IP addresses associated with a task's port discovery info.
+// TODO(jdef) bad assumption!
 // this implementation makes the assumption that the caller is only going to use
 // the first IP address returned, and so the first valid port discovery info
 // determines the ip-addresses reported by this func.
@@ -343,6 +347,10 @@ type State struct {
 	Leader     string      `json:"leader"`
 }
 
+type Labels struct {
+	Labels []Label `json:"labels"`
+}
+
 // DiscoveryInfo holds the discovery meta data for a task defined in the /state.json Mesos HTTP endpoint.
 type DiscoveryInfo struct {
 	Visibilty   string `json:"visibility"`
@@ -350,10 +358,8 @@ type DiscoveryInfo struct {
 	Name        string `json:"name,omitempty"`
 	Location    string `json:"location,omitempty"`
 	Environment string `json:"environment,omitempty"`
-	Labels      struct {
-		Labels []Label `json:"labels"`
-	} `json:"labels"`
-	Ports struct {
+	Labels      Labels `json:"labels"`
+	Ports       struct {
 		DiscoveryPorts []DiscoveryPort `json:"ports"`
 	} `json:"ports"`
 }
@@ -363,9 +369,7 @@ type DiscoveryPort struct {
 	Protocol string `json:"protocol"`
 	Number   int    `json:"number"`
 	Name     string `json:"name"`
-	Labels   struct {
-		Labels []Label `json:"labels"`
-	} `json:"labels"`
+	Labels   Labels `json:"labels"`
 }
 
 type NetworkScope string
