@@ -1,5 +1,5 @@
 ## Summary
-These scripts were developed to deploy mesos-dns to a Mesos cluster created from the tooling at https://google.mesosphere/com.
+These scripts were developed to deploy mesos-dns to a Mesos cluster created from the tooling at https://mesosphere.com/google.
 
 ## Usage
 Edit the `hosts` file, replacing the addresses with those of your Mesos cluster, then:
