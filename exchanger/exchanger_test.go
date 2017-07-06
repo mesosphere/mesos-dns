@@ -60,14 +60,6 @@ func TestInstrumentation(t *testing.T) {
 	}
 }
 
-func stubs(ed ...exchanged) []Exchanger {
-	exs := make([]Exchanger, len(ed))
-	for i := range ed {
-		exs[i] = stub(ed[i])
-	}
-	return exs
-}
-
 func stub(e exchanged) Exchanger {
 	return Func(func(*dns.Msg, string) (*dns.Msg, time.Duration, error) {
 		return e.m, e.rtt, e.err

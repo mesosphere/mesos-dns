@@ -11,5 +11,4 @@ func Ignore(f ErrorFunction) {
 	if err := f(); err != nil {
 		return
 	}
-	return
 }

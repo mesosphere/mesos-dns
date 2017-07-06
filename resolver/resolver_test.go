@@ -410,21 +410,6 @@ func fakeDNS() (*Resolver, error) {
 	return res, nil
 }
 
-func onError(abort <-chan struct{}, errCh <-chan error, f func(error)) <-chan struct{} {
-	ch := make(chan struct{})
-	go func() {
-		select {
-		case <-abort:
-		case e := <-errCh:
-			if e != nil {
-				defer close(ch)
-				f(e)
-			}
-		}
-	}()
-	return ch
-}
-
 func TestMultiError(t *testing.T) {
 	me := multiError(nil)
 	me.Add()
