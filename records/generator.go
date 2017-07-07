@@ -6,21 +6,18 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/mesosphere/mesos-dns/errorutil"
 	"github.com/mesosphere/mesos-dns/httpcli"
 	"github.com/mesosphere/mesos-dns/logging"
 	"github.com/mesosphere/mesos-dns/models"
 	"github.com/mesosphere/mesos-dns/records/labels"
 	"github.com/mesosphere/mesos-dns/records/state"
+	"github.com/mesosphere/mesos-dns/records/state/client"
 	"github.com/mesosphere/mesos-dns/urls"
 	"github.com/tv42/zbase32"
 )
@@ -93,12 +90,11 @@ func (kind rrsKind) rrs(rg *RecordGenerator) rrs {
 // RecordGenerator contains DNS records and methods to access and manipulate
 // them. TODO(kozyraki): Refactor when discovery id is available.
 type RecordGenerator struct {
-	As            rrs
-	SRVs          rrs
-	SlaveIPs      map[string]string
-	EnumData      EnumerationData
-	httpClient    httpcli.Doer
-	stateEndpoint urls.Builder
+	As          rrs
+	SRVs        rrs
+	SlaveIPs    map[string]string
+	EnumData    EnumerationData
+	stateLoader func(masters []string) (state.State, error)
 }
 
 // EnumerableRecord is the lowest level object, and should map 1:1 with DNS records
@@ -141,21 +137,24 @@ func WithConfig(config Config) Option {
 			MaxIdleConnsPerHost: 2,
 			TLSClientConfig:     tlsClientConfig,
 		})
-		timeout = httpcli.Timeout(time.Duration(config.StateTimeoutSeconds) * time.Second)
-		doer    = httpcli.New(config.MesosAuthentication, config.httpConfigMap, transport, timeout)
-	)
-	return func(rg *RecordGenerator) {
-		rg.httpClient = doer
-		rg.stateEndpoint = rg.stateEndpoint.With(
+		timeout       = httpcli.Timeout(time.Duration(config.StateTimeoutSeconds) * time.Second)
+		doer          = httpcli.New(config.MesosAuthentication, config.httpConfigMap, transport, timeout)
+		stateEndpoint = urls.Builder{}.With(
 			urls.Path("/master/state.json"),
 			opt,
 		)
+	)
+	return func(rg *RecordGenerator) {
+		rg.stateLoader = client.NewStateLoader(doer, stateEndpoint, func(b []byte, v *state.State) error {
+			return json.Unmarshal(b, v)
+		})
 	}
 }
 
 // NewRecordGenerator returns a RecordGenerator that's been configured with a timeout.
 func NewRecordGenerator(options ...Option) *RecordGenerator {
 	rg := &RecordGenerator{}
+	rg.stateLoader = func(_ []string) (s state.State, err error) { return }
 	for i := range options {
 		if options[i] != nil {
 			options[i](rg)
@@ -168,7 +167,7 @@ func NewRecordGenerator(options ...Option) *RecordGenerator {
 // into DNS records.
 func (rg *RecordGenerator) ParseState(c Config, masters ...string) error {
 	// find master -- return if error
-	sj, err := rg.findMaster(masters...)
+	sj, err := rg.stateLoader(masters)
 	if err != nil {
 		logging.Error.Println("Failed to fetch state.json. Error: ", err)
 		return err
@@ -185,120 +184,6 @@ func (rg *RecordGenerator) ParseState(c Config, masters ...string) error {
 	}
 
 	return rg.InsertState(sj, c.Domain, c.SOAMname, c.Listener, masters, c.IPSources, hostSpec)
-}
-
-// Tries each master and looks for the leader
-// if no leader responds it errors
-func (rg *RecordGenerator) findMaster(masters ...string) (state.State, error) {
-	var sj state.State
-	var leader string
-
-	if len(masters) > 0 {
-		leader, masters = masters[0], masters[1:]
-	}
-
-	// Check if ZK leader is correct
-	if leader != "" {
-		logging.VeryVerbose.Println("Zookeeper says the leader is: ", leader)
-		ip, port, err := getProto(leader)
-		if err != nil {
-			logging.Error.Println(err)
-		} else {
-			if sj, err = rg.loadWrap(ip, port); err == nil {
-				return sj, nil
-			}
-			logging.Error.Println("Failed to fetch state.json from leader. Error: ", err)
-			if len(masters) == 0 {
-				return sj, errors.New("No more masters to try")
-			}
-			logging.Error.Println("Falling back to remaining masters: ", masters)
-		}
-	}
-
-	// try each listed mesos master before dying
-	for _, master := range masters {
-		ip, port, err := getProto(master)
-		if err != nil {
-			logging.Error.Println(err)
-			continue
-		}
-
-		if sj, err = rg.loadWrap(ip, port); err != nil {
-			logging.Error.Println("Failed to fetch state.json - trying next one. Error: ", err)
-			continue
-		}
-		return sj, nil
-	}
-
-	return sj, errors.New("No more masters eligible for state.json query")
-}
-
-// Loads state.json from mesos master
-func (rg *RecordGenerator) loadFromMaster(ip, port string) (state.State, error) {
-	// REFACTOR: state.json security
-
-	var sj state.State
-	u := url.URL(rg.stateEndpoint.With(urls.Host(net.JoinHostPort(ip, port))))
-
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		logging.Error.Println(err)
-		return state.State{}, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Mesos-DNS")
-
-	resp, err := rg.httpClient.Do(req)
-	if err != nil {
-		logging.Error.Println(err)
-		return state.State{}, err
-	}
-
-	defer errorutil.Ignore(resp.Body.Close)
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		logging.Error.Println(err)
-		return state.State{}, err
-	}
-
-	err = json.Unmarshal(body, &sj)
-	if err != nil {
-		logging.Error.Println(err)
-		return state.State{}, err
-	}
-
-	return sj, nil
-}
-
-// Catches an attempt to load state.json from a mesos master
-// attempts can fail from down server or mesos master secondary
-// it also reloads from a different master if the master it attempted to
-// load from was not the leader
-func (rg *RecordGenerator) loadWrap(ip, port string) (state.State, error) {
-	var err error
-	var sj state.State
-
-	logging.VeryVerbose.Println("reloading from master " + ip)
-	sj, err = rg.loadFromMaster(ip, port)
-	if err != nil {
-		return state.State{}, err
-	}
-	if sj.Leader != "" {
-		var stateLeaderIP string
-
-		stateLeaderIP, err = leaderIP(sj.Leader)
-		if err != nil {
-			return sj, err
-		}
-		if stateLeaderIP != ip {
-			logging.VeryVerbose.Println("Warning: master changed to " + stateLeaderIP)
-			return rg.loadFromMaster(stateLeaderIP, port)
-		}
-		return sj, nil
-	}
-	err = errors.New("Fetched state.json does not contain leader information")
-	return sj, err
 }
 
 // hashes a given name using a truncated sha1 hash
@@ -414,7 +299,7 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 		return // avoid a panic later
 	}
 	leaderAddress := h[1]
-	ip, port, err := getProto(leaderAddress)
+	ip, port, err := urls.SplitHostPort(leaderAddress)
 	if err != nil {
 		logging.Error.Println(err)
 		return
@@ -435,7 +320,7 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 	addedLeaderMasterN := false
 	idx := 0
 	for _, master := range masters {
-		masterIP, _, err := getProto(master)
+		masterIP, _, err := urls.SplitHostPort(master)
 		if err != nil {
 			logging.Error.Println(err)
 			continue
@@ -658,36 +543,8 @@ func (rg *RecordGenerator) insertRR(name, host string, kind rrsKind) (added bool
 	return
 }
 
-// leaderIP returns the ip for the mesos master
-// input format master@ip:port
-func leaderIP(leader string) (string, error) {
-	nameAddressPair := strings.Split(leader, "@")
-	if len(nameAddressPair) != 2 {
-		return "", errors.New("Invalid leader address: " + leader)
-	}
-	hostPort := nameAddressPair[1]
-	host, _, err := net.SplitHostPort(hostPort)
-	if err != nil {
-		return "", err
-	}
-	return host, nil
-}
-
 // return the slave number from a Mesos slave id
 func slaveIDTail(slaveID string) string {
 	fields := strings.Split(slaveID, "-")
 	return strings.ToLower(fields[len(fields)-1])
-}
-
-// should be able to accept
-// ip:port
-// zk://host1:port1,host2:port2,.../path
-// zk://username:password@host1:port1,host2:port2,.../path
-// file:///path/to/file (where file contains one of the above)
-func getProto(pair string) (string, string, error) {
-	h := strings.SplitN(pair, ":", 2)
-	if len(h) != 2 {
-		return "", "", fmt.Errorf("unable to parse proto from %q", pair)
-	}
-	return h[0], h[1], nil
 }

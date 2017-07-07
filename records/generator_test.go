@@ -164,30 +164,6 @@ func TestMasterRecord(t *testing.T) {
 	}
 }
 
-func TestInvalidLeaderIP(t *testing.T) {
-	l := "master!144.76.157.37;5050"
-
-	ip, err := leaderIP(l)
-
-	if err == nil || ip != "" {
-		t.Error("invalid ip was parsed")
-	}
-}
-
-func TestLeaderIP(t *testing.T) {
-	l := "master@144.76.157.37:5050"
-
-	ip, err := leaderIP(l)
-
-	if err != nil {
-		t.Error(err)
-	}
-
-	if ip != "144.76.157.37" {
-		t.Error("not parsing ip")
-	}
-}
-
 func testRecordGenerator(t *testing.T, spec labels.Func, ipSources []string) RecordGenerator {
 	var sj state.State
 
@@ -353,18 +329,17 @@ func TestTimeout(t *testing.T) {
 	defer server.Close()
 
 	rg := NewRecordGenerator(WithConfig(Config{StateTimeoutSeconds: 1}))
-	host, port, _ := net.SplitHostPort(server.Listener.Addr().String())
-	_, err := rg.loadFromMaster(host, port)
+	_, err := rg.stateLoader([]string{server.Listener.Addr().String()})
 	if err == nil {
 		t.Fatal("Expect error because of timeout handler")
 	}
 	urlErr, ok := (err).(*url.Error)
 	if !ok {
-		t.Fatalf("Expected url.Error, instead: %#v", urlErr)
+		t.Fatalf("Expected url.Error, instead: %#v", err)
 	}
 	netErr, ok := urlErr.Err.(net.Error)
 	if !ok {
-		t.Fatalf("Expected net.Error, instead: %#v", netErr)
+		t.Fatalf("Expected net.Error, instead: %#v", urlErr)
 	}
 	if !netErr.Timeout() {
 		t.Errorf("Did not receive a timeout, instead: %#v", err)
