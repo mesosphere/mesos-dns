@@ -32,6 +32,21 @@ func (rg *RecordGenerator) exists(name, host string, kind rrsKind) bool {
 	return false
 }
 
+func TestParseState_SOAMname(t *testing.T) {
+	rg := &RecordGenerator{}
+	rg.stateLoader = func(_ []string) (s state.State, err error) {
+		s.Leader = "foo@123:45" // required or else ParseState bails
+		return
+	}
+	err := rg.ParseState(Config{SOAMname: "jdef123.mesos.", Listener: "4.5.6.7"})
+	if err != nil {
+		t.Fatal("unexpected error", err)
+	}
+	if !rg.exists("jdef123.mesos.", "4.5.6.7", A) {
+		t.Fatalf("failed to locate A record for SOAMname, A records: %#v", rg.As)
+	}
+}
+
 func TestMasterRecord(t *testing.T) {
 	// masterRecord(domain string, masters []string, leader string)
 	type expectedRR struct {
