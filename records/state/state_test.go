@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mesos/mesos-go/upid"
 	. "github.com/mesosphere/mesos-dns/records/state"
+	"github.com/mesosphere/mesos-dns/records/state/upid"
 )
 
 func TestResources_Ports(t *testing.T) {
@@ -30,6 +30,7 @@ func TestPID_UnmarshalJSON(t *testing.T) {
 		{`"slave(1)@127.0.0.1:5051"`, makePID("slave(1)", "127.0.0.1", "5051"), nil},
 		{`  "slave(1)@127.0.0.1:5051"  `, makePID("slave(1)", "127.0.0.1", "5051"), nil},
 		{`"  slave(1)@127.0.0.1:5051  "`, makePID("slave(1)", "127.0.0.1", "5051"), nil},
+		{`"  slave(1)@[2001:db8::1]:5051  "`, makePID("slave(1)", "2001:db8::1", "5051"), nil},
 	} {
 		var pid PID
 		if err := json.Unmarshal([]byte(tt.data), &pid); !reflect.DeepEqual(err, tt.err) {
@@ -87,11 +88,11 @@ func TestTask_IPs(t *testing.T) {
 		},
 		{ // source order
 			Task: task(
-				slaveIP("2.3.4.5"),
-				statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4")))),
+				slaveIPs("2.3.4.5"),
+				statuses(status(state("TASK_RUNNING"), netinfos(netinfo("1.2.3.4", "fd01:b::1:8000:2")))),
 			),
 			srcs: []string{"host", "netinfo"},
-			want: ips("2.3.4.5", "1.2.3.4"),
+			want: ips("2.3.4.5", "1.2.3.4", "fd01:b::1:8000:2"),
 		},
 		{ // statuses state
 			Task: task(
@@ -165,8 +166,8 @@ func statuses(st ...Status) taskOpt {
 	}
 }
 
-func slaveIP(ip string) taskOpt {
-	return func(t *Task) { t.SlaveIP = ip }
+func slaveIPs(ips ...string) taskOpt {
+	return func(t *Task) { t.SlaveIPs = ips }
 }
 
 func status(opts ...statusOpt) Status {

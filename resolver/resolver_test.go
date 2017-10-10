@@ -130,6 +130,15 @@ func runHandlers() error {
 					A(RRHeader("chronos.marathon.mesos.", dns.TypeA, 60),
 						net.ParseIP("1.2.3.11")))),
 		},
+		{ // ipv6
+			res.HandleMesos,
+			Message(
+				Question("toy-store.ipv6-framework.mesos.", dns.TypeAAAA),
+				Header(true, dns.RcodeSuccess),
+				Answers(
+					AAAA(RRHeader("toy-store.ipv6-framework.mesos.", dns.TypeAAAA, 60),
+						net.ParseIP("fd01:b::1:8000:2")))),
+		},
 		{
 			res.HandleMesos,
 			Message(
@@ -212,7 +221,7 @@ func runHandlers() error {
 			res.HandleMesos,
 			Message(
 				Question("missing.mesos.", dns.TypeAAAA),
-				Header(true, dns.RcodeSuccess),
+				Header(true, dns.RcodeNameError),
 				NSs(
 					SOA(RRHeader("missing.mesos.", dns.TypeSOA, 60),
 						"ns1.mesos", "root.ns1.mesos", 60))),
@@ -386,7 +395,7 @@ func fakeDNS() (*Resolver, error) {
 	config := records.NewConfig()
 	config.Masters = []string{"144.76.157.37:5050"}
 	config.RecurseOn = false
-	config.IPSources = []string{"docker", "mesos", "host"}
+	config.IPSources = []string{"netinfo", "docker", "mesos", "host"}
 
 	res := New("", config)
 	res.rng.Seed(0) // for deterministic tests

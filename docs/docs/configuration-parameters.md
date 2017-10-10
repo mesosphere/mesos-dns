@@ -79,7 +79,7 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 
 `timeout` is the timeout threshold, in seconds, for connections and requests to external DNS requests. The default value is 5 seconds. 
 
-`listener` is the IP address of Mesos-DNS. In SOA replies, Mesos-DNS identifies hostname `mesos-dns.domain` as the primary nameserver for the domain. It uses this IP address in an A record for `mesos-dns.domain`. The default value is "0.0.0.0", which instructs Mesos-DNS to create an A record for every IP address associated with a network interface on the server that runs the Mesos-DNS process. 
+`listener` is the IP address of Mesos-DNS. In SOA replies, Mesos-DNS identifies hostname `mesos-dns.domain` as the primary nameserver for the domain. It uses this IP address in an A or AAAA record for `mesos-dns.domain`. The default value is "0.0.0.0", which instructs Mesos-DNS to create an A record for every IP address associated with a network interface on the server that runs the Mesos-DNS process. 
 
 `dnson` is a boolean field that controls whether Mesos-DNS listens for DNS requests or not. The default value is `true`. 
 

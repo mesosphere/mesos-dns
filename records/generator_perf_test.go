@@ -85,7 +85,7 @@ func BenchmarkTaskRecord_withoutDiscoveryInfo(b *testing.B) {
 			ti = rand.Int31n(taskCount)
 		)
 		tt.task.Name = tasks[ti]
-		tt.task.SlaveIP = slaves[si]
+		tt.task.SlaveIPs = []string{slaves[si]}
 		tt.task.SlaveID = "ID-" + slaves[si]
 		tt.rg.taskRecord(tt.task, tt.f, tt.domain, tt.spec, tt.ipSources, &tt.enumFW)
 	}

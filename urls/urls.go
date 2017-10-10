@@ -2,6 +2,7 @@ package urls
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 )
@@ -37,6 +38,10 @@ func Path(path string) Option { return func(b *Builder) { b.Path = path } }
 //     zk://username:password@host1:port1,host2:port2,.../path
 //     file:///path/to/file (where file contains one of the above)
 func SplitHostPort(pair string) (string, string, error) {
+	if host, port, err := net.SplitHostPort(pair); err == nil {
+		return host, port, nil
+	}
+
 	h := strings.SplitN(pair, ":", 2)
 	if len(h) != 2 {
 		return "", "", fmt.Errorf("unable to parse proto from %q", pair)

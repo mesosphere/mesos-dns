@@ -412,9 +412,13 @@ func localAddies() []string {
 		if err != nil {
 			logging.Error.Println(err)
 		}
-		t4 := ip.To4()
-		if t4 != nil {
+		// The servers in cservers above could include
+		// ipv6, so we should include local ipv6 for
+		// that filtering
+		if t4 := ip.To4(); t4 != nil {
 			bad = append(bad, t4.String())
+		} else if t6 := ip.To16(); t6 != nil {
+			bad = append(bad, t6.String())
 		}
 	}
 

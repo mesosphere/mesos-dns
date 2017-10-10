@@ -4,12 +4,12 @@ title: Service Naming
 
 # Service Naming
 
-Mesos-DNS defines a DNS domain for Mesos tasks (default `.mesos`, see [instructions on configuration](configuration-parameters.html)). Running tasks can be discovered by looking up A and, optionally, SRV records within the Mesos domain. 
+Mesos-DNS defines a DNS domain for Mesos tasks (default `.mesos`, see [instructions on configuration](configuration-parameters.html)). Running tasks can be discovered by looking up A, AAAA, and, optionally, SRV records within the Mesos domain. 
 
-## A Records
+## A and AAAA Records
 
-An A record associates a hostname to an IP address.
-For task `task` launched by framework `framework`, Mesos-DNS generates an A record for hostname `task.framework.domain` that provides one of the following:
+A and AAAA records associate a hostname to an IPv4 or IPv6 address respectively.
+For task `task` launched by framework `framework`, Mesos-DNS generates an A or AAAA record for hostname `task.framework.domain` that provides one of the following:
 
 - the IP address of the task's network container (provided by a Mesos containerizer); or
 - the IP address of the specific slave running the task.
@@ -64,7 +64,31 @@ For example, a query of the A records for `search.marathon.slave.mesos` would yi
 - `MesosContainerizer.NetworkSettings.IPAddress`.
 
 In general support for these will not be available before Mesos 0.24.
- 
+
+If the following conditions are true...
+
+- the Mesos-DNS IP-source configuration prioritizes container IPs; and
+- the Mesos containerizer that launches the task provides a container IP `fd01:b::2:8000:2` for the task `search.marathon.mesos`
+
+...then a lookup for AAAA would give:
+
+``` console
+$ dig search.marathon.mesos
+
+; <<>> DiG 9.8.4-rpz2+rl005.12-P1 <<>> search.marathon.mesos
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 45066
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 0
+
+;; QUESTION SECTION:
+;search.marathon.mesos.	IN	AAAA
+
+;; ANSWER SECTION:
+search.marathon.mesos. 60	IN	AAAA	fd01:b::2:8000:2
+```
+
+
 ## SRV Records
 
 An SRV record associates a service name to a hostname and an IP port.
@@ -102,10 +126,10 @@ The following table illustrates the rules that govern SRV generation:
 ## Other Records
 
 Mesos-DNS generates a few special records:
-- for the leading master: A record (`leader.domain`) and SRV records (`_leader._tcp.domain` and `_leader._udp.domain`); and
-- for all framework schedulers: A records (`{framework}.domain`) and SRV records (`_framework._tcp.{framework}.domain`)
-- for every known Mesos master: A records (`master.domain`) and SRV records (`_master._tcp.domain` and `_master._udp.domain`); and
-- for every known Mesos slave: A records (`slave.domain`) and SRV records (`_slave._tcp.domain`).
+- for the leading master: A or AAAA record (`leader.domain`) and SRV records (`_leader._tcp.domain` and `_leader._udp.domain`); and
+- for all framework schedulers: A and AAAA records (`{framework}.domain`) and SRV records (`_framework._tcp.{framework}.domain`)
+- for every known Mesos master: A or AAAA records (`master.domain`) and SRV records (`_master._tcp.domain` and `_master._udp.domain`); and
+- for every known Mesos slave: A or AAAA records (`slave.domain`) and SRV records (`_slave._tcp.domain`).
 
 Note that, if you configure Mesos-DNS to detect the leading master through Zookeeper, then this is the only master it knows about.
 If you configure Mesos-DNS using the `masters` field, it will generate master records for every master in the list.

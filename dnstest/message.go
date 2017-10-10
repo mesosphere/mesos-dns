@@ -70,6 +70,14 @@ func A(hdr dns.RR_Header, ip net.IP) *dns.A {
 	}
 }
 
+// AAAA returns an AAAA record set with the given arguments.
+func AAAA(hdr dns.RR_Header, ip net.IP) *dns.AAAA {
+	return &dns.AAAA{
+		Hdr:  hdr,
+		AAAA: ip.To16(),
+	}
+}
+
 // SRV returns a SRV record set with the given arguments.
 func SRV(hdr dns.RR_Header, target string, port, priority, weight uint16) *dns.SRV {
 	return &dns.SRV{

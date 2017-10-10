@@ -1,5 +1,5 @@
 {
-    "activated_slaves": 3,
+    "activated_slaves": 4,
     "build_date": "2014-07-18 18:52:23",
     "build_time": 1405709543,
     "build_user": "root",
@@ -38,6 +38,69 @@
         "zk_session_timeout": "10secs"
     },
     "frameworks": [
+        {
+            "active": true,
+            "checkpoint": false,
+            "completed_tasks": [],
+            "failover_timeout": 1200,
+            "hostname": "localhost",
+            "pid": "scheduler(1)@[2001:db8::1]:25501",
+            "id": "20140703-014514-3041283216-5050-5349-0001",
+            "name": "ipv6-framework",
+            "offers": [],
+            "registered_time": 1414913537.10742,
+            "reregistered_time": 1414913537.10744,
+            "resources": {
+                "cpus": 0,
+                "disk": 0,
+                "mem": 0
+            },
+            "role": "*",
+            "tasks": [
+                {
+                    "executor_id": "",
+                    "framework_id": "20140703-014514-3041283216-5050-5349-0001",
+                    "id": "toy-store.b8db9f73-562f-11e4-a088-c20493233aa5",
+                    "name": "toy-store",
+                    "resources": {
+                        "cpus": 1,
+                        "disk": 0,
+                        "mem": 1024,
+                        "ports": "[31354-31354, 31355-31355]"
+                    },
+                    "slave_id": "20140803-194712-3041283216-5050-2116-3",
+                    "state": "TASK_RUNNING",
+                    "statuses": [
+                        {
+                            "state": "TASK_RUNNING",
+                            "timestamp": 1507139816.34576,
+                            "container_status": {
+                                "container_id": {
+                                    "value": "da87d8aa-98f1-4fc3-a260-f92c116fc926"
+                                },
+                                "network_infos": [
+                                    {
+                                        "ip_addresses": [
+                                            {
+                                                "protocol": "IPv4",
+                                                "ip_address": "12.0.1.2"
+                                            },
+                                            {
+                                                "protocol": "IPv6",
+                                                "ip_address": "fd01:b::1:8000:2"
+                                            }
+                                        ],
+                                        "name": "dcos6"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ],
+            "unregistered_time": 0,
+            "user": "root"
+        },
         {
             "active": true,
             "checkpoint": false,
@@ -613,6 +676,22 @@
             "pid": "slave(1)@1.2.3.12:5051",
             "registered_time": 1414913537.19731,
             "reregistered_time": 1414913537.19735,
+            "resources": {
+                "cpus": 8,
+                "disk": 1855784,
+                "mem": 31016,
+                "ports": "[31000-32000]"
+            }
+        },
+        {
+            "attributes": {
+                "host": "dev-123-1g.c.mesos.internal"
+            },
+            "hostname": "2001:db8::1",
+            "id": "20140803-194712-3041283216-5050-2116-3",
+            "pid": "slave(1)@[2001:db8::1]:5051",
+            "registered_time": 1414913537.56731,
+            "reregistered_time": 1414913537.56735,
             "resources": {
                 "cpus": 8,
                 "disk": 1855784,

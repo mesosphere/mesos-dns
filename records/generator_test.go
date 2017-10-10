@@ -2,6 +2,7 @@ package records
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net"
@@ -35,25 +36,31 @@ func (rg *RecordGenerator) exists(name, host string, kind rrsKind) bool {
 func TestParseState_SOAMname(t *testing.T) {
 	rg := &RecordGenerator{}
 	rg.stateLoader = func(_ []string) (s state.State, err error) {
-		s.Leader = "foo@123:45" // required or else ParseState bails
+		s.Leader = "foo@0.1.2.3:45" // required or else ParseState bails
 		return
 	}
-	err := rg.ParseState(Config{SOAMname: "jdef123.mesos.", Listener: "4.5.6.7"})
-	if err != nil {
+	cfg1 := Config{SOAMname: "jdef123.mesos.", Listener: "4.5.6.7"}
+	if err := rg.ParseState(cfg1); err != nil {
 		t.Fatal("unexpected error", err)
-	}
-	if !rg.exists("jdef123.mesos.", "4.5.6.7", A) {
+	} else if !rg.exists("jdef123.mesos.", "4.5.6.7", A) {
 		t.Fatalf("failed to locate A record for SOAMname, A records: %#v", rg.As)
 	}
+	cfg2 := Config{SOAMname: "ack456.mesos.", Listener: "2001:db8::1"}
+	if err := rg.ParseState(cfg2); err != nil {
+		t.Fatal("unexpected error", err)
+	} else if !rg.exists("ack456.mesos.", "2001:db8::1", AAAA) {
+		t.Fatalf("failed to locate AAAA record for SOAMname, AAAA records: %#v", rg.AAAAs)
+	}
+}
+
+type expectedRR struct {
+	name string
+	host string
+	kind rrsKind
 }
 
 func TestMasterRecord(t *testing.T) {
 	// masterRecord(domain string, masters []string, leader string)
-	type expectedRR struct {
-		name string
-		host string
-		kind rrsKind
-	}
 	tt := []struct {
 		domain  string
 		masters []string
@@ -65,77 +72,97 @@ func TestMasterRecord(t *testing.T) {
 		{"foo.com", nil, "1@", nil},
 		{"foo.com", nil, "@2", nil},
 		{"foo.com", nil, "3@4", nil},
-		{"foo.com", nil, "5@6:7",
+		{"foo.com", nil, "5@0.0.0.6:7",
 			[]expectedRR{
-				{"leader.foo.com.", "6", A},
-				{"master.foo.com.", "6", A},
-				{"master0.foo.com.", "6", A},
+				{"leader.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.6", A},
+				{"master0.foo.com.", "0.0.0.6", A},
+				{"_leader._tcp.foo.com.", "leader.foo.com.:7", SRV},
+				{"_leader._udp.foo.com.", "leader.foo.com.:7", SRV},
+			}},
+		{"foo.com", nil, "5@[2001:db8::1]:7",
+			[]expectedRR{
+				{"leader.foo.com.", "2001:db8::1", AAAA},
+				{"master.foo.com.", "2001:db8::1", AAAA},
+				{"master0.foo.com.", "2001:db8::1", AAAA},
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", SRV},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", SRV},
 			}},
 		// single master: leader and fallback
-		{"foo.com", []string{"6:7"}, "5@6:7",
+		{"foo.com", []string{"0.0.0.6:7"}, "5@0.0.0.6:7",
 			[]expectedRR{
-				{"leader.foo.com.", "6", A},
-				{"master.foo.com.", "6", A},
-				{"master0.foo.com.", "6", A},
+				{"leader.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.6", A},
+				{"master0.foo.com.", "0.0.0.6", A},
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", SRV},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", SRV},
 			}},
 		// leader not in fallback list
-		{"foo.com", []string{"8:9"}, "5@6:7",
+		{"foo.com", []string{"0.0.0.8:9"}, "5@0.0.0.6:7",
 			[]expectedRR{
-				{"leader.foo.com.", "6", A},
-				{"master.foo.com.", "6", A},
-				{"master.foo.com.", "8", A},
-				{"master1.foo.com.", "6", A},
-				{"master0.foo.com.", "8", A},
+				{"leader.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.8", A},
+				{"master1.foo.com.", "0.0.0.6", A},
+				{"master0.foo.com.", "0.0.0.8", A},
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", SRV},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", SRV},
 			}},
 		// duplicate fallback masters, leader not in fallback list
-		{"foo.com", []string{"8:9", "8:9"}, "5@6:7",
+		{"foo.com", []string{"0.0.0.8:9", "0.0.0.8:9"}, "5@0.0.0.6:7",
 			[]expectedRR{
-				{"leader.foo.com.", "6", A},
-				{"master.foo.com.", "6", A},
-				{"master.foo.com.", "8", A},
-				{"master1.foo.com.", "6", A},
-				{"master0.foo.com.", "8", A},
+				{"leader.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.8", A},
+				{"master1.foo.com.", "0.0.0.6", A},
+				{"master0.foo.com.", "0.0.0.8", A},
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", SRV},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", SRV},
 			}},
 		// leader that's also listed in the fallback list (at the end)
-		{"foo.com", []string{"8:9", "6:7"}, "5@6:7",
+		{"foo.com", []string{"0.0.0.8:9", "0.0.0.6:7"}, "5@0.0.0.6:7",
 			[]expectedRR{
-				{"leader.foo.com.", "6", A},
-				{"master.foo.com.", "6", A},
-				{"master.foo.com.", "8", A},
-				{"master1.foo.com.", "6", A},
-				{"master0.foo.com.", "8", A},
+				{"leader.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.8", A},
+				{"master1.foo.com.", "0.0.0.6", A},
+				{"master0.foo.com.", "0.0.0.8", A},
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", SRV},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", SRV},
 			}},
 		// duplicate leading masters in the fallback list
-		{"foo.com", []string{"8:9", "6:7", "6:7"}, "5@6:7",
+		{"foo.com", []string{"0.0.0.8:9", "0.0.0.6:7", "0.0.0.6:7"}, "5@0.0.0.6:7",
 			[]expectedRR{
-				{"leader.foo.com.", "6", A},
-				{"master.foo.com.", "6", A},
-				{"master.foo.com.", "8", A},
-				{"master1.foo.com.", "6", A},
-				{"master0.foo.com.", "8", A},
+				{"leader.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.8", A},
+				{"master1.foo.com.", "0.0.0.6", A},
+				{"master0.foo.com.", "0.0.0.8", A},
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", SRV},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", SRV},
 			}},
 		// leader that's also listed in the fallback list (in the middle)
-		{"foo.com", []string{"8:9", "6:7", "bob:0"}, "5@6:7",
+		{"foo.com", []string{"0.0.0.8:9", "0.0.0.6:7", "0.0.0.7:0"}, "5@0.0.0.6:7",
 			[]expectedRR{
-				{"leader.foo.com.", "6", A},
-				{"master.foo.com.", "6", A},
-				{"master.foo.com.", "8", A},
-				{"master.foo.com.", "bob", A},
-				{"master0.foo.com.", "8", A},
-				{"master1.foo.com.", "6", A},
-				{"master2.foo.com.", "bob", A},
+				{"leader.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.8", A},
+				{"master.foo.com.", "0.0.0.7", A},
+				{"master0.foo.com.", "0.0.0.8", A},
+				{"master1.foo.com.", "0.0.0.6", A},
+				{"master2.foo.com.", "0.0.0.7", A},
+				{"_leader._tcp.foo.com.", "leader.foo.com.:7", SRV},
+				{"_leader._udp.foo.com.", "leader.foo.com.:7", SRV},
+			}},
+		{"foo.com", []string{"0.0.0.8:9", "0.0.0.6:7", "[2001:db8::1]:0"}, "5@0.0.0.6:7",
+			[]expectedRR{
+				{"leader.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.6", A},
+				{"master.foo.com.", "0.0.0.8", A},
+				{"master.foo.com.", "2001:db8::1", AAAA},
+				{"master0.foo.com.", "0.0.0.8", A},
+				{"master1.foo.com.", "0.0.0.6", A},
+				{"master2.foo.com.", "2001:db8::1", AAAA},
 				{"_leader._tcp.foo.com.", "leader.foo.com.:7", SRV},
 				{"_leader._udp.foo.com.", "leader.foo.com.:7", SRV},
 			}},
@@ -143,6 +170,7 @@ func TestMasterRecord(t *testing.T) {
 	for i, tc := range tt {
 		rg := &RecordGenerator{}
 		rg.As = make(rrs)
+		rg.AAAAs = make(rrs)
 		rg.SRVs = make(rrs)
 		t.Logf("test case %d", i+1)
 		rg.masterRecord(tc.domain, tc.masters, tc.leader)
@@ -150,33 +178,52 @@ func TestMasterRecord(t *testing.T) {
 			if len(rg.As) > 0 {
 				t.Fatalf("test case %d: unexpected As: %v", i+1, rg.As)
 			}
+			if len(rg.AAAAs) > 0 {
+				t.Fatalf("test case %d: unexpected AAAAs: %v", i+1, rg.AAAAs)
+			}
 			if len(rg.SRVs) > 0 {
 				t.Fatalf("test case %d: unexpected SRVs: %v", i+1, rg.SRVs)
 			}
 		}
-		expectedA := make(rrs)
-		expectedSRV := make(rrs)
-		for _, e := range tc.expect {
-			found := rg.exists(e.name, e.host, e.kind)
-			if !found {
-				t.Fatalf("test case %d: missing expected record: name=%q host=%q kind=%s, As=%v", i+1, e.name, e.host, e.kind, rg.As)
-			}
-			switch e.kind {
-			case A:
-				expectedA.add(e.name, e.host)
-			case SRV:
-				expectedSRV.add(e.name, e.host)
-			default:
-				t.Fatalf("unexpected kind %q", e.kind)
-			}
+		eA, eAAAA, eSRV, err := expectRecords(rg, tc.expect)
+		if err != nil {
+			t.Fatalf("test case %d: %s, As=%v, AAAAs=%v, SRVs=%v", i+1, err, rg.As, rg.AAAAs, rg.SRVs)
 		}
-		if !reflect.DeepEqual(rg.As, expectedA) {
-			t.Fatalf("test case %d: expected As of %v instead of %v", i+1, expectedA, rg.As)
+		if !reflect.DeepEqual(rg.As, eA) {
+			t.Fatalf("test case %d: expected As of %v instead of %v", i+1, eA, rg.As)
 		}
-		if !reflect.DeepEqual(rg.SRVs, expectedSRV) {
-			t.Fatalf("test case %d: expected SRVs of %v instead of %v", i+1, expectedSRV, rg.SRVs)
+		if !reflect.DeepEqual(rg.AAAAs, eAAAA) {
+			t.Fatalf("test case %d: expected AAAAs of %v instead of %v", i+1, eAAAA, rg.AAAAs)
+		}
+		if !reflect.DeepEqual(rg.SRVs, eSRV) {
+			t.Fatalf("test case %d: expected SRVs of %v instead of %v", i+1, eSRV, rg.SRVs)
 		}
 	}
+}
+
+func expectRecords(rg *RecordGenerator, expect []expectedRR) (eA, eAAAA, eSRV rrs, err error) {
+	eA = make(rrs)
+	eAAAA = make(rrs)
+	eSRV = make(rrs)
+	for _, e := range expect {
+		found := rg.exists(e.name, e.host, e.kind)
+		if !found {
+			err = fmt.Errorf("missing expected record: name=%q host=%q kind=%s", e.name, e.host, e.kind)
+			return
+		}
+		switch e.kind {
+		case A:
+			eA.add(e.name, e.host)
+		case AAAA:
+			eAAAA.add(e.name, e.host)
+		case SRV:
+			eSRV.add(e.name, e.host)
+		default:
+			err = fmt.Errorf("unexpected kind: %q", e.kind)
+			return
+		}
+	}
+	return
 }
 
 func testRecordGenerator(t *testing.T, spec labels.Func, ipSources []string) RecordGenerator {
@@ -202,10 +249,11 @@ func testRecordGenerator(t *testing.T, spec labels.Func, ipSources []string) Rec
 
 // ensure we are parsing what we think we are
 func TestInsertState(t *testing.T) {
-	rg := testRecordGenerator(t, labels.RFC952, []string{"docker", "mesos", "host"})
+	rg := testRecordGenerator(t, labels.RFC952, []string{"netinfo", "docker", "mesos", "host"})
 	rgDocker := testRecordGenerator(t, labels.RFC952, []string{"docker", "host"})
 	rgMesos := testRecordGenerator(t, labels.RFC952, []string{"mesos", "host"})
 	rgSlave := testRecordGenerator(t, labels.RFC952, []string{"host"})
+	rgNetinfo := testRecordGenerator(t, labels.RFC952, []string{"netinfo"})
 
 	for i, tt := range []struct {
 		rrs  rrs
@@ -225,6 +273,12 @@ func TestInsertState(t *testing.T) {
 		{rg.As, "slave.mesos.", []string{"1.2.3.10", "1.2.3.11", "1.2.3.12"}},
 		{rg.As, "some-box.chronoswithaspaceandmixe.mesos.", []string{"1.2.3.11"}}, // ensure we translate the framework name as well
 		{rg.As, "marathon.mesos.", []string{"1.2.3.11"}},
+
+		{rg.AAAAs, "toy-store.ipv6-framework.mesos.", []string{"fd01:b::1:8000:2"}},
+		{rg.AAAAs, "toy-store.ipv6-framework.slave.mesos.", []string{"2001:db8::1"}},
+		{rg.AAAAs, "ipv6-framework.mesos.", []string{"2001:db8::1"}},
+		{rg.AAAAs, "slave.mesos.", []string{"2001:db8::1"}},
+
 		{rg.SRVs, "_big-dog._tcp.marathon.mesos.", []string{
 			"big-dog-4dfjd-0.marathon.mesos.:80",
 			"big-dog-4dfjd-0.marathon.mesos.:443",
@@ -263,15 +317,28 @@ func TestInsertState(t *testing.T) {
 		{rgSlave.As, "nginx.marathon.mesos.", []string{"1.2.3.11"}},
 		{rgSlave.As, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
 
+		{rgSlave.AAAAs, "toy-store.ipv6-framework.mesos.", []string{"2001:db8::1"}},
+		{rgSlave.AAAAs, "toy-store.ipv6-framework.slave.mesos.", []string{"2001:db8::1"}},
+
 		{rgMesos.As, "liquor-store.marathon.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
 		{rgMesos.As, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
 		{rgMesos.As, "nginx.marathon.mesos.", []string{"10.3.0.3"}},
 		{rgMesos.As, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
 
+		{rgMesos.AAAAs, "toy-store.ipv6-framework.mesos.", []string{"2001:db8::1"}},
+		{rgMesos.AAAAs, "toy-store.ipv6-framework.slave.mesos.", []string{"2001:db8::1"}},
+
+		{rgNetinfo.As, "toy-store.ipv6-framework.mesos.", []string{"12.0.1.2"}},
+
+		{rgNetinfo.AAAAs, "toy-store.ipv6-framework.mesos.", []string{"fd01:b::1:8000:2"}},
+		{rgNetinfo.AAAAs, "toy-store.ipv6-framework.slave.mesos.", []string{"2001:db8::1"}},
+
 		{rgDocker.As, "liquor-store.marathon.mesos.", []string{"10.3.0.1", "10.3.0.2"}},
 		{rgDocker.As, "liquor-store.marathon.slave.mesos.", []string{"1.2.3.11", "1.2.3.12"}},
 		{rgDocker.As, "nginx.marathon.mesos.", []string{"1.2.3.11"}},
 		{rgDocker.As, "car-store.marathon.slave.mesos.", []string{"1.2.3.11"}},
+		{rgDocker.AAAAs, "toy-store.ipv6-framework.mesos.", []string{"2001:db8::1"}},
+		{rgDocker.AAAAs, "toy-store.ipv6-framework.slave.mesos.", []string{"2001:db8::1"}},
 	} {
 		// convert want into a map[string]struct{} (string set) for simpler comparison
 		// via reflect.DeepEqual
@@ -283,7 +350,7 @@ func TestInsertState(t *testing.T) {
 			if len(got) == 0 && len(want) == 0 {
 				continue
 			}
-			t.Errorf("test #%d: %q: got: %q, want: %q", i, tt.name, got, want)
+			t.Errorf("test #%d: %q: got: %q, want: %q", i+1, tt.name, got, want)
 		}
 	}
 }

@@ -5,13 +5,10 @@ import (
 )
 
 func TestNonLocalAddies(t *testing.T) {
-	nlocal := []string{"127.0.0.1"}
+	nlocal := localAddies()
 	addies := nonLocalAddies(nlocal)
-
-	for i := 0; i < len(addies); i++ {
-		if "127.0.0.1" == addies[i] {
-			t.Error("finding a local address")
-		}
+	if len(addies) > 0 {
+		t.Error("finding a local address")
 	}
 }
 

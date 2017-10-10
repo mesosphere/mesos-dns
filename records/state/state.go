@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mesos/mesos-go/upid"
 	"github.com/mesosphere/mesos-dns/logging"
+	"github.com/mesosphere/mesos-dns/records/state/upid"
 )
 
 // Resources holds resources as defined in the /state.json Mesos HTTP endpoint.
@@ -93,7 +93,8 @@ type Task struct {
 	Resources     `json:"resources"`
 	DiscoveryInfo DiscoveryInfo `json:"discovery"`
 
-	SlaveIP string `json:"-"`
+	// SlaveIPs is used internally and contains ipv4, ipv6, or both
+	SlaveIPs []string `json:"-"`
 }
 
 // HasDiscoveryInfo return whether the DiscoveryInfo was provided in the state.json
@@ -137,7 +138,7 @@ var sources = map[string]func(*Task) []string{
 
 // hostIPs is an IPSource which returns the IP addresses of the slave a Task
 // runs on.
-func hostIPs(t *Task) []string { return []string{t.SlaveIP} }
+func hostIPs(t *Task) []string { return t.SlaveIPs }
 
 // networkInfoIPs returns IP addresses from a given Task's
 // []Status.ContainerStatus.[]NetworkInfos.[]IPAddresses.IPAddress

@@ -49,7 +49,7 @@ curl http://10.190.238.173:8123/v1/config
 ```
 ## `GET /v1/hosts/{host}`
 
-Lists in JSON format the IP address(es) that correspond to a hostname. It is the equivalent of DNS A record lookup.  Note, the HTTP interface only translates hostnames in the Mesos domain. 
+Lists in JSON format the IP address(es) that correspond to a hostname. It is the equivalent of DNS A and AAAA record lookup.  Note, the HTTP interface only translates hostnames in the Mesos domain. 
 
 ```console
 $ curl http://10.190.238.173:8123/v1/hosts/nginx.marathon.mesos
