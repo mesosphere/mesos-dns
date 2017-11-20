@@ -43,6 +43,8 @@ func LoadMasterStateTryAll(masters []string, stateLoader func(ip, port string) (
 
 	if len(masters) > 0 {
 		leader, masters = masters[0], masters[1:]
+	} else {
+		return sj, errors.New("no masters given to fetch state.json")
 	}
 
 	// Check if ZK leader is correct
