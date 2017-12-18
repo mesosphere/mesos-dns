@@ -202,7 +202,7 @@ func netinfos(netinfos ...NetworkInfo) statusOpt {
 func netinfo(ips ...string) NetworkInfo {
 	netinfo := NetworkInfo{}
 	for _, ip := range ips {
-		netinfo.IPAddresses = append(netinfo.IPAddresses, IPAddress{ip})
+		netinfo.IPAddresses = append(netinfo.IPAddresses, IPAddress{IPAddress: ip})
 	}
 	return netinfo
 }
@@ -218,7 +218,7 @@ func oldnetinfo(ip string) NetworkInfo {
 func oldnewnetinfo(oldip string, newip string) NetworkInfo {
 	netinfo := NetworkInfo{}
 	netinfo.IPAddress = oldip
-	netinfo.IPAddresses = append(netinfo.IPAddresses, IPAddress{newip})
+	netinfo.IPAddresses = append(netinfo.IPAddresses, IPAddress{IPAddress: newip})
 	return netinfo
 }
 
