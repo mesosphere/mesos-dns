@@ -21,6 +21,7 @@
   "httpport": 8123,
   "externalon": true,
   "recurseon": true,
+  "srvRecordDefaultWeight": 1,
   "IPSources": ["mesos", "host"],
   "EnforceRFC952": false,
   "EnumerationOn": true

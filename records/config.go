@@ -39,6 +39,8 @@ type Config struct {
 	HTTPPort int `json:"HttpPort"`
 	// TTL: the TTL value used for SRV and A records (default 60)
 	TTL int32
+	// SRVRecordDefaultWeight: default weight for SRV records
+	SRVRecordDefaultWeight uint16
 	// SOA record fields (see http://tools.ietf.org/html/rfc1035#page-18)
 	SOASerial  uint32 // initial version number (incremented on refresh)
 	SOARefresh uint32 // refresh interval
@@ -111,32 +113,33 @@ type Config struct {
 // NewConfig return the default config of the resolver
 func NewConfig() Config {
 	return Config{
-		ZkDetectionTimeout:  30,
-		RefreshSeconds:      60,
-		TTL:                 60,
-		Domain:              "mesos",
-		Port:                53,
-		Timeout:             5,
-		StateTimeoutSeconds: 300,
-		SOARname:            "root.ns1.mesos",
-		SOAMname:            "ns1.mesos",
-		SOARefresh:          60,
-		SOARetry:            600,
-		SOAExpire:           86400,
-		SOAMinttl:           60,
-		ZoneResolvers:       map[string][]string{},
-		Resolvers:           []string{"8.8.8.8"},
-		Listener:            "0.0.0.0",
-		HTTPListener:        "0.0.0.0",
-		HTTPPort:            8123,
-		DNSOn:               true,
-		HTTPOn:              true,
-		ExternalOn:          true,
-		SetTruncateBit:      true,
-		RecurseOn:           true,
-		IPSources:           []string{"netinfo", "mesos", "host"},
-		EnumerationOn:       true,
-		MesosAuthentication: httpcli.AuthNone,
+		ZkDetectionTimeout:     30,
+		RefreshSeconds:         60,
+		TTL:                    60,
+		SRVRecordDefaultWeight: 1,
+		Domain:                 "mesos",
+		Port:                   53,
+		Timeout:                5,
+		StateTimeoutSeconds:    300,
+		SOARname:               "root.ns1.mesos",
+		SOAMname:               "ns1.mesos",
+		SOARefresh:             60,
+		SOARetry:               600,
+		SOAExpire:              86400,
+		SOAMinttl:              60,
+		ZoneResolvers:          map[string][]string{},
+		Resolvers:              []string{"8.8.8.8"},
+		Listener:               "0.0.0.0",
+		HTTPListener:           "0.0.0.0",
+		HTTPPort:               8123,
+		DNSOn:                  true,
+		HTTPOn:                 true,
+		ExternalOn:             true,
+		SetTruncateBit:         true,
+		RecurseOn:              true,
+		IPSources:              []string{"netinfo", "mesos", "host"},
+		EnumerationOn:          true,
+		MesosAuthentication:    httpcli.AuthNone,
 	}
 }
 
@@ -264,6 +267,7 @@ func (c Config) log() {
 	logging.Verbose.Println("   - Port: ", c.Port)
 	logging.Verbose.Println("   - DnsOn: ", c.DNSOn)
 	logging.Verbose.Println("   - TTL: ", c.TTL)
+	logging.Verbose.Println("   - SRVRecordDefaultWeight: ", c.SRVRecordDefaultWeight)
 	logging.Verbose.Println("   - Timeout: ", c.Timeout)
 	logging.Verbose.Println("   - StateTimeoutSeconds: ", c.StateTimeoutSeconds)
 

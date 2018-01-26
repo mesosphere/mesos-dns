@@ -146,13 +146,13 @@ func runHandlers() error {
 				Header(true, dns.RcodeSuccess),
 				Answers(
 					SRV(RRHeader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
-						"liquor-store-4dfjd-0.marathon.mesos.", 443, 0, 0),
+						"liquor-store-4dfjd-0.marathon.mesos.", 443, 0, 1),
 					SRV(RRHeader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
-						"liquor-store-zasmd-1.marathon.mesos.", 80, 0, 0),
+						"liquor-store-zasmd-1.marathon.mesos.", 80, 0, 1),
 					SRV(RRHeader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
-						"liquor-store-zasmd-1.marathon.mesos.", 443, 0, 0),
+						"liquor-store-zasmd-1.marathon.mesos.", 443, 0, 1),
 					SRV(RRHeader("_liquor-store._tcp.marathon.mesos.", dns.TypeSRV, 60),
-						"liquor-store-4dfjd-0.marathon.mesos.", 80, 0, 0)),
+						"liquor-store-4dfjd-0.marathon.mesos.", 80, 0, 1)),
 				Extras(
 					A(RRHeader("liquor-store-4dfjd-0.marathon.mesos.", dns.TypeA, 60),
 						net.ParseIP("10.3.0.1")),
@@ -166,9 +166,9 @@ func runHandlers() error {
 				Header(true, dns.RcodeSuccess),
 				Answers(
 					SRV(RRHeader("_car-store._udp.marathon.mesos.", dns.TypeSRV, 60),
-						"car-store-zinaz-0.marathon.slave.mesos.", 31365, 0, 0),
+						"car-store-zinaz-0.marathon.slave.mesos.", 31365, 0, 1),
 					SRV(RRHeader("_car-store._udp.marathon.mesos.", dns.TypeSRV, 60),
-						"car-store-zinaz-0.marathon.slave.mesos.", 31364, 0, 0)),
+						"car-store-zinaz-0.marathon.slave.mesos.", 31364, 0, 1)),
 				Extras(
 					A(RRHeader("car-store-zinaz-0.marathon.slave.mesos.", dns.TypeA, 60),
 						net.ParseIP("1.2.3.11")))),

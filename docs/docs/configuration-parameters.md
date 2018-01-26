@@ -4,7 +4,7 @@ title: Mesos-DNS Configuration Parameters
 
 ##  Mesos-DNS Configuration Parameters
 
-Mesos-DNS is configured through the parameters in a json file. You can point Mesos-DNS to a specific configuration file using the argument `-config=pathto/file.json`. If no configuration file is passed as an argument, Mesos-DNS will look for file `config.json` in the current directory. 
+Mesos-DNS is configured through the parameters in a json file. You can point Mesos-DNS to a specific configuration file using the argument `-config=pathto/file.json`. If no configuration file is passed as an argument, Mesos-DNS will look for file `config.json` in the current directory.
 
 The configuration file should include the following fields:
 
@@ -25,7 +25,7 @@ The configuration file should include the following fields:
   "zoneResolvers": {
     "weave": ["172.17.0.1"]
   },
-  "timeout": 5, 
+  "timeout": 5,
   "httpon": true,
   "dnson": true,
   "httpport": 8123,
@@ -41,7 +41,7 @@ The configuration file should include the following fields:
 }
 ```
 
-`zk` is a link to the Zookeeper instances on the Mesos cluster. Its format is `zk://host1:port1,host2:port2/mesos/`, where the number of hosts can be one or more. The default port for Zookeeper is `2181`. Mesos-DNS will monitor the Zookeeper instances to detect the current leading master. 
+`zk` is a link to the Zookeeper instances on the Mesos cluster. Its format is `zk://host1:port1,host2:port2/mesos/`, where the number of hosts can be one or more. The default port for Zookeeper is `2181`. Mesos-DNS will monitor the Zookeeper instances to detect the current leading master.
 
 `zkDetectionTimeout` defines how long to wait (in seconds) for Zookeeper to report a new leading Mesos master.
 This timeout is activated on:
@@ -55,39 +55,41 @@ a new leading Mesos master is reported by the ZK-based master detector, the prog
 
 Defaults to `30` seconds.
 
-`masters` is a comma separated list with the IP address and port number for the master(s) in the Mesos cluster. Mesos-DNS will automatically find the leading master at any point in order to retrieve state about running tasks. If there is no leading master or the leading master is not responsive, Mesos-DNS will continue serving DNS requests based on stale information about running tasks. The `masters` field is required. 
+`masters` is a comma separated list with the IP address and port number for the master(s) in the Mesos cluster. Mesos-DNS will automatically find the leading master at any point in order to retrieve state about running tasks. If there is no leading master or the leading master is not responsive, Mesos-DNS will continue serving DNS requests based on stale information about running tasks. The `masters` field is required.
 
-It is sufficient to specify just one of the `zk` or `masters` field. If both are defined, Mesos-DNS will first attempt to detect the leading master through Zookeeper. If Zookeeper is not responding, it will fall back to using the `masters` field. Both `zk` and `master` fields are static. To update them you need to restart Mesos-DNS. We recommend you use the `zk` field since this allows the dynamic addition to Mesos masters. 
+It is sufficient to specify just one of the `zk` or `masters` field. If both are defined, Mesos-DNS will first attempt to detect the leading master through Zookeeper. If Zookeeper is not responding, it will fall back to using the `masters` field. Both `zk` and `master` fields are static. To update them you need to restart Mesos-DNS. We recommend you use the `zk` field since this allows the dynamic addition to Mesos masters.
 
 `mesosAuthentication` configures the authentication mechanism for talking to the Mesos cluster. Valid values are '', 'basic' (see `mesosCredentials`), and 'iam'. Default is ''.
 
 `mesosCredentials` is a dictionary containing a `principal` and a `secret`, corresponding to a configured authentication principal for the Mesos masters. Starting with Mesos `1.0.0`, if the masters have `http_authentication` enabled, then Mesos-DNS must authenticate. You must specify `mesosAuthentication`: `basic` to use this configuration.
 
-`refreshSeconds` is the frequency at which Mesos-DNS updates DNS records based on information retrieved from the Mesos master. The default value is 60 seconds. 
+`refreshSeconds` is the frequency at which Mesos-DNS updates DNS records based on information retrieved from the Mesos master. The default value is 60 seconds.
 
 `stateTimeoutSeconds` is the time that Mesos-DNS will wait for the Mesos master to respond to its request for state.json in seconds. The default value is 300 seconds.
 
-`ttl` is the [time to live](http://en.wikipedia.org/wiki/Time_to_live#DNS_records) value for DNS records served by Mesos-DNS, in seconds. It allows caching of the DNS record for a period of time in order to reduce DNS request rate. `ttl` should be equal or larger than `refreshSeconds`. The default value is 60 seconds. 
+`ttl` is the [time to live](http://en.wikipedia.org/wiki/Time_to_live#DNS_records) value for DNS records served by Mesos-DNS, in seconds. It allows caching of the DNS record for a period of time in order to reduce DNS request rate. `ttl` should be equal or larger than `refreshSeconds`. The default value is 60 seconds.
 
 `domain` is the domain name for the Mesos cluster. The domain name can use characters [a-z, A-Z, 0-9], `-` if it is not the first or last character of a domain portion, and `.` as a separator of the textual portions of the domain name. We recommend you avoid valid [top-level domain names](http://en.wikipedia.org/wiki/List_of_Internet_top-level_domains). The default value is `mesos`.
 
 `port` is the port number that Mesos-DNS monitors for incoming DNS requests. Requests can be sent over TCP or UDP. We recommend you use port `53` as several applications assume that the DNS server listens to this port. The default value is `53`.
 
-`resolvers` is a comma separated list with the IP addresses of external DNS servers that Mesos-DNS will contact to resolve any DNS requests outside the `domain`. We ***recommend*** that you list the nameservers specified in the `/etc/resolv.conf` on the server Mesos-DNS is running. Alternatively, you can list `8.8.8.8`, which is the [Google public DNS](https://developers.google.com/speed/public-dns/) address. The `resolvers` field is required. 
+`resolvers` is a comma separated list with the IP addresses of external DNS servers that Mesos-DNS will contact to resolve any DNS requests outside the `domain`. We ***recommend*** that you list the nameservers specified in the `/etc/resolv.conf` on the server Mesos-DNS is running. Alternatively, you can list `8.8.8.8`, which is the [Google public DNS](https://developers.google.com/speed/public-dns/) address. The `resolvers` field is required.
 
 `zoneResolvers` is a dictionary of zone-specific external DNS servers, where the key is the matching zone (sans leading / trailing .). You can use this configuration option to route a subset of DNS queries to a specific set of DNS servers. Note, general, catch-all resolvers are still specified with `resolvers`.
 
-`timeout` is the timeout threshold, in seconds, for connections and requests to external DNS requests. The default value is 5 seconds. 
+`timeout` is the timeout threshold, in seconds, for connections and requests to external DNS requests. The default value is 5 seconds.
 
-`listener` is the IP address of Mesos-DNS. In SOA replies, Mesos-DNS identifies hostname `mesos-dns.domain` as the primary nameserver for the domain. It uses this IP address in an A or AAAA record for `mesos-dns.domain`. The default value is "0.0.0.0", which instructs Mesos-DNS to create an A record for every IP address associated with a network interface on the server that runs the Mesos-DNS process. 
+`listener` is the IP address of Mesos-DNS. In SOA replies, Mesos-DNS identifies hostname `mesos-dns.domain` as the primary nameserver for the domain. It uses this IP address in an A or AAAA record for `mesos-dns.domain`. The default value is "0.0.0.0", which instructs Mesos-DNS to create an A record for every IP address associated with a network interface on the server that runs the Mesos-DNS process.
 
-`dnson` is a boolean field that controls whether Mesos-DNS listens for DNS requests or not. The default value is `true`. 
+`dnson` is a boolean field that controls whether Mesos-DNS listens for DNS requests or not. The default value is `true`.
 
-`httpon` is a boolean field that controls whether Mesos-DNS listens for HTTP requests or not. The default value is `true`. 
+`httpon` is a boolean field that controls whether Mesos-DNS listens for HTTP requests or not. The default value is `true`.
 
 `httpport` is the port number that Mesos-DNS monitors for incoming HTTP requests. The default value is `8123`.
 
-`externalon` is a boolean field that controls whether Mesos-DNS serves requests outside of the Mesos domain. The default value is `true`. 
+`externalon` is a boolean field that controls whether Mesos-DNS serves requests outside of the Mesos domain. The default value is `true`.
+
+`srvRecordDefaultWeight` is an int field field that defines the default weight given to SRV records. The default value is `1`.
 
 `SOAMname` specifies the domain name of the name server that was the original or primary source of data for the configured domain.
 The configured name will always be converted to a FQDN by ensuring it ends with a `.`. The default value is `ns1.mesos`.
@@ -102,7 +104,7 @@ The configured name will always be converted to a FQDN by ensuring it ends with 
 
 `SOAMinttl` is the minimum TTL field in the SOA record for the Mesos domain. For details, see the [RFC-2308](https://tools.ietf.org/html/rfc2308). The default value is `60`.
 
-`recurseon` controls if the DNS replies for names in the Mesos domain will indicate that recursion is available. The default value is `true`. 
+`recurseon` controls if the DNS replies for names in the Mesos domain will indicate that recursion is available. The default value is `true`.
 
 `enforceRFC952` will enforce an older, more strict set of rules for DNS labels. For details, see the [RFC-952](https://tools.ietf.org/html/rfc952). The default value is `false`.
 
