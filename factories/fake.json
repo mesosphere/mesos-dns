@@ -213,6 +213,35 @@
              "user": "root"
         },
         {
+            "id":"1b4c4343-a8a1-48ca-a74c-4e24d7947303-0002",
+            "name":"marathon",
+            "pid":"scheduler-621043d2-ab95-448d-a5a9-970d475a8b4e@10.0.2.175:44369",
+            "capabilities":["TASK_KILLING_STATE","PARTITION_AWARE","REGION_AWARE"],
+            "hostname":"10.0.2.175",
+            "webui_url":"http:\/\/10.0.2.175:26074",
+            "active":false,
+            "connected":false,
+            "recovered":false,
+            "user":"root",
+            "failover_timeout":604800.0,
+            "checkpoint":true,
+            "registered_time":1519673766.85769,
+            "unregistered_time":0.0,
+            "principal":"marathon",
+            "resources":{
+              "disk":0.0,
+              "mem":0.0,
+              "gpus":0.0,
+              "cpus":0.0
+            },
+            "role":"marathon",
+            "tasks":[],
+            "unreachable_tasks":[],
+            "completed_tasks":[],
+            "offers":[],
+            "executors":[]
+        },
+        {
             "active": true,
             "checkpoint": true,
             "completed_tasks": [

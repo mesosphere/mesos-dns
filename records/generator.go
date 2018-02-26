@@ -221,6 +221,9 @@ func (rg *RecordGenerator) InsertState(sj state.State, domain, ns, listener stri
 //     _framework._tcp.frameworkname.domain. // resolves to the driver port and IP of each framework
 func (rg *RecordGenerator) frameworkRecords(sj state.State, domain string, spec labels.Func) {
 	for _, f := range sj.Frameworks {
+		if !f.Active {
+			continue
+		}
 		host, port := f.HostPort()
 		if ips := hostToIPs(host); len(ips) > 0 {
 			fname := labels.DomainFrag(f.Name, labels.Sep, spec)

@@ -220,6 +220,7 @@ type Framework struct {
 	PID      PID    `json:"pid"`
 	Name     string `json:"name"`
 	Hostname string `json:"hostname"`
+	Active   bool   `json:"active"`
 }
 
 // HostPort returns the hostname and port where a framework's scheduler is
