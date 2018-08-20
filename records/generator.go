@@ -145,7 +145,7 @@ func WithConfig(config Config) Option {
 		timeout       = httpcli.Timeout(time.Duration(config.StateTimeoutSeconds) * time.Second)
 		doer          = httpcli.New(config.MesosAuthentication, config.httpConfigMap, transport, timeout)
 		stateEndpoint = urls.Builder{}.With(
-			urls.Path("/master/state.json"),
+			urls.Path("/master/state"),
 			opt,
 		)
 	)
@@ -168,13 +168,13 @@ func NewRecordGenerator(options ...Option) *RecordGenerator {
 	return rg
 }
 
-// ParseState retrieves and parses the Mesos master /state.json and converts it
+// ParseState retrieves and parses the Mesos master /state and converts it
 // into DNS records.
 func (rg *RecordGenerator) ParseState(c Config, masters ...string) error {
 	// find master -- return if error
 	sj, err := rg.stateLoader(masters)
 	if err != nil {
-		logging.Error.Println("Failed to fetch state.json. Error: ", err)
+		logging.Error.Println("Failed to fetch state. Error: ", err)
 		return err
 	}
 	if sj.Leader == "" {

@@ -55,7 +55,7 @@ func LoadMasterStateTryAll(masters []string, stateLoader func(ip, port string) (
 			if sj, err = stateLoader(ip, port); err == nil {
 				return sj, nil
 			}
-			logging.Error.Println("Failed to fetch state.json from leader. Error: ", err)
+			logging.Error.Println("Failed to fetch state from leader. Error: ", err)
 			if len(masters) == 0 {
 				logging.Error.Println("No more masters to try, returning last error")
 				return sj, err
@@ -77,17 +77,17 @@ func LoadMasterStateTryAll(masters []string, stateLoader func(ip, port string) (
 		}
 
 		if sj, err = stateLoader(ip, port); err != nil {
-			logging.Error.Println("Failed to fetch state.json - trying next one. Error: ", err)
+			logging.Error.Println("Failed to fetch state - trying next one. Error: ", err)
 			continue
 		}
 		return sj, nil
 	}
 
-	logging.Error.Println("No more masters eligible for state.json query, returning last error")
+	logging.Error.Println("No more masters eligible for state query, returning last error")
 	return sj, err
 }
 
-// LoadMasterStateFailover catches an attempt to load state.json from a mesos master.
+// LoadMasterStateFailover catches an attempt to load state from a mesos master.
 // Attempts can fail from due to a down server or if contacting a mesos master secondary.
 // It reloads from a different master if the contacted master is a secondary.
 func LoadMasterStateFailover(initialMasterIP string, stateLoader func(ip string) (state.State, error)) (state.State, error) {
@@ -112,13 +112,13 @@ func LoadMasterStateFailover(initialMasterIP string, stateLoader func(ip string)
 		}
 		return sj, nil
 	}
-	err = errors.New("Fetched state.json does not contain leader information")
+	err = errors.New("Fetched state does not contain leader information")
 	return sj, err
 }
 
-// LoadMasterState loads state.json from mesos master
+// LoadMasterState loads state from mesos master
 func LoadMasterState(client httpcli.Doer, stateEndpoint urls.Builder, ip, port string, unmarshal Unmarshaler) (sj state.State, _ error) {
-	// REFACTOR: state.json security
+	// REFACTOR: state security
 
 	u := url.URL(stateEndpoint.With(urls.Host(net.JoinHostPort(ip, port))))
 

@@ -10,7 +10,7 @@ import (
 	"github.com/mesosphere/mesos-dns/records/state/upid"
 )
 
-// Resources holds resources as defined in the /state.json Mesos HTTP endpoint.
+// Resources holds resources as defined in the /state Mesos HTTP endpoint.
 type Resources struct {
 	PortRanges string `json:"ports"`
 }
@@ -48,13 +48,13 @@ func (r Resources) Ports() []string {
 	return yports
 }
 
-// Label holds a label as defined in the /state.json Mesos HTTP endpoint.
+// Label holds a label as defined in the /state Mesos HTTP endpoint.
 type Label struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
 
-// Status holds a task status as defined in the /state.json Mesos HTTP endpoint.
+// Status holds a task status as defined in the /state Mesos HTTP endpoint.
 type Status struct {
 	Timestamp       float64         `json:"timestamp"`
 	State           string          `json:"state"`
@@ -62,14 +62,14 @@ type Status struct {
 	ContainerStatus ContainerStatus `json:"container_status,omitempty"`
 }
 
-// ContainerStatus holds container metadata as defined in the /state.json
+// ContainerStatus holds container metadata as defined in the /state
 // Mesos HTTP endpoint.
 type ContainerStatus struct {
 	NetworkInfos []NetworkInfo `json:"network_infos,omitempty"`
 }
 
 // NetworkInfo holds the network configuration for a single interface
-// as defined in the /state.json Mesos HTTP endpoint.
+// as defined in the /state Mesos HTTP endpoint.
 type NetworkInfo struct {
 	IPAddresses []IPAddress `json:"ip_addresses,omitempty"`
 	// back-compat with 0.25 IPAddress format
@@ -77,12 +77,12 @@ type NetworkInfo struct {
 }
 
 // IPAddress holds a single IP address configured on an interface,
-// as defined in the /state.json Mesos HTTP endpoint.
+// as defined in the /state Mesos HTTP endpoint.
 type IPAddress struct {
 	IPAddress string `json:"ip_address,omitempty"`
 }
 
-// Task holds a task as defined in the /state.json Mesos HTTP endpoint.
+// Task holds a task as defined in the /state Mesos HTTP endpoint.
 type Task struct {
 	FrameworkID   string   `json:"framework_id"`
 	ID            string   `json:"id"`
@@ -97,7 +97,7 @@ type Task struct {
 	SlaveIPs []string `json:"-"`
 }
 
-// HasDiscoveryInfo return whether the DiscoveryInfo was provided in the state.json
+// HasDiscoveryInfo return whether the DiscoveryInfo was provided in the state
 func (t *Task) HasDiscoveryInfo() bool {
 	return t.DiscoveryInfo.Name != ""
 }
@@ -184,7 +184,7 @@ func mesosIPs(t *Task) []string {
 
 // statusIPs returns the latest running status IPs extracted with the given src
 func statusIPs(st []Status, src func(*Status) []string) []string {
-	// the state.json we extract from mesos makes no guarantees re: the order
+	// the state we extract from mesos makes no guarantees re: the order
 	// of the task statuses so we should check the timestamps to avoid problems
 	// down the line. we can't rely on seeing the same sequence. (@joris)
 	// https://github.com/apache/mesos/blob/0.24.0/src/slave/slave.cpp#L5226-L5238
@@ -214,7 +214,7 @@ func labels(key string) func(*Status) []string {
 	}
 }
 
-// Framework holds a framework as defined in the /state.json Mesos HTTP endpoint.
+// Framework holds a framework as defined in the /state Mesos HTTP endpoint.
 type Framework struct {
 	Tasks    []Task `json:"tasks"`
 	PID      PID    `json:"pid"`
@@ -231,7 +231,7 @@ func (f Framework) HostPort() (string, string) {
 	return f.Hostname, ""
 }
 
-// Slave holds a slave as defined in the /state.json Mesos HTTP endpoint.
+// Slave holds a slave as defined in the /state Mesos HTTP endpoint.
 type Slave struct {
 	ID       string `json:"id"`
 	Hostname string `json:"hostname"`
@@ -247,14 +247,14 @@ func (p *PID) UnmarshalJSON(data []byte) (err error) {
 	return err
 }
 
-// State holds the state defined in the /state.json Mesos HTTP endpoint.
+// State holds the state defined in the /state Mesos HTTP endpoint.
 type State struct {
 	Frameworks []Framework `json:"frameworks"`
 	Slaves     []Slave     `json:"slaves"`
 	Leader     string      `json:"leader"`
 }
 
-// DiscoveryInfo holds the discovery meta data for a task defined in the /state.json Mesos HTTP endpoint.
+// DiscoveryInfo holds the discovery meta data for a task defined in the /state Mesos HTTP endpoint.
 type DiscoveryInfo struct {
 	Visibilty   string `json:"visibility"`
 	Version     string `json:"version,omitempty"`
@@ -269,7 +269,7 @@ type DiscoveryInfo struct {
 	} `json:"ports"`
 }
 
-// DiscoveryPort holds a port for a task defined in the /state.json Mesos HTTP endpoint.
+// DiscoveryPort holds a port for a task defined in the /state Mesos HTTP endpoint.
 type DiscoveryPort struct {
 	Protocol string `json:"protocol"`
 	Number   int    `json:"number"`

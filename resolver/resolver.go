@@ -783,7 +783,9 @@ func panicRecover(f func(w dns.ResponseWriter, r *dns.Msg)) func(w dns.ResponseW
 			if rec := recover(); rec != nil {
 				m := new(dns.Msg)
 				m.SetRcode(r, 2)
-				_ = w.WriteMsg(m)
+				if err := w.WriteMsg(m); err != nil {
+					logging.Error.Println(err)
+				}
 				logging.Error.Println(rec)
 			}
 		}()
