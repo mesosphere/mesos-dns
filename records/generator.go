@@ -3,7 +3,7 @@
 package records
 
 import (
-	"crypto/sha1"
+	"crypto/sha1" // nolint: gosec
 	"encoding/json"
 	"errors"
 	"net"
@@ -197,7 +197,7 @@ func (rg *RecordGenerator) ParseState(c Config, masters ...string) error {
 // zbase32: http://philzimmermann.com/docs/human-oriented-base-32-encoding.txt
 // is used to promote human-readable names
 func hashString(s string) string {
-	hash := sha1.Sum([]byte(s))
+	hash := sha1.Sum([]byte(s)) // nolint: gosec
 	return zbase32.EncodeToString(hash[:])[:5]
 }
 

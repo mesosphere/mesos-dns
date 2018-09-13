@@ -12,7 +12,7 @@ import (
 // LoadFromFile reads an IAM Config from a file (JSON format) on the local filesystem.
 func LoadFromFile(filename string) (config Config, err error) {
 	var f *os.File
-	if f, err = os.Open(filename); err != nil {
+	if f, err = os.Open(filename); err != nil { // nolint: gosec
 		err = fmt.Errorf("failed to load IAM config from file %q: %+v", filename, err)
 		return
 	}
