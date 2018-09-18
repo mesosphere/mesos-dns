@@ -1,1 +1,3 @@
-just a quick tool to help w/benchmarking
+# Tools
+
+Just a quick tool to help with benchmarking.

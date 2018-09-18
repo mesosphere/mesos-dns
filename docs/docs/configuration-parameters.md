@@ -2,13 +2,13 @@
 title: Mesos-DNS Configuration Parameters
 ---
 
-##  Mesos-DNS Configuration Parameters
+# Mesos-DNS Configuration Parameters
 
-Mesos-DNS is configured through the parameters in a json file. You can point Mesos-DNS to a specific configuration file using the argument `-config=pathto/file.json`. If no configuration file is passed as an argument, Mesos-DNS will look for file `config.json` in the current directory.
+Mesos-DNS is configured through the parameters in a JSON file. You can point Mesos-DNS to a specific configuration file using the argument `-config=pathto/file.json`. If no configuration file is passed as an argument, Mesos-DNS will look for file `config.json` in the current directory.
 
 The configuration file should include the following fields:
 
-```
+```json
 {
   "zk": "zk://10.101.160.15:2181/mesos",
   "masters": ["10.101.160.15:5050", "10.101.160.16:5050", "10.101.160.17:5050"],
@@ -43,8 +43,7 @@ The configuration file should include the following fields:
 
 `zk` is a link to the Zookeeper instances on the Mesos cluster. Its format is `zk://host1:port1,host2:port2/mesos/`, where the number of hosts can be one or more. The default port for Zookeeper is `2181`. Mesos-DNS will monitor the Zookeeper instances to detect the current leading master.
 
-`zkDetectionTimeout` defines how long to wait (in seconds) for Zookeeper to report a new leading Mesos master.
-This timeout is activated on:
+`zkDetectionTimeout` defines how long to wait (in seconds) for Zookeeper to report a new leading Mesos master. This timeout is activated on:
 
 - Start up, where it plays the role of the "initial leader detection timeout" via ZK.
 - Mesos cluster changes, where there is no leading master for some period of time.
@@ -65,7 +64,7 @@ It is sufficient to specify just one of the `zk` or `masters` field. If both are
 
 `refreshSeconds` is the frequency at which Mesos-DNS updates DNS records based on information retrieved from the Mesos master. The default value is 60 seconds.
 
-`stateTimeoutSeconds` is the time that Mesos-DNS will wait for the Mesos master to respond to its request for state.json in seconds. The default value is 300 seconds.
+`stateTimeoutSeconds` is the time that Mesos-DNS will wait for the Mesos master to respond to its request for `state.json` in seconds. The default value is 300 seconds.
 
 `ttl` is the [time to live](http://en.wikipedia.org/wiki/Time_to_live#DNS_records) value for DNS records served by Mesos-DNS, in seconds. It allows caching of the DNS record for a period of time in order to reduce DNS request rate. `ttl` should be equal or larger than `refreshSeconds`. The default value is 60 seconds.
 

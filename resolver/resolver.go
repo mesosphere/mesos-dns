@@ -335,7 +335,7 @@ func rcode(err error) int {
 
 // HandleMesos is a resolver request handler that responds to a resource
 // question with resource answer(s)
-// it can handle {A, AAAA, SRV, ANY}
+// it can handle {A, AAAA, SRV, SOA, NS, ANY}
 func (res *Resolver) HandleMesos(w dns.ResponseWriter, r *dns.Msg) {
 	logging.CurLog.MesosRequests.Inc()
 

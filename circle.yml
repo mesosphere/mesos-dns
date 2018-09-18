@@ -21,7 +21,7 @@ dependencies:
     - go get github.com/mattn/goveralls
     - go get github.com/jstemmer/go-junit-report
     - sudo mount --bind $PWD $GOPATH/src/github.com/mesosphere/mesos-dns
-    - git describe --tags |tee VERSION
+    - git describe --tags | tee VERSION
     - gpg --yes --batch --import build/private.key
   override:
     - cd $GOPATH/src/github.com/mesosphere/mesos-dns && go install ./...
