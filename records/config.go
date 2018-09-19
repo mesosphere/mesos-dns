@@ -113,9 +113,9 @@ type Config struct {
 // NewConfig return the default config of the resolver
 func NewConfig() Config {
 	return Config{
-		ZkDetectionTimeout:     30,
-		RefreshSeconds:         60,
-		TTL:                    60,
+		ZkDetectionTimeout: 30,
+		RefreshSeconds:     60,
+		TTL:                60,
 		SRVRecordDefaultWeight: 1,
 		Domain:                 "mesos",
 		Port:                   53,
@@ -313,7 +313,7 @@ func (c Config) log() {
 
 func readCACertFile(caCertFile string) (caPool *x509.CertPool, err error) {
 	var f *os.File
-	if f, err = os.Open(caCertFile); err != nil {
+	if f, err = os.Open(caCertFile); err != nil { // nolint: gosec
 		err = fmt.Errorf("CACertFile open failed: %v", err)
 		return
 	}
