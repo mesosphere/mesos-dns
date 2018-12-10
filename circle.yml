@@ -1,7 +1,7 @@
 machine:
   pre:
-    - wget https://storage.googleapis.com/golang/go1.6.2.linux-amd64.tar.gz
-    - tar zxvf go1.6.2.linux-amd64.tar.gz
+    - wget https://storage.googleapis.com/golang/go1.11.2.linux-amd64.tar.gz
+    - tar zxvf go1.11.2.linux-amd64.tar.gz
   environment:
     GOROOT: ${HOME}/go
     GOPATH: ${HOME}/gopath
