@@ -46,7 +46,8 @@
 [[projects]]
   name = "github.com/miekg/dns"
   packages = ["."]
-  revision = "db96a2b759cdef4f11a34506a42eb8d1290c598e"
+  revision = "7064f7248f5fa5fd79382a76328b4e200b79e4ae"
+  version = "v1.0.15"
 
 [[projects]]
   name = "github.com/samuel/go-zookeeper"
@@ -72,13 +73,36 @@
   revision = "03389da7e0bf9844767f82690f4d68fc097a1306"
 
 [[projects]]
+  branch = "master"
+  name = "golang.org/x/crypto"
+  packages = [
+    "ed25519",
+    "ed25519/internal/edwards25519"
+  ]
+  revision = "505ab145d0a99da450461ae2c1a9f6cd10d1f447"
+
+[[projects]]
+  branch = "master"
   name = "golang.org/x/net"
-  packages = ["context"]
-  revision = "db8e4de5b2d6653f66aea53094624468caad15d2"
+  packages = [
+    "bpf",
+    "context",
+    "internal/iana",
+    "internal/socket",
+    "ipv4",
+    "ipv6"
+  ]
+  revision = "610586996380ceef02dd726cc09df7e00a3f8e56"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/sys"
+  packages = ["unix"]
+  revision = "2a47403f2ae58167c4d75973960ccc62b28cb0d8"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "fcc6c3f5616b478f85fa3ff3f035f18c03a48b91691bce8f4fa549c10fa04624"
+  inputs-digest = "d2d90b1fde9f52fc4dce9491b11649d7f288dd7ed6330e068f64a79e470f8128"
   solver-name = "gps-cdcl"
   solver-version = 1
