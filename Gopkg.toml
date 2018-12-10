@@ -22,3 +22,7 @@
 [[constraint]]
   name="github.com/miekg/dns"
   version="=v1.0.15"
+
+[[constraint]]
+  name="github.com/emicklei/go-restful"
+  version="=v1.1.3"

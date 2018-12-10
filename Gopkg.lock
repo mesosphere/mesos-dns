@@ -8,11 +8,9 @@
 
 [[projects]]
   name = "github.com/emicklei/go-restful"
-  packages = [
-    ".",
-    "log"
-  ]
-  revision = "892402ba11a2e2fd5e1295dd633481f27365f14d"
+  packages = ["."]
+  revision = "89af920d613f1e3f771f6460b2629632e7a36ae9"
+  version = "v1.1.3"
 
 [[projects]]
   name = "github.com/gogo/protobuf"
@@ -103,6 +101,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d2d90b1fde9f52fc4dce9491b11649d7f288dd7ed6330e068f64a79e470f8128"
+  inputs-digest = "33a348d242d1134accb163c3bb93136b5d488204aeccb5aa2cd55bedad15f725"
   solver-name = "gps-cdcl"
   solver-version = 1
