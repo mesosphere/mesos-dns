@@ -627,7 +627,6 @@ func zlexer(s *scan, c chan lex) {
 			if stri > 0 {
 				l.value = zString
 				l.token = string(str[:stri])
-				l.tokenUpper = strings.ToUpper(l.token)
 				l.length = stri
 				debug.Printf("[4 %+v]", l.token)
 				c <- l
@@ -664,7 +663,6 @@ func zlexer(s *scan, c chan lex) {
 					owner = true
 					l.value = zNewline
 					l.token = "\n"
-					l.tokenUpper = l.token
 					l.length = 1
 					l.comment = string(com[:comi])
 					debug.Printf("[3 %+v %+v]", l.token, l.comment)
@@ -698,7 +696,6 @@ func zlexer(s *scan, c chan lex) {
 				}
 				l.value = zNewline
 				l.token = "\n"
-				l.tokenUpper = l.token
 				l.length = 1
 				debug.Printf("[1 %+v]", l.token)
 				c <- l
@@ -743,7 +740,6 @@ func zlexer(s *scan, c chan lex) {
 			if stri != 0 {
 				l.value = zString
 				l.token = string(str[:stri])
-				l.tokenUpper = strings.ToUpper(l.token)
 				l.length = stri
 
 				debug.Printf("[%+v]", l.token)
@@ -754,7 +750,6 @@ func zlexer(s *scan, c chan lex) {
 			// send quote itself as separate token
 			l.value = zQuote
 			l.token = "\""
-			l.tokenUpper = l.token
 			l.length = 1
 			c <- l
 			quote = !quote
@@ -780,7 +775,6 @@ func zlexer(s *scan, c chan lex) {
 				brace--
 				if brace < 0 {
 					l.token = "extra closing brace"
-					l.tokenUpper = l.token
 					l.err = true
 					debug.Printf("[%+v]", l.token)
 					c <- l
@@ -805,7 +799,6 @@ func zlexer(s *scan, c chan lex) {
 	if stri > 0 {
 		// Send remainder
 		l.token = string(str[:stri])
-		l.tokenUpper = strings.ToUpper(l.token)
 		l.length = stri
 		l.value = zString
 		debug.Printf("[%+v]", l.token)
