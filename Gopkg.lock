@@ -4,7 +4,8 @@
 [[projects]]
   name = "github.com/dgrijalva/jwt-go"
   packages = ["."]
-  revision = "40bd0f3b4891a9d7f121bfb7b8e8b0525625e262"
+  revision = "268038b363c7a8d7306b8e35bf77a1fde4b0c402"
+  version = "v2.7.0"
 
 [[projects]]
   name = "github.com/emicklei/go-restful"
@@ -101,6 +102,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "33a348d242d1134accb163c3bb93136b5d488204aeccb5aa2cd55bedad15f725"
+  inputs-digest = "84c47fd8b66cd550e3aca4eb8d5dd1203a8e1f9a860d392ccec05bfc516ee6df"
   solver-name = "gps-cdcl"
   solver-version = 1
