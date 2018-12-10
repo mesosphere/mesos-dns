@@ -402,13 +402,17 @@ func TestTimeout(t *testing.T) {
 		t.Skip("Integration test - skipping for short mode.")
 	}
 
+	ch := make(chan struct{})
 	sleepForeverHandler := func(w http.ResponseWriter, req *http.Request) {
 		req.Close = true
-		notify := w.(http.CloseNotifier).CloseNotify()
-		<-notify
+		<-ch
 	}
+
 	server := httptest.NewServer(http.HandlerFunc(sleepForeverHandler))
-	defer server.Close()
+	defer func() {
+		defer server.Close()
+		close(ch) // do this first so that server.Close can complete
+	}()
 
 	rg := NewRecordGenerator(WithConfig(Config{StateTimeoutSeconds: 1}))
 	_, err := rg.stateLoader([]string{server.Listener.Addr().String()})
