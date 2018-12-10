@@ -4,3 +4,4 @@ mesos-dns
 *.gz
 VERSION
 cov.json
+*.swp
