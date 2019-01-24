@@ -154,7 +154,7 @@ func (res *Resolver) Serve(proto string) (<-chan struct{}, <-chan error) {
 		defer close(errCh)
 		err := server.ListenAndServe()
 		if err != nil {
-			errCh <- fmt.Errorf("Failed to setup %q server: %v", proto, err)
+			errCh <- fmt.Errorf("failed to setup %q server: %v", proto, err)
 		} else {
 			logging.Error.Printf("Not listening/serving any more requests.")
 		}
@@ -613,7 +613,7 @@ func (res *Resolver) LaunchHTTP() <-chan error {
 		defer func() { errCh <- err }()
 
 		if err = http.ListenAndServe(listenAddress, nil); err != nil {
-			err = fmt.Errorf("Failed to setup http server: %v", err)
+			err = fmt.Errorf("failed to setup http server: %v", err)
 		} else {
 			logging.Error.Println("Not serving http requests any more.")
 		}

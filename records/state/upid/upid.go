@@ -38,7 +38,7 @@ func Parse(input string) (*UPID, error) {
 
 	splits := strings.Split(input, "@")
 	if len(splits) != 2 {
-		return nil, fmt.Errorf("Expect one `@' in the input")
+		return nil, fmt.Errorf("expect one `@' in the input")
 	}
 	upid.ID = splits[0]
 

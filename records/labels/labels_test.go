@@ -40,22 +40,23 @@ func TestRFC952(t *testing.T) {
 	t.Parallel()
 
 	testFunc(t, "RFC952", RFC952, cases{
-		"4abc123":                                                        "abc123",
-		"-4abc123":                                                       "abc123",
-		"fd%gsf---gs7-f$gs--d7fddg-123":                                  "fdgsf---gs7-fgs--d7fddg1",
-		"89fdgsf---gs7-fgs--d7fddg-123":                                  "fdgsf---gs7-fgs--d7fddg1",
-		"89fdgsf---gs7-fgs--d7fddg---123":                                "fdgsf---gs7-fgs--d7fddg1",
-		"89fdgsf---gs7-fgs--d7fddg-":                                     "fdgsf---gs7-fgs--d7fddg",
-		"chronos with a space AND MIXED CASE-2.0.1":                      "chronoswithaspaceandmixe",
-		"chronos with a space AND----------MIXED--":                      "chronoswithaspaceandmixe",
+		"4abc123":                                   "abc123",
+		"-4abc123":                                  "abc123",
+		"fd%gsf---gs7-f$gs--d7fddg-123":             "fdgsf---gs7-fgs--d7fddg1",
+		"89fdgsf---gs7-fgs--d7fddg-123":             "fdgsf---gs7-fgs--d7fddg1",
+		"89fdgsf---gs7-fgs--d7fddg---123":           "fdgsf---gs7-fgs--d7fddg1",
+		"89fdgsf---gs7-fgs--d7fddg-":                "fdgsf---gs7-fgs--d7fddg",
+		"chronos with a space AND MIXED CASE-2.0.1": "chronoswithaspaceandmixe",
+		"chronos with a space AND----------MIXED--": "chronoswithaspaceandmixe",
 		"hello--------------------------------------------------------f": "hellof",
 	})
 
 	quickCheckFunc(t, "RFC952", RFC952, cases{
 		"doesn't start with numbers or dashes": func(s string) bool {
-			return 0 != strings.IndexFunc(RFC952(s), func(r rune) bool {
+			val := strings.IndexFunc(RFC952(s), func(r rune) bool {
 				return r == '-' || (r >= '0' && r <= '9')
 			})
+			return val != 0
 		},
 		"isn't longer than 24 chars": func(s string) bool {
 			return len(RFC952(s)) <= 24
@@ -74,12 +75,12 @@ func TestRFC1123(t *testing.T) {
 	t.Parallel()
 
 	testFunc(t, "RFC1123", RFC1123, cases{
-		"4abc123":                                                                "4abc123",
-		"-4abc123":                                                               "4abc123",
-		"89fdgsf---gs7-fgs--d7fddg-123":                                          "89fdgsf---gs7-fgs--d7fddg-123",
-		"89fdgsf---gs7-fgs--d7fddg---123":                                        "89fdgsf---gs7-fgs--d7fddg---123",
-		"89fdgsf---gs7-fgs--d7fddg-":                                             "89fdgsf---gs7-fgs--d7fddg",
-		"fd%gsf---gs7-f$gs--d7fddg-123":                                          "fdgsf---gs7-fgs--d7fddg-123",
+		"4abc123":                         "4abc123",
+		"-4abc123":                        "4abc123",
+		"89fdgsf---gs7-fgs--d7fddg-123":   "89fdgsf---gs7-fgs--d7fddg-123",
+		"89fdgsf---gs7-fgs--d7fddg---123": "89fdgsf---gs7-fgs--d7fddg---123",
+		"89fdgsf---gs7-fgs--d7fddg-":      "89fdgsf---gs7-fgs--d7fddg",
+		"fd%gsf---gs7-f$gs--d7fddg-123":   "fdgsf---gs7-fgs--d7fddg-123",
 		"fd%gsf---gs7-f$gs--d7fddg123456789012345678901234567890123456789-123":   "fdgsf---gs7-fgs--d7fddg1234567890123456789012345678901234567891",
 		"$$fdgsf---gs7-fgs--d7fddg123456789012345678901234567890123456789-123":   "fdgsf---gs7-fgs--d7fddg1234567890123456789012345678901234567891",
 		"%%fdgsf---gs7-fgs--d7fddg123456789012345678901234567890123456789---123": "fdgsf---gs7-fgs--d7fddg1234567890123456789012345678901234567891",
@@ -129,20 +130,20 @@ func testDomainFrag(t *testing.T, id string, label Func, special cases) {
 
 func testFunc(t *testing.T, id string, label Func, special cases) {
 	testTransform(t, id, label, special, cases{
-		"":                                                                 "",
-		"a":                                                                "a",
-		"-":                                                                "",
-		"a---":                                                             "a",
-		"---a---":                                                          "a",
-		"---a---b":                                                         "a---b",
-		"a.b.c.d.e":                                                        "a-b-c-d-e",
-		"a.c.d_de.":                                                        "a-c-d-de",
-		"abc123":                                                           "abc123",
-		"-abc123":                                                          "abc123",
-		"abc123-":                                                          "abc123",
-		"abc-123":                                                          "abc-123",
-		"abc--123":                                                         "abc--123",
-		"r29f.dev.angrypigs":                                               "r29f-dev-angrypigs",
+		"":                   "",
+		"a":                  "a",
+		"-":                  "",
+		"a---":               "a",
+		"---a---":            "a",
+		"---a---b":           "a---b",
+		"a.b.c.d.e":          "a-b-c-d-e",
+		"a.c.d_de.":          "a-c-d-de",
+		"abc123":             "abc123",
+		"-abc123":            "abc123",
+		"abc123-":            "abc123",
+		"abc-123":            "abc-123",
+		"abc--123":           "abc--123",
+		"r29f.dev.angrypigs": "r29f-dev-angrypigs",
 		"hello----------------------------------------------------------f": "hellof",
 	})
 }

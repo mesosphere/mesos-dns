@@ -112,7 +112,7 @@ func LoadMasterStateFailover(initialMasterIP string, stateLoader func(ip string)
 		}
 		return sj, nil
 	}
-	err = errors.New("Fetched state does not contain leader information")
+	err = errors.New("fetched state does not contain leader information")
 	return sj, err
 }
 
