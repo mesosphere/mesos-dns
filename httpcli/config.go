@@ -21,8 +21,8 @@ var (
 // AuthNone, et al. represent the complete set of supported authentication mechanisms
 const (
 	AuthNone  AuthMechanism = ""      // AuthNone specifies no authentication mechanism
-	AuthBasic               = "basic" // AuthBasic specifies to use HTTP Basic
-	AuthIAM                 = "iam"   // AuthIAM specifies to use IAM / JDK authentication
+	AuthBasic AuthMechanism = "basic" // AuthBasic specifies to use HTTP Basic
+	AuthIAM   AuthMechanism = "iam"   // AuthIAM specifies to use IAM / JDK authentication
 )
 
 var (

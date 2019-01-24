@@ -12,10 +12,10 @@ var dnsValidationRegex = regexp.MustCompile(`^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*$`)
 
 func validateEnabledServices(c *Config) error {
 	if !c.DNSOn && !c.HTTPOn {
-		return fmt.Errorf("Either DNS or HTTP server should be on")
+		return fmt.Errorf("either DNS or HTTP server should be on")
 	}
 	if len(c.Masters) == 0 && c.Zk == "" {
-		return fmt.Errorf("Specify Mesos masters or Zookeeper in config.json")
+		return fmt.Errorf("specify Mesos masters or Zookeeper in config.json")
 	}
 	return nil
 }
@@ -25,7 +25,7 @@ func validateEnabledServices(c *Config) error {
 // returns nil if the masters list is empty, or else all masters in the list are valid.
 func validateMasters(ms []string) error {
 	if err := validateUniqueStrings(ms, normalizeMaster); err != nil {
-		return fmt.Errorf("Error validating masters: %v", err)
+		return fmt.Errorf("error validating masters: %v", err)
 	}
 	return nil
 }
@@ -33,14 +33,14 @@ func validateMasters(ms []string) error {
 func normalizeMaster(hostPort string) (string, error) {
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
-		return "", fmt.Errorf("Illegal host:port specified: %v. Error: %v", hostPort, err)
+		return "", fmt.Errorf("illegal host:port specified: %v. Error: %v", hostPort, err)
 	}
 	if ip := net.ParseIP(host); ip != nil {
 		//TODO(jdef) distinguish between intended hostnames and invalid ip addresses
 		host = ip.String()
 	}
 	if !validPortString(port) {
-		return "", fmt.Errorf("Illegal host:port specified: %v", hostPort)
+		return "", fmt.Errorf("illegal host:port specified: %v", hostPort)
 	}
 	return net.JoinHostPort(host, port), nil
 }
@@ -50,14 +50,14 @@ func normalizeMaster(hostPort string) (string, error) {
 // returns nil if the resolver list is empty, or else all resolvers in the list are valid.
 func validateResolvers(rs []string) error {
 	if err := validateUniqueStrings(rs, normalizeResolver); err != nil {
-		return fmt.Errorf("Error validating resolvers: %v", err)
+		return fmt.Errorf("error validating resolvers: %v", err)
 	}
 	return nil
 }
 
 func validateDomainName(domain string) error {
 	if !dnsValidationRegex.MatchString(domain) {
-		return fmt.Errorf("Invalid domain name: %s", domain)
+		return fmt.Errorf("invalid domain name: %s", domain)
 	}
 	return nil
 }
@@ -69,7 +69,7 @@ func validateZoneResolvers(zrs map[string][]string, mesosDomain string) (
 
 	for domain, rs := range zrs {
 		if len(rs) == 0 {
-			return fmt.Errorf("ZoneResolver %v is empty", domain)
+			return fmt.Errorf("field ZoneResolver %v is empty", domain)
 		}
 		err = validateDomainName(domain)
 		if err != nil {
@@ -81,7 +81,7 @@ func validateZoneResolvers(zrs map[string][]string, mesosDomain string) (
 			return
 		}
 		if domain == mesosDomain {
-			return fmt.Errorf("Can't specify ZoneResolver for Mesos domain (%v)",
+			return fmt.Errorf("can't specify ZoneResolver for Mesos domain (%v)",
 				mesosDomain)
 		}
 		allDomains = append(allDomains, "."+domain)
@@ -91,7 +91,7 @@ func validateZoneResolvers(zrs map[string][]string, mesosDomain string) (
 		for _, b := range allDomains {
 			if (a != b) &&
 				strings.HasSuffix(a, b) {
-				return fmt.Errorf("Ambiguous zone resolvers: %v is masked by %v",
+				return fmt.Errorf("ambiguous zone resolvers: %v is masked by %v",
 					a, b)
 			}
 		}
@@ -108,11 +108,11 @@ func normalizeResolver(hostPort string) (string, error) {
 	if ip := net.ParseIP(host); ip != nil {
 		host = ip.String()
 	} else {
-		return "", fmt.Errorf("Illegal ip specified: %v", host)
+		return "", fmt.Errorf("illegal ip specified: %v", host)
 	}
 
 	if !validPortString(port) {
-		return "", fmt.Errorf("Illegal host:port specified: %v", hostPort)
+		return "", fmt.Errorf("illegal host:port specified: %v", hostPort)
 	}
 	return net.JoinHostPort(host, port), nil
 }
@@ -127,7 +127,7 @@ func validateUniqueStrings(strings []string, normalize func(string) (string, err
 			return err
 		}
 		if _, found := valid[normalized]; found {
-			return fmt.Errorf("Duplicate found: %v", str)
+			return fmt.Errorf("duplicate found: %v", str)
 		}
 		valid[normalized] = struct{}{}
 	}
