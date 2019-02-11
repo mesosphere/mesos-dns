@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	"sync"
 
 	"github.com/miekg/dns"
 )
@@ -32,14 +33,19 @@ func query(dom string) {
 }
 
 func main() {
+	wg := &sync.WaitGroup{}
 	start := time.Now()
-
 	cnt := 10000
 
 	for i := 0; i < cnt; i++ {
-		go query("bob.mesos")
+		wg.Add(1)
+		go func() {
+			query("bob.mesos")
+			wg.Done()
+		}()
 	}
 
+	wg.Wait()
 	elapsed := time.Since(start)
 	log.Printf("benching took %s", elapsed)
 	log.Printf("doing %d/%v rps", cnt, elapsed)
