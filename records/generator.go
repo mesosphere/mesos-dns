@@ -211,6 +211,7 @@ func (rg *RecordGenerator) InsertState(sj state.State, domain, ns, listener stri
 	rg.slaveRecords(sj, domain, spec)
 	rg.listenerRecord(listener, ns)
 	rg.masterRecord(domain, masters, sj.Leader)
+	rg.etcdRecord(domain, masters)
 	rg.taskRecords(sj, domain, spec, ipSources)
 
 	return nil
@@ -354,6 +355,17 @@ func (rg *RecordGenerator) masterRecord(domain string, masters []string, leader 
 		}
 		extraMasterRecord := "master" + strconv.Itoa(idx) + "." + domain + "."
 		rg.insertRR(extraMasterRecord, ip, ipKind)
+	}
+}
+
+// SRV record for etcd
+func (rg *RecordGenerator) etcdRecord(domain string, masters []string) {
+	server := "_etcd-server._tcp." + domain + "."
+	client := "_etcd-client._tcp." + domain + "."
+	for idx, _ := range masters {
+		perMasterRecord := "master" + strconv.Itoa(idx) + "." + domain + "." 
+		rg.insertRR(client, perMasterRecord + ":2379", SRV)
+		rg.insertRR(server, perMasterRecord + ":2380", SRV)
 	}
 }
 
