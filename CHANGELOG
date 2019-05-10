@@ -1,3 +1,25 @@
+2019-05-10: v0.7.0
+  New Features:
+    IPv6 is now supported.
+    TLS supports client-side cert + keypair.
+    Zone-specific resolvers.
+
+  Enhancements:
+    dns: truncate bit is configurable.
+    dns: non-zero weight for returned SRV records.
+    mesos: poll /state instead of /state.json.
+    logs: updated logging regarding new masters.
+    logs: added error message when no masters discovered.
+    Bump underlying libraries to pick up fixes (DNS, HTTP API).
+
+  Fixes:
+    api/dns: wait for a reload before serving DNS and HTTP.
+    api: specify valid Accept content types.
+    dns: properly report SOA mname (instead of rname).
+    docs: document the `enumerate` endpoint.
+    docs: correct URL in contrib/ansible-gce/README.md.
+    docs: clean up formatting, typos and so on.
+
 2016-09-14: v0.6.0
   Added some benchmarks for RecordGenerator.insertRR
   Make minor fixes to enumeration API, where it would return null, as
