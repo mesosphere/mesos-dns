@@ -16,7 +16,7 @@ sass:
   style: :compressed
 
 baseurl: "/mesos-dns"
-highlighter: pygments
+highlighter: rouge
 lsi: false
 markdown: commonmark
 redcarpet:
