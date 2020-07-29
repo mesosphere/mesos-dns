@@ -111,7 +111,7 @@ func (t *Task) IP(srcs ...string) string {
 }
 
 // IPs returns a slice of IPs sourced from the given sources with ascending
-// priority. Returns only the IPs from the first successful source.
+// priority. Returns only the IPs from the first populated source.
 func (t *Task) IPs(srcs ...string) (ips []net.IP) {
 	if t == nil {
 		return nil

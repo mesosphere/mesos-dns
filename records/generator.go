@@ -567,7 +567,7 @@ func rrsKindForIPStr(ip string) rrsKind {
 
 // hostToIPs attempts to parse a hostname into an ip.
 // If that doesn't work it will perform a lookup and try to
-// find all ipv4 and ipv6 addresses for teh hostname.
+// find all ipv4 and ipv6 addresses for the hostname.
 func hostToIPs(hostname string) (ips []net.IP) {
 	if ip := net.ParseIP(hostname); ip != nil {
 		ips = []net.IP{ip}
