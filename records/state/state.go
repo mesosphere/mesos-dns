@@ -111,7 +111,7 @@ func (t *Task) IP(srcs ...string) string {
 }
 
 // IPs returns a slice of IPs sourced from the given sources with ascending
-// priority.
+// priority. Returns only the IPs from the first successful source.
 func (t *Task) IPs(srcs ...string) (ips []net.IP) {
 	if t == nil {
 		return nil
@@ -123,6 +123,10 @@ func (t *Task) IPs(srcs ...string) (ips []net.IP) {
 					ips = append(ips, ip)
 				}
 			}
+		}
+		// Return IPs from first populated source
+		if len(ips) > 0 {
+			return ips
 		}
 	}
 	return ips
@@ -144,7 +148,7 @@ func hostIPs(t *Task) []string { return t.SlaveIPs }
 // []Status.ContainerStatus.[]NetworkInfos.[]IPAddresses.IPAddress
 func networkInfoIPs(t *Task) []string {
 	return statusIPs(t.Statuses, func(s *Status) []string {
-		ips := make([]string, len(s.ContainerStatus.NetworkInfos))
+		ips := []string{}
 		for _, netinfo := range s.ContainerStatus.NetworkInfos {
 			if len(netinfo.IPAddresses) > 0 {
 				// In v0.26, we use the IPAddresses field.
