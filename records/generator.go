@@ -434,14 +434,12 @@ func (rg *RecordGenerator) taskContextRecord(ctx context, task state.Task, f sta
 	canonical := ctx.taskName + "-" + ctx.taskID + "-" + ctx.slaveID + "." + fname
 	arec := ctx.taskName + "." + fname
 
-	// Only use the first ipv4 and first ipv6 found in sources
-	tIPs := ipsTo4And6(ctx.taskIPs)
-	for _, tIP := range tIPs {
+	// Use the IPs from the first populated source
+	for _, tIP := range ctx.taskIPs {
 		rg.insertTaskRR(arec+tail, tIP.String(), rrsKindForIP(tIP), enumTask)
 		rg.insertTaskRR(canonical+tail, tIP.String(), rrsKindForIP(tIP), enumTask)
 	}
 
-	// slaveIPs already only has at most one ipv4 and one ipv6
 	for _, sIPStr := range ctx.slaveIPs {
 		if sIP := net.ParseIP(sIPStr); sIP != nil {
 			rg.insertTaskRR(arec+".slave"+tail, sIP.String(), rrsKindForIP(sIP), enumTask)
@@ -567,41 +565,14 @@ func rrsKindForIPStr(ip string) rrsKind {
 	panic("unable to parse ip: " + ip)
 }
 
-// ipsTo4And6 returns a list with at most 1 ipv4 and 1 ipv6
-// from a list of IPs
-func ipsTo4And6(allIPs []net.IP) (ips []net.IP) {
-	var ipv4, ipv6 net.IP
-	for _, ip := range allIPs {
-		if ipv4 != nil && ipv6 != nil {
-			break
-		} else if t4 := ip.To4(); t4 != nil {
-			if ipv4 == nil {
-				ipv4 = t4
-			}
-		} else if t6 := ip.To16(); t6 != nil {
-			if ipv6 == nil {
-				ipv6 = t6
-			}
-		}
-	}
-	ips = []net.IP{}
-	if ipv4 != nil {
-		ips = append(ips, ipv4)
-	}
-	if ipv6 != nil {
-		ips = append(ips, ipv6)
-	}
-	return
-}
-
 // hostToIPs attempts to parse a hostname into an ip.
 // If that doesn't work it will perform a lookup and try to
-// find one ipv4 and one ipv6 in the results.
+// find all ipv4 and ipv6 addresses for the hostname.
 func hostToIPs(hostname string) (ips []net.IP) {
 	if ip := net.ParseIP(hostname); ip != nil {
 		ips = []net.IP{ip}
 	} else if allIPs, err := net.LookupIP(hostname); err == nil {
-		ips = ipsTo4And6(allIPs)
+		ips = allIPs
 	}
 	if len(ips) == 0 {
 		logging.VeryVerbose.Printf("cannot translate hostname %q into an ipv4 or ipv6 address", hostname)

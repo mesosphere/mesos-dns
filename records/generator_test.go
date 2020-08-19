@@ -328,7 +328,7 @@ func TestInsertState(t *testing.T) {
 		{rgMesos.AAAAs, "toy-store.ipv6-framework.mesos.", []string{"2001:db8::1"}},
 		{rgMesos.AAAAs, "toy-store.ipv6-framework.slave.mesos.", []string{"2001:db8::1"}},
 
-		{rgNetinfo.As, "toy-store.ipv6-framework.mesos.", []string{"12.0.1.2"}},
+		{rgNetinfo.As, "toy-store.ipv6-framework.mesos.", []string{"12.0.1.3", "12.0.1.2"}},
 
 		{rgNetinfo.AAAAs, "toy-store.ipv6-framework.mesos.", []string{"fd01:b::1:8000:2"}},
 		{rgNetinfo.AAAAs, "toy-store.ipv6-framework.slave.mesos.", []string{"2001:db8::1"}},
